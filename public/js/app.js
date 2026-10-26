@@ -12,6 +12,22 @@ let currentDateStr = new Date().toISOString().slice(0, 10);
 let currentClass = 'Class 10';
 let currentSubject = '';
 
+// Sanitization Helpers
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeQuotes(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   initServiceWorker();
@@ -22,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAppSettings();
   await loadClasses();
   await loadSubjects();
+  await loadTeachersData();
   await loadAttendanceRoster();
   await loadReport();
   await loadActivityLogs();
@@ -1843,7 +1860,7 @@ async function handleResetAppPrompt() {
 
 // ================= TAB NAVIGATION =================
 function selectTopTab(tab) {
-  ['attendance', 'report', 'settings', 'classes', 'subjects', 'students'].forEach(v => {
+  ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
   });
@@ -2531,7 +2548,7 @@ async function renderTeachersList() {
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               </button>
 
-              <button onclick="handleDeleteTeacher('${t._id}', '${escapeQuotes(t.name)}')" title="Delete Teacher" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+              <button onclick="handleDeleteTeacher('${t._id}', this.getAttribute('data-name'))" data-name="${escapeHtml(t.name)}" title="Delete Teacher" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
             </div>

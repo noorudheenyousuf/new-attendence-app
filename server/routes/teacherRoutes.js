@@ -7,9 +7,6 @@ const Attendance = require('../models/Attendance');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 
-// Require authentication for all teacher routes
-router.use(authMiddleware);
-
 // Helper to get Gravatar URL based on email
 function getGravatarUrl(email) {
   if (!email) return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
@@ -185,7 +182,7 @@ router.get('/:id/logs', async (req, res) => {
 
 // @route   POST /api/teachers
 // @desc    USER DIRECTIVE: Add teacher with photo(email-connected), name, email, assigned classes & subjects
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, email, password, avatarUrl, assignedClasses, assignedSubjects, phone } = req.body;
 
@@ -260,7 +257,7 @@ router.post('/', async (req, res) => {
 
 // @route   PUT /api/teachers/:id
 // @desc    USER DIRECTIVE: Edit teacher details (photo, name, email, classes, subjects)
-router.put('/:id', async (req, res) => {
+router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { name, email, avatarUrl, assignedClasses, assignedSubjects, phone, role } = req.body;
     const teacher = await User.findById(req.params.id);
@@ -338,7 +335,7 @@ router.put('/:id', async (req, res) => {
 
 // @route   DELETE /api/teachers/:id
 // @desc    USER DIRECTIVE: Delete teacher account
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const teacher = await User.findById(req.params.id);
     if (!teacher) {
