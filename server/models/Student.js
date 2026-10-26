@@ -37,6 +37,7 @@ const studentSchema = new mongoose.Schema({
     fatherWhatsapp: { type: String, default: '' }
   },
   academicStatus: {
+    yearJoined: { type: String, default: '' },
     admissionStatus: { type: String, default: 'Confirmed' },
     rank: { type: String, default: '' },
     previousCollege: { type: String, default: '' }

@@ -52,6 +52,17 @@ router.get('/class', async (req, res) => {
 
       const percent = sessions > 0 ? Number(((present / sessions) * 100).toFixed(1)) : 100.0;
 
+      let status = 'Regular';
+      if (percent >= 90) {
+        status = 'Excellent';
+      } else if (percent >= 75) {
+        status = 'Regular';
+      } else if (percent >= 60) {
+        status = 'Warning';
+      } else {
+        status = 'Critical';
+      }
+
       return {
         studentId: st.studentId,
         roll: st.roll,
@@ -62,7 +73,8 @@ router.get('/class', async (req, res) => {
         present,
         absent,
         late,
-        percent
+        percent,
+        status
       };
     });
 

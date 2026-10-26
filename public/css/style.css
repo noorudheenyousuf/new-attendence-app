@@ -27,6 +27,9 @@
   --text-main: #14323d;
   --text-sub: #557582;
   --border-color: #d1e3e6;
+  --input-bg: #ffffff;
+  --input-text: #14323d;
+  --input-border: #cbd5e1;
 }
 
 /* Dark Mode Theme */
@@ -37,6 +40,9 @@ body.dark-mode {
   --text-sub: #8eaab5;
   --border-color: #20353f;
   --header-gradient: linear-gradient(135deg, #183e4c, #265557);
+  --input-bg: #101d23;
+  --input-text: #f0f7f9;
+  --input-border: #243c47;
 }
 
 .custom-gradient-header {
@@ -49,6 +55,111 @@ body.dark-mode {
 }
 .custom-gradient-btn:hover {
   opacity: 0.95;
+}
+
+/* Inputs, selects, and textareas - Guarantee clean light mode & dark mode readability */
+input, select, textarea {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+  border-color: var(--input-border) !important;
+}
+input::placeholder, textarea::placeholder {
+  color: var(--text-sub) !important;
+  opacity: 0.7;
+}
+
+/* Signout Button: User Directive "signout button gave lightorange when lightmode" */
+.btn-signout {
+  background-color: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #fed7aa !important;
+}
+.btn-signout:hover {
+  background-color: #ffedd5 !important;
+}
+body.dark-mode .btn-signout {
+  background-color: rgba(154, 52, 18, 0.25) !important;
+  color: #fdba74 !important;
+  border: 1px solid rgba(234, 88, 12, 0.4) !important;
+}
+body.dark-mode .btn-signout:hover {
+  background-color: rgba(154, 52, 18, 0.45) !important;
+}
+
+/* Delete Button: User Directive "delete buuton clour in dark mode is white fix it" */
+.btn-delete {
+  background-color: #fee2e2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+.btn-delete:hover {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+body.dark-mode .btn-delete {
+  background-color: #450a0a !important;
+  color: #f87171 !important;
+  border: 1px solid #7f1d1d !important;
+}
+body.dark-mode .btn-delete:hover {
+  background-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
+/* Report Status Badges: Excellent, Regular, Warning, Critical */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.status-excellent {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+body.dark-mode .status-excellent {
+  background-color: rgba(6, 78, 59, 0.4);
+  color: #6ee7b7;
+  border: 1px solid #047857;
+}
+
+.status-regular {
+  background-color: #ccfbf1;
+  color: #115e59;
+  border: 1px solid #5eead4;
+}
+body.dark-mode .status-regular {
+  background-color: rgba(19, 78, 74, 0.4);
+  color: #5eead4;
+  border: 1px solid #0f766e;
+}
+
+.status-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+body.dark-mode .status-warning {
+  background-color: rgba(120, 53, 15, 0.4);
+  color: #fcd34d;
+  border: 1px solid #b45309;
+}
+
+.status-critical {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+body.dark-mode .status-critical {
+  background-color: rgba(127, 29, 29, 0.4);
+  color: #fca5a5;
+  border: 1px solid #b91c1c;
 }
 
 /* Print styles for Whole Class Attendance Report */

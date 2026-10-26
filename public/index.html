@@ -237,6 +237,7 @@
                   <th class="py-2 px-1 text-center text-rose-600">Absent</th>
                   <th class="py-2 px-1 text-center text-amber-600">Late</th>
                   <th class="py-2 px-1 text-center">Percent</th>
+                  <th class="py-2 px-1.5 text-center">Status</th>
                   <th class="py-2 px-1.5 text-center no-print">Action</th>
                 </tr>
               </thead>
@@ -304,8 +305,8 @@
           </div>
         </div>
 
-        <!-- Sign Out Button -->
-        <button onclick="handleSignout()" class="touch-btn w-full bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-bold text-sm rounded-2xl border border-rose-200 dark:border-rose-900 flex items-center justify-center gap-2 transition">
+        <!-- Sign Out Button (Light Orange in Light Mode) -->
+        <button onclick="handleSignout()" class="touch-btn w-full btn-signout font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition shadow-sm">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
           <span>Sign Out</span>
         </button>
@@ -417,6 +418,30 @@
     </div>
   </div>
 
+  <!-- ================= EDIT CLASS MODAL ================= -->
+  <div id="modal-edit-class" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)]">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-extrabold text-base text-[var(--text-main)]">Edit Class</h3>
+        <button onclick="closeEditClassModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <form onsubmit="handleUpdateClass(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Class Name</label>
+          <input type="text" id="edit-class-name" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Class Teacher</label>
+          <input type="text" id="edit-class-teacher" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+        </div>
+        <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
+          Save Changes
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- ================= ADD SUBJECT MODAL ================= -->
   <div id="modal-add-subject" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
     <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)]">
@@ -495,11 +520,21 @@
       <form onsubmit="handleSaveNewStudent(event)" class="space-y-3.5">
         <!-- Top: Photo + Student ID (Auto-added starting with 2000, read-only) -->
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center gap-3">
-          <div class="w-14 h-14 rounded-xl bg-slate-200 overflow-hidden border flex-shrink-0">
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face" class="w-full h-full object-cover">
+          <div class="relative w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden border border-[var(--border-color)] flex-shrink-0 cursor-pointer group shadow-inner" onclick="document.getElementById('new-student-photo-file').click()" title="Click to upload student photo">
+            <img id="new-preview-photo" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-80 group-hover:opacity-100 transition text-white">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
           </div>
-          <div class="flex-1">
-            <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Student ID (Auto-Generated)</label>
+          <input type="file" id="new-student-photo-file" accept="image/*" class="hidden" onchange="handlePhotoUpload(event, 'new')">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-[10px] font-bold text-[var(--text-sub)] uppercase">Student ID (Auto)</label>
+              <button type="button" onclick="document.getElementById('new-student-photo-file').click()" class="text-[11px] font-bold text-[#245b70] hover:underline flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Choose Photo
+              </button>
+            </div>
             <input type="text" id="auto-student-id" value="2000" readonly class="touch-input w-full bg-white dark:bg-slate-900 border border-[#245b70] rounded-xl px-3 text-sm font-black text-[#245b70] cursor-not-allowed">
           </div>
         </div>
@@ -549,13 +584,18 @@
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
           <div class="text-[10px] font-black text-[#245b70] uppercase">Academic Status</div>
           <div class="grid grid-cols-3 gap-2">
-            <select id="new-student-admission" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-              <option value="Confirmed">Confirmed</option>
-              <option value="Provisional">Provisional</option>
-              <option value="Pending">Pending</option>
-            </select>
-            <input type="text" id="new-student-rank" placeholder="Rank" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="new-student-college" placeholder="Previous College" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            <div>
+              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Year Joined College</label>
+              <input type="number" id="new-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" value="2024" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Rank</label>
+              <input type="text" id="new-student-rank" placeholder="Rank" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Previous College</label>
+              <input type="text" id="new-student-college" placeholder="Previous College" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            </div>
           </div>
         </div>
 
@@ -579,11 +619,21 @@
 
       <form onsubmit="handleSaveEditedStudent(event)" class="space-y-3.5">
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center gap-3">
-          <div class="relative w-14 h-14 rounded-xl overflow-hidden border flex-shrink-0">
+          <div class="relative w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden border border-[var(--border-color)] flex-shrink-0 cursor-pointer group shadow-inner" onclick="document.getElementById('edit-student-photo-file').click()" title="Click to change student photo">
             <img id="edit-preview-photo" src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-80 group-hover:opacity-100 transition text-white">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
           </div>
-          <div class="flex-1">
-            <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Student ID (Cannot be changed)</label>
+          <input type="file" id="edit-student-photo-file" accept="image/*" class="hidden" onchange="handlePhotoUpload(event, 'edit')">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-[10px] font-bold text-[var(--text-sub)] uppercase">Student ID (Protected)</label>
+              <button type="button" onclick="document.getElementById('edit-student-photo-file').click()" class="text-[11px] font-bold text-[#245b70] hover:underline flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Change Photo
+              </button>
+            </div>
             <input type="text" id="edit-student-id" readonly class="touch-input w-full bg-slate-100 dark:bg-slate-800 border border-[#245b70] rounded-xl px-3 text-sm font-black text-[#245b70] cursor-not-allowed">
           </div>
         </div>
@@ -640,12 +690,8 @@
           <div class="text-[10px] font-black text-[#245b70] uppercase">Academic Status</div>
           <div class="grid grid-cols-3 gap-2">
             <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Admission Status</label>
-              <select id="edit-student-admission" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-                <option value="Confirmed">Confirmed</option>
-                <option value="Provisional">Provisional</option>
-                <option value="Pending">Pending</option>
-              </select>
+              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Year Joined College</label>
+              <input type="number" id="edit-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
             </div>
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Rank</label>
@@ -662,6 +708,85 @@
           Save All Changes
         </button>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= READ-ONLY STUDENT DETAILS MODAL (FROM ATTENDANCE PHOTO CLICK) ================= -->
+  <div id="modal-student-details" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[92vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <h3 class="font-black text-base text-[var(--text-main)]">Student Profile (Read-Only)</h3>
+        </div>
+        <button onclick="closeStudentDetailsModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <!-- Photo & Top Badges (Clicking photo opens enlarged view!) -->
+      <div class="text-center space-y-2">
+        <div class="relative w-24 h-24 mx-auto cursor-pointer group" onclick="openEnlargedPhoto(document.getElementById('details-student-photo').src, document.getElementById('details-student-name').innerText)" title="Click photo to enlarge">
+          <img id="details-student-photo" src="" alt="Student Photo" class="w-full h-full rounded-2xl object-cover border-2 border-[#245b70] shadow-md group-hover:scale-105 transition-all">
+          <div class="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[11px] font-bold">
+            🔍 Enlarge
+          </div>
+        </div>
+        <p class="text-[10px] text-[#245b70] font-bold cursor-pointer" onclick="openEnlargedPhoto(document.getElementById('details-student-photo').src, document.getElementById('details-student-name').innerText)">
+          (Tap photo to view large)
+        </p>
+        <h4 id="details-student-name" class="font-black text-lg text-[var(--text-main)] leading-tight"></h4>
+        <div class="flex items-center justify-center gap-2">
+          <span id="details-student-id" class="px-2.5 py-0.5 rounded-full bg-[#245b70]/10 text-[#245b70] font-black text-xs"></span>
+          <span id="details-student-class" class="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[var(--text-main)] font-bold text-xs"></span>
+          <span id="details-student-roll" class="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[var(--text-main)] font-bold text-xs"></span>
+        </div>
+      </div>
+
+      <!-- Address Info (Read Only) -->
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-1.5 text-xs">
+        <div class="text-[10px] font-black text-[#245b70] uppercase tracking-wider">Address Details</div>
+        <div><span class="text-[var(--text-sub)] font-semibold">Full Address:</span> <span id="details-student-address" class="font-bold text-[var(--text-main)]"></span></div>
+        <div class="grid grid-cols-3 gap-1 pt-1 text-[11px]">
+          <div><span class="text-[var(--text-sub)]">Place:</span> <span id="details-student-place" class="font-bold block text-[var(--text-main)]"></span></div>
+          <div><span class="text-[var(--text-sub)]">District:</span> <span id="details-student-district" class="font-bold block text-[var(--text-main)]"></span></div>
+          <div><span class="text-[var(--text-sub)]">State:</span> <span id="details-student-state" class="font-bold block text-[var(--text-main)]"></span></div>
+        </div>
+      </div>
+
+      <!-- Family Info (Read Only) -->
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-1.5 text-xs">
+        <div class="text-[10px] font-black text-[#245b70] uppercase tracking-wider">Family Details</div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><span class="text-[var(--text-sub)] font-semibold">Father:</span> <span id="details-student-father" class="font-bold block text-[var(--text-main)]"></span></div>
+          <div><span class="text-[var(--text-sub)] font-semibold">Mother:</span> <span id="details-student-mother" class="font-bold block text-[var(--text-main)]"></span></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <div><span class="text-[var(--text-sub)] font-semibold">Mobile:</span> <span id="details-student-mobile" class="font-bold block text-[var(--text-main)]"></span></div>
+          <div><span class="text-[var(--text-sub)] font-semibold">WhatsApp:</span> <span id="details-student-wa" class="font-bold block text-emerald-600"></span></div>
+        </div>
+      </div>
+
+      <!-- Academic Info (Read Only) -->
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-1.5 text-xs">
+        <div class="text-[10px] font-black text-[#245b70] uppercase tracking-wider">Academic Status</div>
+        <div class="grid grid-cols-3 gap-2 text-[11px]">
+          <div><span class="text-[var(--text-sub)]">Year Joined:</span> <span id="details-student-year" class="font-bold block text-[var(--text-main)]"></span></div>
+          <div><span class="text-[var(--text-sub)]">Rank:</span> <span id="details-student-rank" class="font-bold block text-[var(--text-main)]"></span></div>
+          <div><span class="text-[var(--text-sub)]">Prev College:</span> <span id="details-student-college" class="font-bold block text-[var(--text-main)]"></span></div>
+        </div>
+      </div>
+
+      <button onclick="closeStudentDetailsModal()" class="touch-btn w-full custom-gradient-btn font-extrabold text-xs sm:text-sm rounded-xl shadow-md">
+        Close Details
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= ENLARGED PHOTO MODAL (LIGHTBOX) ================= -->
+  <div id="modal-photo-enlarged" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden no-print" onclick="closeEnlargedPhoto()">
+    <div class="relative max-w-sm sm:max-w-md w-full text-center" onclick="event.stopPropagation()">
+      <button onclick="closeEnlargedPhoto()" class="absolute -top-10 right-0 text-white font-bold text-sm bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full backdrop-blur-sm transition">✕ Close</button>
+      <img id="enlarged-photo-img" src="" alt="Enlarged Student Photo" class="w-full max-h-[75vh] object-contain rounded-3xl shadow-2xl border-2 border-white/20 mx-auto bg-black/50">
+      <div id="enlarged-photo-caption" class="mt-3 text-white font-black text-base tracking-wide"></div>
     </div>
   </div>
 

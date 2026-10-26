@@ -70,7 +70,7 @@ const seedInitialData = async () => {
           photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face',
           address: { fullAddress: 'Rose Villa, MG Road', place: 'Kochi', district: 'Ernakulam', state: 'Kerala' },
           familyDetails: { fatherName: 'Robert Davis', motherName: 'Mary Davis', fatherMobile: '+91 9847012345', fatherWhatsapp: '+91 9847012345' },
-          academicStatus: { admissionStatus: 'Confirmed', rank: '4', previousCollege: 'St. Pauls High' }
+          academicStatus: { yearJoined: '2024', admissionStatus: 'Confirmed', rank: '4', previousCollege: 'St. Pauls High' }
         },
         {
           studentId: 2001,
@@ -80,7 +80,7 @@ const seedInitialData = async () => {
           photoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face',
           address: { fullAddress: 'Green Valley House', place: 'Aluva', district: 'Ernakulam', state: 'Kerala' },
           familyDetails: { fatherName: 'Edward Thorne', motherName: 'Clara Thorne', fatherMobile: '+91 9447123456', fatherWhatsapp: '+91 9447123456' },
-          academicStatus: { admissionStatus: 'Confirmed', rank: '1', previousCollege: 'Model School' }
+          academicStatus: { yearJoined: '2024', admissionStatus: 'Confirmed', rank: '1', previousCollege: 'Model School' }
         },
         {
           studentId: 2002,
@@ -90,7 +90,7 @@ const seedInitialData = async () => {
           photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face',
           address: { fullAddress: 'Lake View Apt', place: 'Edappally', district: 'Ernakulam', state: 'Kerala' },
           familyDetails: { fatherName: 'John Evans', motherName: 'Sarah Evans', fatherMobile: '+91 9895001122', fatherWhatsapp: '+91 9895001122' },
-          academicStatus: { admissionStatus: 'Provisional', rank: '9', previousCollege: 'Central School' }
+          academicStatus: { yearJoined: '2023', admissionStatus: 'Provisional', rank: '9', previousCollege: 'Central School' }
         }
       ]);
       console.log('[Seed] Sample students initialized with IDs starting from 2000');

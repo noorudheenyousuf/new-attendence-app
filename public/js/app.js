@@ -210,11 +210,53 @@ function renderClassesList() {
           <p class="text-xs text-[var(--text-sub)]">Class Teacher: ${c.classTeacher}</p>
         </div>
       </div>
-      <button onclick="deleteClass('${c._id}', '${c.name}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-      </button>
+      <div class="flex items-center gap-1.5">
+        <button onclick="openEditClassModal('${c._id}', '${c.name.replace(/'/g, "\\'")}', '${c.classTeacher.replace(/'/g, "\\'")}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </button>
+        <button onclick="deleteClass('${c._id}', '${c.name.replace(/'/g, "\\'")}')" title="Delete Class" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>
     </div>
   `).join('');
+}
+
+let activeEditClassId = null;
+function openEditClassModal(id, name, teacher) {
+  activeEditClassId = id;
+  const nameInput = document.getElementById('edit-class-name');
+  const teacherInput = document.getElementById('edit-class-teacher');
+  if (nameInput) nameInput.value = name;
+  if (teacherInput) teacherInput.value = teacher;
+  const modal = document.getElementById('modal-edit-class');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeEditClassModal() {
+  const modal = document.getElementById('modal-edit-class');
+  if (modal) modal.classList.add('hidden');
+  activeEditClassId = null;
+}
+
+async function handleUpdateClass(e) {
+  e.preventDefault();
+  if (!activeEditClassId) return;
+
+  const name = document.getElementById('edit-class-name').value.trim();
+  const classTeacher = document.getElementById('edit-class-teacher').value.trim();
+
+  try {
+    const res = await API.updateClass(activeEditClassId, name, classTeacher);
+    if (res.success) {
+      showToast(`Class "${name}" updated!`);
+      closeEditClassModal();
+      await loadClasses();
+      await loadAttendanceRoster();
+    }
+  } catch (error) {
+    showToast(error.message, true);
+  }
 }
 
 async function handleSaveClass(e) {
@@ -301,7 +343,7 @@ function renderSubjectsList() {
         <button onclick="openEditSubjectModal('${s._id}', '${s.name}', '${s.subjectCode}', '${s.teacher || ''}', '${s.assignedClasses.join(', ')}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteSubject('${s._id}', '${s.name}')" title="Delete Subject" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition">
+        <button onclick="deleteSubject('${s._id}', '${s.name.replace(/'/g, "\\'")}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
@@ -438,10 +480,10 @@ function renderAttendanceList() {
 
     return `
       <div class="bg-[var(--card-bg)] p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2.5 transition-all">
-        <!-- Student Info: Photo & Name ONLY (No ID and No Roll) -->
+        <!-- Student Info: Photo & Name ONLY (No ID and No Roll) - Click Photo to View Details -->
         <div class="flex items-center gap-3 min-w-0">
-          <div class="relative flex-shrink-0">
-            <img src="${st.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face'}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)]">
+          <div class="relative flex-shrink-0 cursor-pointer group" onclick="openStudentDetailsModal(${st.studentId})" title="Click to view student details">
+            <img src="${st.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face'}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)] group-hover:scale-105 transition shadow-sm">
             <span class="absolute -bottom-1 -right-1 text-[9px] font-black px-1.5 py-0.2 rounded-md ${
               isP ? 'bg-emerald-600 text-white' : isA ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
             }">${record.status}</span>
@@ -580,11 +622,18 @@ function renderReportTable(data, summary) {
   if (!tbody) return;
 
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-xs text-[var(--text-sub)]">No attendance records found for this selection.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="py-6 text-center text-xs text-[var(--text-sub)]">No attendance records found for this selection.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = data.map(row => `
+  tbody.innerHTML = data.map(row => {
+    const effStatus = row.status || (row.percent >= 90 ? 'Excellent' : row.percent >= 75 ? 'Regular' : row.percent >= 60 ? 'Warning' : 'Critical');
+    const badgeClass =
+      effStatus === 'Excellent' ? 'status-excellent' :
+      effStatus === 'Regular' ? 'status-regular' :
+      effStatus === 'Warning' ? 'status-warning' : 'status-critical';
+
+    return `
     <tr>
       <td class="py-2.5 px-2">
         <!-- Roll No with rounded square border solid background -->
@@ -605,14 +654,19 @@ function renderReportTable(data, summary) {
       <td class="py-2.5 px-1.5 text-center font-black ${row.percent >= 75 ? 'text-emerald-600' : 'text-rose-600'}">
         ${row.percent}%
       </td>
+      <td class="py-2.5 px-1.5 text-center">
+        <!-- Status: Excellent, Regular, Warning, Critical -->
+        <span class="status-badge ${badgeClass}">${effStatus}</span>
+      </td>
       <td class="py-2.5 px-2 text-center no-print">
         <!-- Action: Button named "Log" -->
-        <button onclick="openStudentLogModal(${row.studentId}, '${row.name}', ${row.roll})" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-[#245b70]/10 hover:bg-[#245b70] hover:text-white text-[#245b70] transition shadow-sm">
+        <button onclick="openStudentLogModal(${row.studentId}, '${row.name.replace(/'/g, "\\'")}', ${row.roll})" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-[#245b70]/10 hover:bg-[#245b70] hover:text-white text-[#245b70] transition shadow-sm">
           Log
         </button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // Student Log Modal (When clicking "Log")
@@ -697,7 +751,7 @@ async function renderStudentsDirectory() {
               <button onclick="openEditStudentModal('${st._id}')" title="Edit Student (All fields)" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               </button>
-              <button onclick="confirmDeleteStudent('${st._id}', '${st.name}', ${st.studentId})" title="Delete Student" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white flex items-center justify-center transition">
+              <button onclick="confirmDeleteStudent('${st._id}', '${st.name.replace(/'/g, "\\'")}', ${st.studentId})" title="Delete Student" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
             </div>
@@ -710,8 +764,37 @@ async function renderStudentsDirectory() {
   }
 }
 
+// Student Photo Upload Helper (Data URL Base64)
+let newStudentBase64Photo = '';
+let editStudentBase64Photo = '';
+
+function handlePhotoUpload(event, mode) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+    if (mode === 'new') {
+      newStudentBase64Photo = base64;
+      const preview = document.getElementById('new-preview-photo');
+      if (preview) preview.src = base64;
+    } else {
+      editStudentBase64Photo = base64;
+      const preview = document.getElementById('edit-preview-photo');
+      if (preview) preview.src = base64;
+    }
+    showToast('Photo selected!');
+  };
+  reader.readAsDataURL(file);
+}
+
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
+  newStudentBase64Photo = '';
+  const preview = document.getElementById('new-preview-photo');
+  if (preview) preview.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+
   try {
     const res = await API.getNextStudentId();
     if (res.success) {
@@ -725,6 +808,7 @@ async function openStudentModal() {
 
 function closeStudentModal() {
   document.getElementById('modal-add-student').classList.add('hidden');
+  newStudentBase64Photo = '';
 }
 
 async function handleSaveNewStudent(e) {
@@ -740,17 +824,20 @@ async function handleSaveNewStudent(e) {
   const motherName = document.getElementById('new-student-mother').value.trim();
   const fatherMobile = document.getElementById('new-student-mobile-normal').value.trim();
   const fatherWhatsapp = document.getElementById('new-student-mobile-wa').value.trim();
-  const admissionStatus = document.getElementById('new-student-admission').value;
+  const yearJoined = document.getElementById('new-student-year-joined').value.trim() || '2024';
   const rank = document.getElementById('new-student-rank').value.trim();
   const previousCollege = document.getElementById('new-student-college').value.trim();
+
+  const photoUrl = newStudentBase64Photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
 
   const payload = {
     name,
     class: studentClass,
     roll,
+    photoUrl,
     address: { fullAddress, place, district, state },
     familyDetails: { fatherName, motherName, fatherMobile, fatherWhatsapp },
-    academicStatus: { admissionStatus, rank, previousCollege }
+    academicStatus: { yearJoined, rank, previousCollege }
   };
 
   try {
@@ -776,6 +863,7 @@ async function openEditStudentModal(id) {
     const student = res.data.find(s => s._id === id);
     if (!student) return;
 
+    editStudentBase64Photo = student.photoUrl || '';
     document.getElementById('edit-student-modal-title').innerText = `Edit Student: ${student.name}`;
     document.getElementById('edit-student-id').value = student.studentId;
     document.getElementById('edit-preview-photo').src = student.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face';
@@ -790,7 +878,10 @@ async function openEditStudentModal(id) {
     document.getElementById('edit-student-mother').value = (student.familyDetails && student.familyDetails.motherName) || '';
     document.getElementById('edit-student-mobile-normal').value = (student.familyDetails && student.familyDetails.fatherMobile) || '';
     document.getElementById('edit-student-mobile-wa').value = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '';
-    document.getElementById('edit-student-admission').value = (student.academicStatus && student.academicStatus.admissionStatus) || 'Confirmed';
+    
+    // Academic Status: Year Joined in the College
+    const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '2024';
+    document.getElementById('edit-student-year-joined').value = yr;
     document.getElementById('edit-student-rank').value = (student.academicStatus && student.academicStatus.rank) || '';
     document.getElementById('edit-student-college').value = (student.academicStatus && student.academicStatus.previousCollege) || '';
 
@@ -803,6 +894,7 @@ async function openEditStudentModal(id) {
 function closeEditStudentModal() {
   document.getElementById('modal-edit-student').classList.add('hidden');
   activeEditStudentObjId = null;
+  editStudentBase64Photo = '';
 }
 
 async function handleSaveEditedStudent(e) {
@@ -820,7 +912,7 @@ async function handleSaveEditedStudent(e) {
   const motherName = document.getElementById('edit-student-mother').value.trim();
   const fatherMobile = document.getElementById('edit-student-mobile-normal').value.trim();
   const fatherWhatsapp = document.getElementById('edit-student-mobile-wa').value.trim();
-  const admissionStatus = document.getElementById('edit-student-admission').value;
+  const yearJoined = document.getElementById('edit-student-year-joined').value.trim();
   const rank = document.getElementById('edit-student-rank').value.trim();
   const previousCollege = document.getElementById('edit-student-college').value.trim();
 
@@ -828,9 +920,10 @@ async function handleSaveEditedStudent(e) {
     name,
     class: studentClass,
     roll,
+    photoUrl: editStudentBase64Photo,
     address: { fullAddress, place, district, state },
     familyDetails: { fatherName, motherName, fatherMobile, fatherWhatsapp },
-    academicStatus: { admissionStatus, rank, previousCollege }
+    academicStatus: { yearJoined, rank, previousCollege }
   };
 
   try {
@@ -845,6 +938,68 @@ async function handleSaveEditedStudent(e) {
   } catch (error) {
     showToast(error.message, true);
   }
+}
+
+// ================= READ-ONLY STUDENT DETAILS & PHOTO ENLARGE =================
+// USER DIRECTIVE:
+// "when click the photo from taking attendence show sudents details fully ....only to read not edit...one more click to photo show largly...."
+async function openStudentDetailsModal(studentId) {
+  let student = studentsList.find(s => s.studentId === studentId);
+  if (!student) {
+    try {
+      const res = await API.getStudents();
+      student = res.data.find(s => s.studentId === studentId);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  if (!student) {
+    showToast('Student information not found', true);
+    return;
+  }
+
+  const photo = student.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop&crop=face';
+  document.getElementById('details-student-photo').src = photo;
+  document.getElementById('details-student-name').innerText = student.name;
+  document.getElementById('details-student-id').innerText = `ID: ${student.studentId}`;
+  document.getElementById('details-student-class').innerText = `Class: ${student.class}`;
+  document.getElementById('details-student-roll').innerText = `Roll #${student.roll}`;
+
+  document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || '—';
+  document.getElementById('details-student-place').innerText = (student.address && student.address.place) || '—';
+  document.getElementById('details-student-district').innerText = (student.address && student.address.district) || '—';
+  document.getElementById('details-student-state').innerText = (student.address && student.address.state) || '—';
+
+  document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || '—';
+  document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || '—';
+  document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || '—';
+  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '—';
+
+  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '—';
+  document.getElementById('details-student-year').innerText = yr;
+  document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || '—';
+  document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || '—';
+
+  document.getElementById('modal-student-details').classList.remove('hidden');
+}
+
+function closeStudentDetailsModal() {
+  document.getElementById('modal-student-details').classList.add('hidden');
+}
+
+// Lightbox: One more click to photo shows largely!
+function openEnlargedPhoto(photoUrl, name) {
+  const modal = document.getElementById('modal-photo-enlarged');
+  const img = document.getElementById('enlarged-photo-img');
+  const cap = document.getElementById('enlarged-photo-caption');
+  if (img) img.src = photoUrl;
+  if (cap) cap.innerText = name || 'Student Photo';
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeEnlargedPhoto() {
+  const modal = document.getElementById('modal-photo-enlarged');
+  if (modal) modal.classList.add('hidden');
 }
 
 async function confirmDeleteStudent(id, name, studentId) {
