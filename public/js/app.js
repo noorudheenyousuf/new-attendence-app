@@ -604,7 +604,6 @@ function getSelectedClassCheckboxes(containerId) {
 async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
   document.getElementById('input-sub-code').value = '';
-  await populateTeacherDropdowns('input-sub-teacher', '');
   renderClassCheckboxes('add-sub-classes-container', []);
   document.getElementById('modal-add-subject').classList.remove('hidden');
 }
@@ -617,7 +616,8 @@ async function handleSaveSubject(e) {
   e.preventDefault();
   const name = document.getElementById('input-sub-name').value.trim();
   const subjectCode = document.getElementById('input-sub-code').value.trim();
-  const teacher = document.getElementById('input-sub-teacher').value.trim();
+  const teacherEl = document.getElementById('input-sub-teacher');
+  const teacher = teacherEl ? teacherEl.value.trim() : '';
   const assignedClasses = getSelectedClassCheckboxes('add-sub-classes-container');
 
   try {
