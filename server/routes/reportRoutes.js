@@ -119,9 +119,13 @@ router.get('/student-logs/:studentId', async (req, res) => {
     attendanceDocs.forEach(doc => {
       const rec = doc.records.find(r => r.studentId === studentId);
       if (rec) {
+        const subDisplay = (!doc.subject || doc.subject === 'whole' || doc.subject === 'all')
+          ? 'General Attendance'
+          : doc.subject;
         logs.push({
           date: doc.date,
-          period: doc.subject === 'all' ? 'Daily General' : doc.subject,
+          subject: subDisplay,
+          period: subDisplay,
           status: rec.status,
           statusText: rec.status === 'P' ? 'Present' : rec.status === 'A' ? 'Absent' : 'Late',
           note: rec.note || ''

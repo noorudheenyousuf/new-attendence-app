@@ -8,7 +8,7 @@ const subjectSchema = new mongoose.Schema({
   },
   subjectCode: {
     type: String,
-    required: true,
+    default: '',
     trim: true
   },
   teacher: {

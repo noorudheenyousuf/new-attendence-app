@@ -9,7 +9,7 @@ const classSchema = new mongoose.Schema({
   },
   classTeacher: {
     type: String,
-    required: true,
+    default: 'Not Assigned',
     trim: true
   },
   order: {

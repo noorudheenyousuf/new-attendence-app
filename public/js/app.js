@@ -249,6 +249,15 @@ function populateClassDropdowns() {
   }
   if (editStudentClass) editStudentClass.innerHTML = optionsHtml;
   if (newStudentClass) newStudentClass.innerHTML = optionsHtml;
+
+  const addSubModal = document.getElementById('modal-add-subject');
+  if (addSubModal && !addSubModal.classList.contains('hidden')) {
+    renderClassCheckboxes('add-sub-classes-container', getSelectedClassCheckboxes('add-sub-classes-container'));
+  }
+  const editSubModal = document.getElementById('modal-edit-subject');
+  if (editSubModal && !editSubModal.classList.contains('hidden')) {
+    renderClassCheckboxes('edit-sub-classes-container', getSelectedClassCheckboxes('edit-sub-classes-container'));
+  }
 }
 
 // Drag & Drop Sorting for Classes
@@ -538,22 +547,56 @@ function renderSubjectsList() {
   `).join('');
 }
 
+// Checkbox helper for Subject classes
+function renderClassCheckboxes(containerId, selectedClasses = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!classesList || classesList.length === 0) {
+    container.innerHTML = `<span class="text-xs text-[var(--text-sub)] col-span-full py-1">No classes created yet. Add classes in "Add Class" tab first.</span>`;
+    return;
+  }
+
+  container.innerHTML = classesList.map(c => {
+    const isChecked = selectedClasses.includes(c.name);
+    return `
+      <label class="flex items-center gap-1.5 p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs font-bold text-[var(--text-main)] transition shadow-sm select-none">
+        <input type="checkbox" name="${containerId}-cb" value="${c.name}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-[#245b70] focus:ring-[#245b70] accent-[#245b70] cursor-pointer">
+        <span class="truncate">${c.name}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function getSelectedClassCheckboxes(containerId) {
+  const checkboxes = document.querySelectorAll(`input[name="${containerId}-cb"]:checked`);
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
+function openSubjectModal() {
+  document.getElementById('input-sub-name').value = '';
+  document.getElementById('input-sub-code').value = '';
+  document.getElementById('input-sub-teacher').value = '';
+  renderClassCheckboxes('add-sub-classes-container', []);
+  document.getElementById('modal-add-subject').classList.remove('hidden');
+}
+
+function closeSubjectModal() {
+  document.getElementById('modal-add-subject').classList.add('hidden');
+}
+
 async function handleSaveSubject(e) {
   e.preventDefault();
   const name = document.getElementById('input-sub-name').value.trim();
   const subjectCode = document.getElementById('input-sub-code').value.trim();
   const teacher = document.getElementById('input-sub-teacher').value.trim();
-  const assignedClasses = document.getElementById('input-sub-classes').value.trim();
+  const assignedClasses = getSelectedClassCheckboxes('add-sub-classes-container');
 
   try {
     const res = await API.addSubject({ name, subjectCode, teacher, assignedClasses });
     if (res.success) {
       showToast(`Subject "${name}" added!`);
       closeSubjectModal();
-      document.getElementById('input-sub-name').value = '';
-      document.getElementById('input-sub-code').value = '';
-      document.getElementById('input-sub-teacher').value = '';
-      document.getElementById('input-sub-classes').value = '';
       await loadSubjects();
     }
   } catch (error) {
@@ -565,9 +608,10 @@ let activeEditSubjectId = null;
 function openEditSubjectModal(id, name, code, teacher, classes) {
   activeEditSubjectId = id;
   document.getElementById('edit-sub-name').value = name;
-  document.getElementById('edit-sub-code').value = code;
-  document.getElementById('edit-sub-teacher').value = teacher;
-  document.getElementById('edit-sub-classes').value = classes;
+  document.getElementById('edit-sub-code').value = code || '';
+  document.getElementById('edit-sub-teacher').value = teacher || '';
+  const selectedList = classes ? classes.split(',').map(c => c.trim()).filter(Boolean) : [];
+  renderClassCheckboxes('edit-sub-classes-container', selectedList);
   document.getElementById('modal-edit-subject').classList.remove('hidden');
 }
 
@@ -583,7 +627,7 @@ async function handleUpdateSubject(e) {
   const name = document.getElementById('edit-sub-name').value.trim();
   const subjectCode = document.getElementById('edit-sub-code').value.trim();
   const teacher = document.getElementById('edit-sub-teacher').value.trim();
-  const assignedClasses = document.getElementById('edit-sub-classes').value.trim();
+  const assignedClasses = getSelectedClassCheckboxes('edit-sub-classes-container');
 
   try {
     const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher, assignedClasses });
@@ -632,7 +676,7 @@ async function loadAttendanceRoster() {
 
     if (attRes.success && attRes.data && Array.isArray(attRes.data.records) && attRes.data.records.length > 0) {
       attendanceRecords = attRes.data.records;
-      if (saveBtnText) saveBtnText.innerText = 'Update Attendance (Session Already Taken)';
+      if (saveBtnText) saveBtnText.innerText = 'Update Attendance';
     } else {
       // Default to Present
       attendanceRecords = studentsList.map(st => ({
@@ -754,7 +798,7 @@ async function saveAttendance() {
     if (res.success) {
       showToast('Attendance saved & updated successfully!');
       const saveBtnText = document.getElementById('btn-save-attendance-text');
-      if (saveBtnText) saveBtnText.innerText = 'Update Attendance (Session Already Taken)';
+      if (saveBtnText) saveBtnText.innerText = 'Update Attendance';
       await loadActivityLogs();
       await loadReport();
     }
@@ -897,18 +941,26 @@ async function openStudentLogModal(studentId, name, roll) {
         return;
       }
 
-      listContainer.innerHTML = res.logs.map(log => `
-        <div class="p-2.5 rounded-xl bg-[var(--bg-page)] flex items-center justify-between text-xs border border-[var(--border-color)]">
-          <div>
-            <div class="font-bold text-[var(--text-main)]">${log.date}</div>
-            <div class="text-[10px] text-[var(--text-sub)]">${log.period} ${log.note ? '• ' + log.note : ''}</div>
+      listContainer.innerHTML = res.logs.map(log => {
+        const subjectName = log.subject || log.period || 'General Attendance';
+        return `
+          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] flex items-center justify-between text-xs border border-[var(--border-color)]">
+            <div class="min-w-0 pr-2">
+              <div class="font-bold text-[var(--text-main)] flex items-center gap-2 flex-wrap">
+                <span>${log.date}</span>
+                <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#245b70]/10 text-[#245b70] dark:bg-[#245b70]/30 dark:text-cyan-300">
+                  ${subjectName}
+                </span>
+              </div>
+              ${log.note ? `<div class="text-[10px] text-[var(--text-sub)] mt-0.5">Note: ${log.note}</div>` : ''}
+            </div>
+            <span class="px-2.5 py-0.5 rounded-md font-black text-xs flex-shrink-0 ${
+              log.status === 'P' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' :
+              log.status === 'A' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
+            }">${log.statusText}</span>
           </div>
-          <span class="px-2.5 py-0.5 rounded-md font-black text-xs ${
-            log.status === 'P' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' :
-            log.status === 'A' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
-          }">${log.statusText}</span>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
   } catch (error) {
     if (listContainer) listContainer.innerHTML = `<div class="p-3 text-xs text-rose-600">Failed to load logs.</div>`;
@@ -1466,6 +1518,9 @@ async function loadAdminTeachersList() {
               }">
                 ${isAdmin ? 'Remove Admin' : 'Make Admin'}
               </button>
+              <button onclick="deleteTeacherAccount('${t._id}', '${t.name.replace(/'/g, "\\'")}', '${t.role}')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:hover:bg-rose-900 dark:text-rose-300 transition" title="Delete account">
+                Remove
+              </button>
               <button onclick="editTeacherName('${t._id}', '${t.name.replace(/'/g, "\\'")}')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition">
                 Edit
               </button>
@@ -1496,6 +1551,25 @@ async function toggleTeacherAdminRole(id, name, currentRole) {
     }
   } catch (error) {
     showToast(error.message, true);
+  }
+}
+
+// USER DIRECTIVE: "also add remove teachers for admin near to make admin"
+async function deleteTeacherAccount(id, name, role) {
+  if (currentUser && currentUser._id === id) {
+    showToast('You cannot delete your own logged-in admin account', true);
+    return;
+  }
+  if (!confirm(`Are you sure you want to permanently remove teacher "${name}"?`)) return;
+
+  try {
+    const res = await API.deleteTeacher(id);
+    if (res.success) {
+      showToast(res.message || `Account "${name}" removed successfully!`);
+      await loadAdminTeachersList();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to remove teacher', true);
   }
 }
 
@@ -1654,8 +1728,6 @@ function selectBottomTab(tab) {
 // Modal triggers
 function openClassModal() { document.getElementById('modal-add-class').classList.remove('hidden'); }
 function closeClassModal() { document.getElementById('modal-add-class').classList.add('hidden'); }
-function openSubjectModal() { document.getElementById('modal-add-subject').classList.remove('hidden'); }
-function closeSubjectModal() { document.getElementById('modal-add-subject').classList.add('hidden'); }
 // Auth Modal & Controls
 function openAuthModal() {
   const modal = document.getElementById('auth-modal');

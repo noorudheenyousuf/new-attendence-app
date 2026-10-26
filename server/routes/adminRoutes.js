@@ -178,6 +178,46 @@ router.put(['/teachers/:id/toggle-admin', '/teachers/:id/make-admin'], async (re
   }
 });
 
+// @route   DELETE /api/admin/teachers/:id
+// @desc    USER DIRECTIVE: Remove a teacher / entering account
+router.delete('/teachers/:id', async (req, res) => {
+  try {
+    const teacher = await User.findById(req.params.id);
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Teacher account not found' });
+    }
+
+    // Safety: prevent deleting the last admin
+    if (teacher.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot remove the only remaining admin account'
+        });
+      }
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+
+    await ActivityLog.create({
+      action: `Teacher Account Removed: ${teacher.name}`,
+      details: `Email: ${teacher.email} (${teacher.role}) deleted by admin ${req.user ? req.user.name : ''}`,
+      performedBy: req.user ? req.user.name : 'Admin',
+      role: 'admin',
+      entityType: 'settings',
+      canUndo: false
+    });
+
+    res.json({
+      success: true,
+      message: `Account "${teacher.name}" removed successfully`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   POST /api/admin/clear-data
 // @desc    USER DIRECTIVE: Clear ONLY whole class attendance data (keeps teachers, students, class, subjects, details intact)
 router.post('/clear-data', async (req, res) => {

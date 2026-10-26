@@ -35,13 +35,17 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/subjects
-// @desc    Add subject (name, subject code, teacher optional, assigned classes)
+// @desc    Add subject (name, subject code optional, teacher optional, assigned classes)
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, subjectCode, teacher, assignedClasses } = req.body;
-    if (!name || !subjectCode) {
-      return res.status(400).json({ success: false, message: 'Subject name and code are required' });
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Subject name is required' });
     }
+
+    const finalCode = (subjectCode && subjectCode.trim())
+      ? subjectCode.trim()
+      : ((name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'SUB') + '101');
 
     const classesArray = Array.isArray(assignedClasses)
       ? assignedClasses
@@ -49,7 +53,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const newSubject = await Subject.create({
       name,
-      subjectCode,
+      subjectCode: finalCode,
       teacher: teacher || '',
       assignedClasses: classesArray
     });

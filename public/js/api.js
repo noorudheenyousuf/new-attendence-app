@@ -266,6 +266,12 @@ const API = {
     });
   },
 
+  async deleteTeacher(id) {
+    return this.request(`/admin/teachers/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
   async clearData() {
     return this.request('/admin/clear-data', {
       method: 'POST'

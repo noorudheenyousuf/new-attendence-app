@@ -35,12 +35,12 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/classes
-// @desc    Add a class (only asks name and class teacher)
+// @desc    Add a class (only asks name and optional class teacher)
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, classTeacher } = req.body;
-    if (!name || !classTeacher) {
-      return res.status(400).json({ success: false, message: 'Class name and class teacher are required' });
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Class name is required' });
     }
 
     const existing = await Class.findOne({ name });
@@ -50,7 +50,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const newClass = await Class.create({
       name,
-      classTeacher
+      classTeacher: classTeacher || 'Not Assigned'
     });
 
     // Log action
@@ -83,7 +83,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     const updated = await Class.findByIdAndUpdate(
       req.params.id,
-      { name, classTeacher },
+      { name: name || oldClass.name, classTeacher: classTeacher || 'Not Assigned' },
       { new: true }
     );
 
