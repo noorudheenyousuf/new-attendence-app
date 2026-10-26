@@ -36,8 +36,8 @@ router.get('/export', async (req, res) => {
     await ActivityLog.create({
       action: 'Database Backup Exported',
       details: `${students.length} Students, ${classes.length} Classes, ${attendance.length} Attendance Records`,
-      performedBy: req.user.name,
-      role: 'admin',
+      performedBy: (req.user && req.user.name) ? req.user.name : 'Admin',
+      role: (req.user && req.user.role) ? req.user.role : 'admin',
       entityType: 'backup',
       canUndo: false
     });

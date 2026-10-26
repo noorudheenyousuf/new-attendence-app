@@ -1589,9 +1589,46 @@ async function editTeacherName(id, currentName) {
 }
 
 // ================= BACKUP (ADMIN ONLY) =================
-function exportBackupData() {
-  window.location.href = '/api/backup/export';
-  showToast('Admin: Database Backup downloading...');
+async function exportBackupData() {
+  try {
+    showToast('Admin: Preparing backup export...');
+    const token = API.getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/backup/export', {
+      method: 'GET',
+      headers
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to download backup');
+    }
+
+    const data = await res.json();
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const downloadUrl = window.URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = downloadUrl;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.download = `REGISTERLY_backup_${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    }, 200);
+
+    showToast('Admin: Database backup downloaded successfully!');
+  } catch (error) {
+    console.error('[Backup Export Error]', error);
+    showToast(error.message || 'Failed to export backup', true);
+  }
 }
 
 async function importBackupData(event) {
