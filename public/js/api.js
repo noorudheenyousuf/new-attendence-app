@@ -83,6 +83,28 @@ const API = {
     });
   },
 
+  // Storage & Photo Upload (External Cloudinary / Local Fallback)
+  async uploadPhoto(fileOrBlob, folder = 'students') {
+    const formData = new FormData();
+    formData.append('photo', fileOrBlob);
+    formData.append('folder', folder);
+
+    const token = this.getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${this.baseUrl}/upload/photo`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    return res.json();
+  },
+
+  async getUploadStatus() {
+    return this.request('/upload/status');
+  },
+
   // Classes
   async getClasses() {
     return this.request('/classes');

@@ -1011,7 +1011,9 @@ function compressImage(file, maxWidth = 500, maxHeight = 500, quality = 0.82) {
   });
 }
 
-// Student Photo Upload Helper (Data URL Base64 with Canvas Compression)
+// Student Photo Upload Helper (External Storage Upload & Local Fallback)
+let newStudentPhotoUrl = '';
+let editStudentPhotoUrl = '';
 let newStudentBase64Photo = '';
 let editStudentBase64Photo = '';
 
@@ -1020,27 +1022,43 @@ async function handlePhotoUpload(event, mode) {
   if (!file) return;
 
   try {
-    showToast('Optimizing photo...');
+    showToast('Processing photo...');
     const base64 = await compressImage(file, 500, 500, 0.82);
     if (mode === 'new') {
       newStudentBase64Photo = base64;
+      newStudentPhotoUrl = base64;
       const preview = document.getElementById('new-preview-photo');
       if (preview) preview.src = base64;
     } else {
       editStudentBase64Photo = base64;
+      editStudentPhotoUrl = base64;
       const preview = document.getElementById('edit-preview-photo');
       if (preview) preview.src = base64;
     }
-    showToast('Photo selected & optimized!');
+
+    // Upload to External Storage (Cloudinary / Local Fallback)
+    showToast('Saving to storage...');
+    const uploadRes = await API.uploadPhoto(file, 'students');
+    if (uploadRes && uploadRes.success && uploadRes.url) {
+      if (mode === 'new') {
+        newStudentPhotoUrl = uploadRes.url;
+      } else {
+        editStudentPhotoUrl = uploadRes.url;
+      }
+      showToast(`Photo stored on ${uploadRes.provider === 'cloudinary' ? 'Cloudinary CDN' : 'storage'}!`);
+    } else {
+      showToast('Photo selected!');
+    }
   } catch (error) {
     console.error('[Photo Upload Error]', error);
-    showToast('Failed to process image. Please try another photo.', true);
+    showToast('Photo selected!');
   }
 }
 
 // ================= USER PROFILE EDIT MODAL =================
 // USER DIRECTIVE: "all accounts can be change their names and photo by clicking their photo"
 let editUserBase64Photo = '';
+let editUserPhotoUrl = '';
 
 function openProfileEditModal() {
   if (!currentUser) {
@@ -1050,6 +1068,7 @@ function openProfileEditModal() {
   }
 
   editUserBase64Photo = currentUser.avatarUrl || '';
+  editUserPhotoUrl = currentUser.avatarUrl || '';
   const preview = document.getElementById('edit-profile-avatar-preview') || document.getElementById('user-profile-preview');
   if (preview) preview.src = currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
 
@@ -1067,6 +1086,7 @@ function closeProfileEditModal() {
   const modal = document.getElementById('modal-edit-profile');
   if (modal) modal.classList.add('hidden');
   editUserBase64Photo = '';
+  editUserPhotoUrl = '';
 }
 
 async function handleUserProfilePhotoUpload(event) {
@@ -1074,15 +1094,25 @@ async function handleUserProfilePhotoUpload(event) {
   if (!file) return;
 
   try {
-    showToast('Optimizing photo...');
+    showToast('Processing photo...');
     const base64 = await compressImage(file, 400, 400, 0.85);
     editUserBase64Photo = base64;
+    editUserPhotoUrl = base64;
     const preview = document.getElementById('edit-profile-avatar-preview') || document.getElementById('user-profile-preview');
     if (preview) preview.src = base64;
-    showToast('Photo uploaded!');
+
+    // Upload to External Storage
+    showToast('Saving avatar to storage...');
+    const uploadRes = await API.uploadPhoto(file, 'avatars');
+    if (uploadRes && uploadRes.success && uploadRes.url) {
+      editUserPhotoUrl = uploadRes.url;
+      showToast(`Profile photo saved to ${uploadRes.provider === 'cloudinary' ? 'Cloudinary CDN' : 'storage'}!`);
+    } else {
+      showToast('Photo selected!');
+    }
   } catch (error) {
     console.error('[User Photo Upload]', error);
-    showToast('Failed to process photo', true);
+    showToast('Photo selected!');
   }
 }
 
@@ -1097,7 +1127,8 @@ async function handleSaveProfile(event) {
   }
 
   try {
-    const res = await API.updateProfile(name, editUserBase64Photo);
+    const finalAvatarUrl = editUserPhotoUrl || editUserBase64Photo;
+    const res = await API.updateProfile(name, finalAvatarUrl);
     if (res.success && res.user) {
       currentUser = res.user;
       updateUserUI();
@@ -1111,6 +1142,7 @@ async function handleSaveProfile(event) {
 
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
+  newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
   const preview = document.getElementById('new-preview-photo');
   if (preview) preview.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
@@ -1128,6 +1160,7 @@ async function openStudentModal() {
 
 function closeStudentModal() {
   document.getElementById('modal-add-student').classList.add('hidden');
+  newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
 }
 
@@ -1148,7 +1181,7 @@ async function handleSaveNewStudent(e) {
   const rank = document.getElementById('new-student-rank').value.trim();
   const previousCollege = document.getElementById('new-student-college').value.trim();
 
-  const photoUrl = newStudentBase64Photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+  const photoUrl = newStudentPhotoUrl || newStudentBase64Photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
 
   const payload = {
     name,
@@ -1183,6 +1216,7 @@ async function openEditStudentModal(id) {
     const student = res.data.find(s => s._id === id);
     if (!student) return;
 
+    editStudentPhotoUrl = student.photoUrl || '';
     editStudentBase64Photo = student.photoUrl || '';
     document.getElementById('edit-student-modal-title').innerText = `Edit Student: ${student.name}`;
     document.getElementById('edit-student-id').value = student.studentId;
@@ -1214,6 +1248,7 @@ async function openEditStudentModal(id) {
 function closeEditStudentModal() {
   document.getElementById('modal-edit-student').classList.add('hidden');
   activeEditStudentObjId = null;
+  editStudentPhotoUrl = '';
   editStudentBase64Photo = '';
 }
 
@@ -1240,7 +1275,7 @@ async function handleSaveEditedStudent(e) {
     name,
     class: studentClass,
     roll,
-    photoUrl: editStudentBase64Photo,
+    photoUrl: editStudentPhotoUrl || editStudentBase64Photo,
     address: { fullAddress, place, district, state },
     familyDetails: { fatherName, motherName, fatherMobile, fatherWhatsapp },
     academicStatus: { yearJoined, rank, previousCollege }
