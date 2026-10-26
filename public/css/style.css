@@ -1,0 +1,76 @@
+/* Custom Medium-Big Touch Styling */
+.touch-btn {
+  min-height: 48px;
+  touch-action: manipulation;
+}
+.touch-input {
+  min-height: 48px;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.tab-transition {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* THEME: User's exact custom gradient */
+:root {
+  --primary-color: #245b70;
+  --secondary-teal: #43888a;
+  --header-gradient: linear-gradient(135deg, #245b70, #43888a);
+  --bg-page: #f2f7f8;
+  --card-bg: #ffffff;
+  --text-main: #14323d;
+  --text-sub: #557582;
+  --border-color: #d1e3e6;
+}
+
+/* Dark Mode Theme */
+body.dark-mode {
+  --bg-page: #0c1519;
+  --card-bg: #142229;
+  --text-main: #f0f7f9;
+  --text-sub: #8eaab5;
+  --border-color: #20353f;
+  --header-gradient: linear-gradient(135deg, #183e4c, #265557);
+}
+
+.custom-gradient-header {
+  background: var(--header-gradient) !important;
+}
+
+.custom-gradient-btn {
+  background: var(--header-gradient) !important;
+  color: #ffffff !important;
+}
+.custom-gradient-btn:hover {
+  opacity: 0.95;
+}
+
+/* Print styles for Whole Class Attendance Report */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-report, #printable-report * {
+    visibility: visible;
+  }
+  #printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: black !important;
+    padding: 20px;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
