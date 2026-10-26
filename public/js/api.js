@@ -62,10 +62,11 @@ const API = {
     return this.request('/auth/google-client-id');
   },
 
-  async googleLogin(credential) {
+  async googleLogin(payload) {
+    const body = typeof payload === 'string' ? { credential: payload } : payload;
     const res = await this.request('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ credential })
+      body: JSON.stringify(body)
     });
     if (res.token) this.setToken(res.token);
     return res;

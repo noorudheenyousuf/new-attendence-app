@@ -6,7 +6,12 @@ const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const getGoogleClientId = () => {
+  try {
+    require('dotenv').config();
+  } catch (e) {}
+  return (process.env.GOOGLE_CLIENT_ID || '').trim();
+};
 
 // Generate JWT Helper
 const generateToken = (user) => {
@@ -21,7 +26,7 @@ const generateToken = (user) => {
 // @desc    Returns configured Google Client ID to frontend for Google Identity Services initialization
 router.get('/google-client-id', (req, res) => {
   res.json({
-    clientId: process.env.GOOGLE_CLIENT_ID || ''
+    clientId: getGoogleClientId()
   });
 });
 
@@ -90,13 +95,15 @@ router.post('/login', async (req, res) => {
     }
 
     const trimmedInput = email.trim();
-    // Search by email or case-insensitive name
-    const user = await User.findOne({
-      $or: [
-        { email: trimmedInput.toLowerCase() },
-        { name: new RegExp(`^${trimmedInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
-      ]
-    });
+    // Search by email, case-insensitive name, or 'admin' role
+    const query = [
+      { email: trimmedInput.toLowerCase() },
+      { name: new RegExp(`^${trimmedInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    ];
+    if (trimmedInput.toLowerCase() === 'admin') {
+      query.push({ role: 'admin' });
+    }
+    const user = await User.findOne({ $or: query });
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid username/email or password' });
@@ -128,61 +135,93 @@ router.post('/login', async (req, res) => {
 });
 
 // @route   POST /api/auth/google
-// @desc    Cryptographically verify Google ID Token & Authenticate User
+// @desc    Cryptographically verify Google ID Token or Access Token & Authenticate User
 router.post('/google', async (req, res) => {
   try {
-    const { credential } = req.body;
+    const { credential, access_token } = req.body;
 
-    if (!credential) {
+    if (!credential && !access_token) {
       return res.status(400).json({
         success: false,
-        message: 'Google cryptographic ID token (credential) is required.'
+        message: 'Google authentication credential or access token is required.'
       });
     }
 
-    let payload = null;
+    let email = null;
+    let name = null;
+    let picture = null;
+    let sub = null;
 
-    // Verify token cryptographically using official Google Auth Library
-    if (process.env.GOOGLE_CLIENT_ID) {
-      try {
-        const ticket = await googleClient.verifyIdToken({
-          idToken: credential,
-          audience: process.env.GOOGLE_CLIENT_ID
-        });
-        payload = ticket.getPayload();
-      } catch (err) {
-        console.error('[Google Verification Failed]', err.message);
-        return res.status(401).json({
-          success: false,
-          message: 'Google authentication verification failed: ' + err.message
-        });
-      }
-    } else {
-      // Decode JWT payload if GOOGLE_CLIENT_ID is awaiting configuration in .env
-      try {
+    if (credential) {
+      const clientId = getGoogleClientId();
+      if (clientId) {
+        try {
+          const client = new OAuth2Client(clientId);
+          const ticket = await client.verifyIdToken({
+            idToken: credential,
+            audience: clientId
+          });
+          const payload = ticket.getPayload();
+          email = payload.email;
+          name = payload.name;
+          picture = payload.picture;
+          sub = payload.sub;
+        } catch (err) {
+          console.error('[Google Verification Failed]', err.message);
+          return res.status(401).json({
+            success: false,
+            message: 'Google authentication verification failed: ' + err.message
+          });
+        }
+      } else {
+        // Fallback JWT parse if client ID not configured
         const base64Url = credential.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
+        const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
+        email = payload.email;
+        name = payload.name;
+        picture = payload.picture;
+        sub = payload.sub;
+      }
+    } else if (access_token) {
+      // Cryptographically verify access token directly with Google OAuth2 UserInfo API
+      try {
+        const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${access_token}` }
+        });
+        if (!googleRes.ok) {
+          return res.status(401).json({
+            success: false,
+            message: 'Failed to verify Google access token with Google identity server.'
+          });
+        }
+        const data = await googleRes.json();
+        email = data.email;
+        name = data.name;
+        picture = data.picture;
+        sub = data.sub;
       } catch (err) {
-        return res.status(400).json({ success: false, message: 'Invalid Google credential token' });
+        return res.status(401).json({
+          success: false,
+          message: 'Error communicating with Google OAuth verification service: ' + err.message
+        });
       }
     }
 
-    if (!payload || !payload.email) {
+    if (!email) {
       return res.status(401).json({
         success: false,
-        message: 'Unable to extract verified email from Google credential.'
+        message: 'Unable to extract verified email from Google authentication.'
       });
     }
 
-    const { email, name, picture, sub } = payload;
     const normalizedEmail = email.toLowerCase().trim();
 
     // Check if user exists in database
     let user = await User.findOne({
       $or: [
         { email: normalizedEmail },
-        { googleId: sub }
+        ...(sub ? [{ googleId: sub }] : [])
       ]
     });
 
@@ -207,7 +246,7 @@ router.post('/google', async (req, res) => {
     } else {
       // Link Google ID or updated avatar
       let modified = false;
-      if (!user.googleId) {
+      if (sub && !user.googleId) {
         user.googleId = sub;
         modified = true;
       }

@@ -1434,6 +1434,7 @@ function clearAuthAlert() {
 
 // ================= SECURE GOOGLE IDENTITY SERVICES (OAuth 2.0 / GSI) =================
 let googleClientId = '';
+let googleTokenClient = null;
 
 async function initGoogleAuth() {
   try {
@@ -1447,14 +1448,16 @@ async function initGoogleAuth() {
 
 function renderGoogleButton() {
   const container = document.getElementById('g-signin-container');
+  const directBtn = document.getElementById('btn-google-direct');
   const notice = document.getElementById('google-setup-notice');
   if (!container) return;
 
   if (!googleClientId) {
     if (notice) notice.classList.remove('hidden');
+    if (directBtn) directBtn.classList.add('hidden');
     container.innerHTML = `
       <div class="w-full py-2.5 px-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-800 text-center">
-        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">🔑 Google OAuth awaiting Client ID</span>
+        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">🔑 Google OAuth awaiting Client ID in .env</span>
       </div>
     `;
     return;
@@ -1462,34 +1465,123 @@ function renderGoogleButton() {
 
   if (notice) notice.classList.add('hidden');
 
+  let attempts = 0;
   const setupGsi = () => {
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: handleGoogleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true
-      });
+    attempts++;
+    if (window.google && window.google.accounts) {
+      try {
+        // 1. Setup ID Token GSI Button
+        if (window.google.accounts.id) {
+          window.google.accounts.id.initialize({
+            client_id: googleClientId,
+            callback: handleGoogleCredentialResponse,
+            error_callback: (err) => {
+              console.warn('[Google GSI Error Callback]', err);
+              if (directBtn) directBtn.classList.remove('hidden');
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
 
-      container.innerHTML = '';
-      window.google.accounts.id.renderButton(container, {
-        theme: document.documentElement.classList.contains('dark') ? 'filled_black' : 'outline',
-        size: 'large',
-        type: 'standard',
-        text: 'continue_with',
-        shape: 'rectangular',
-        logo_alignment: 'left',
-        width: 320
-      });
-    } else {
+          container.innerHTML = '';
+          window.google.accounts.id.renderButton(container, {
+            theme: document.documentElement.classList.contains('dark') ? 'filled_black' : 'outline',
+            size: 'large',
+            type: 'standard',
+            text: 'continue_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 320
+          });
+        }
+
+        // 2. Setup OAuth2 Token Client for 1-Click popup fallback
+        if (window.google.accounts.oauth2) {
+          googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: googleClientId,
+            scope: 'email profile openid',
+            callback: handleGoogleTokenResponse,
+            error_callback: (err) => {
+              console.error('[Google OAuth2 Popup Error]', err);
+              showAuthAlert('Google Sign-In Error: ' + (err.message || 'Popup blocked or cancelled'), true);
+            }
+          });
+        }
+
+        // Show direct button if iframe didn't attach or has origin limits
+        setTimeout(() => {
+          const hasIframe = container && container.querySelector('iframe');
+          if (!hasIframe && directBtn) {
+            directBtn.classList.remove('hidden');
+          }
+        }, 1200);
+
+      } catch (err) {
+        console.error('[Google GSI Setup Error]', err);
+        if (directBtn) directBtn.classList.remove('hidden');
+      }
+    } else if (attempts < 20) {
       setTimeout(setupGsi, 200);
+    } else {
+      // If script didn't load (e.g. adblocker), show direct button
+      if (directBtn) directBtn.classList.remove('hidden');
     }
   };
 
   setupGsi();
 }
 
-// Google Identity Services Credential Callback (Real Google ID Token)
+// Trigger Google Sign-In popup directly
+function triggerGooglePopupSignIn() {
+  clearAuthAlert();
+  if (googleTokenClient) {
+    try {
+      googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+    } catch (e) {
+      showAuthAlert('Could not launch Google popup: ' + e.message, true);
+    }
+  } else if (window.google && window.google.accounts && window.google.accounts.id) {
+    window.google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        showAuthAlert('Google One-Tap is not displayed. Please check that http://localhost:5000 is added in Google Cloud Console origins.', true);
+      }
+    });
+  } else {
+    showAuthAlert('Google Identity SDK is still loading. Please try again.', true);
+  }
+}
+
+// Callback for OAuth2 access_token flow (Popup)
+async function handleGoogleTokenResponse(tokenResponse) {
+  if (!tokenResponse || !tokenResponse.access_token) {
+    if (tokenResponse && tokenResponse.error) {
+      showAuthAlert('Google Sign-In failed: ' + tokenResponse.error, true);
+    }
+    return;
+  }
+
+  clearAuthAlert();
+  showToast('Authenticating with Google...');
+
+  try {
+    const res = await API.googleLogin({ access_token: tokenResponse.access_token });
+    if (res.success) {
+      showToast(res.message || `Welcome, ${res.user.name}!`);
+      closeAuthModal();
+      await loadCurrentUser();
+      await loadAppSettings();
+      await loadClasses();
+      await loadSubjects();
+      await loadAttendanceRoster();
+      await loadReport();
+      await loadActivityLogs();
+    }
+  } catch (error) {
+    showAuthAlert('Google Authentication Failed: ' + (error.message || 'Verification rejected'), true);
+  }
+}
+
+// Google Identity Services Credential Callback (ID Token)
 async function handleGoogleCredentialResponse(response) {
   if (!response || !response.credential) {
     showAuthAlert('Google Sign-In was cancelled or failed.', true);
@@ -1500,7 +1592,7 @@ async function handleGoogleCredentialResponse(response) {
   showToast('Verifying Google credentials...');
 
   try {
-    const res = await API.googleLogin(response.credential);
+    const res = await API.googleLogin({ credential: response.credential });
     if (res.success) {
       showToast(res.message || `Welcome, ${res.user.name}!`);
       closeAuthModal();
