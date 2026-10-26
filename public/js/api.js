@@ -58,19 +58,14 @@ const API = {
     return res;
   },
 
-  async googleLogin(name, email, avatarUrl, googleId, credential) {
-    const res = await this.request('/auth/google', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, avatarUrl, googleId, credential })
-    });
-    if (res.token) this.setToken(res.token);
-    return res;
+  async getGoogleClientId() {
+    return this.request('/auth/google-client-id');
   },
 
-  async demoLogin(role) {
-    const res = await this.request('/auth/demo-login', {
+  async googleLogin(credential) {
+    const res = await this.request('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ role })
+      body: JSON.stringify({ credential })
     });
     if (res.token) this.setToken(res.token);
     return res;

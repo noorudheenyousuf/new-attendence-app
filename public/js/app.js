@@ -16,6 +16,7 @@ let currentSubject = 'all';
 document.addEventListener('DOMContentLoaded', async () => {
   initServiceWorker();
   selectTopTab('attendance');
+  await initGoogleAuth();
   await loadCurrentUser();
   await loadAppSettings();
   await loadClasses();
@@ -177,6 +178,7 @@ function toggleDarkMode() {
     document.documentElement.classList.remove('dark');
     showToast('Light Mode Activated');
   }
+  renderGoogleButton();
 }
 
 // ================= APP SETTINGS (App Name & School Name) =================
@@ -1359,6 +1361,7 @@ function openAuthModal() {
   const modal = document.getElementById('auth-modal');
   if (modal) modal.classList.remove('hidden');
   clearAuthAlert();
+  renderGoogleButton();
 }
 
 function closeAuthModal() {
@@ -1429,14 +1432,89 @@ function clearAuthAlert() {
   if (alertEl) alertEl.classList.add('hidden');
 }
 
-// Quick Fill Demo Credentials
-function quickFillCredentials(email, password) {
-  switchAuthTab('signin');
-  const emailInput = document.getElementById('login-email');
-  const passInput = document.getElementById('login-password');
-  if (emailInput) emailInput.value = email;
-  if (passInput) passInput.value = password;
-  showToast(`Credentials filled for: ${email}`);
+// ================= SECURE GOOGLE IDENTITY SERVICES (OAuth 2.0 / GSI) =================
+let googleClientId = '';
+
+async function initGoogleAuth() {
+  try {
+    const res = await API.getGoogleClientId();
+    googleClientId = res && res.clientId ? res.clientId.trim() : '';
+    renderGoogleButton();
+  } catch (error) {
+    console.warn('[Google Auth Init Error]', error);
+  }
+}
+
+function renderGoogleButton() {
+  const container = document.getElementById('g-signin-container');
+  const notice = document.getElementById('google-setup-notice');
+  if (!container) return;
+
+  if (!googleClientId) {
+    if (notice) notice.classList.remove('hidden');
+    container.innerHTML = `
+      <div class="w-full py-2.5 px-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-800 text-center">
+        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">🔑 Google OAuth awaiting Client ID</span>
+      </div>
+    `;
+    return;
+  }
+
+  if (notice) notice.classList.add('hidden');
+
+  const setupGsi = () => {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredentialResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true
+      });
+
+      container.innerHTML = '';
+      window.google.accounts.id.renderButton(container, {
+        theme: document.documentElement.classList.contains('dark') ? 'filled_black' : 'outline',
+        size: 'large',
+        type: 'standard',
+        text: 'continue_with',
+        shape: 'rectangular',
+        logo_alignment: 'left',
+        width: 320
+      });
+    } else {
+      setTimeout(setupGsi, 200);
+    }
+  };
+
+  setupGsi();
+}
+
+// Google Identity Services Credential Callback (Real Google ID Token)
+async function handleGoogleCredentialResponse(response) {
+  if (!response || !response.credential) {
+    showAuthAlert('Google Sign-In was cancelled or failed.', true);
+    return;
+  }
+
+  clearAuthAlert();
+  showToast('Verifying Google credentials...');
+
+  try {
+    const res = await API.googleLogin(response.credential);
+    if (res.success) {
+      showToast(res.message || `Welcome, ${res.user.name}!`);
+      closeAuthModal();
+      await loadCurrentUser();
+      await loadAppSettings();
+      await loadClasses();
+      await loadSubjects();
+      await loadAttendanceRoster();
+      await loadReport();
+      await loadActivityLogs();
+    }
+  } catch (error) {
+    showAuthAlert('Google Authentication Failed: ' + (error.message || 'Verification rejected'), true);
+  }
 }
 
 // Handle Sign In (Email / Username & Password)
@@ -1542,50 +1620,6 @@ async function handleEmailRegister(e) {
       btn.innerHTML = originalBtnText;
     }
   }
-}
-
-// Google Sign-In Chooser
-function openGoogleAccountChooser() {
-  const modal = document.getElementById('modal-google-chooser');
-  if (modal) modal.classList.remove('hidden');
-}
-
-function closeGoogleAccountChooser() {
-  const modal = document.getElementById('modal-google-chooser');
-  if (modal) modal.classList.add('hidden');
-}
-
-async function authenticateWithGoogleProfile(name, email, avatarUrl) {
-  closeGoogleAccountChooser();
-  try {
-    const res = await API.googleLogin(name, email, avatarUrl);
-    if (res.success) {
-      showToast(res.message || `Signed in with Google as ${res.user.name}`);
-      closeAuthModal();
-      await loadCurrentUser();
-      await loadAppSettings();
-      await loadClasses();
-      await loadSubjects();
-      await loadAttendanceRoster();
-      await loadReport();
-      await loadActivityLogs();
-    }
-  } catch (error) {
-    showAuthAlert('Google authentication failed: ' + error.message, true);
-  }
-}
-
-async function promptCustomGoogleAccount() {
-  closeGoogleAccountChooser();
-  const email = prompt('Enter your Google Account Email:');
-  if (!email || !email.trim()) return;
-  const name = prompt('Enter your Full Name:', email.split('@')[0]) || email.split('@')[0];
-
-  authenticateWithGoogleProfile(
-    name.trim(),
-    email.trim().toLowerCase(),
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face'
-  );
 }
 
 // Signout

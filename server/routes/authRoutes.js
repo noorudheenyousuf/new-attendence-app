@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT Helper
 const generateToken = (user) => {
@@ -13,6 +16,14 @@ const generateToken = (user) => {
     { expiresIn: '30d' }
   );
 };
+
+// @route   GET /api/auth/google-client-id
+// @desc    Returns configured Google Client ID to frontend for Google Identity Services initialization
+router.get('/google-client-id', (req, res) => {
+  res.json({
+    clientId: process.env.GOOGLE_CLIENT_ID || ''
+  });
+});
 
 // @route   POST /api/auth/register
 // @desc    Register a new user (First registered user is automatically Admin)
@@ -79,7 +90,7 @@ router.post('/login', async (req, res) => {
     }
 
     const trimmedInput = email.trim();
-    // Search by email or case-insensitive exact name
+    // Search by email or case-insensitive name
     const user = await User.findOne({
       $or: [
         { email: trimmedInput.toLowerCase() },
@@ -117,39 +128,66 @@ router.post('/login', async (req, res) => {
 });
 
 // @route   POST /api/auth/google
-// @desc    Google Sign-In / OAuth Authentication
+// @desc    Cryptographically verify Google ID Token & Authenticate User
 router.post('/google', async (req, res) => {
   try {
-    let { credential, email, name, avatarUrl, googleId } = req.body;
+    const { credential } = req.body;
 
-    // If client sent Google One Tap / GSI credential (JWT id_token)
-    if (credential) {
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google cryptographic ID token (credential) is required.'
+      });
+    }
+
+    let payload = null;
+
+    // Verify token cryptographically using official Google Auth Library
+    if (process.env.GOOGLE_CLIENT_ID) {
       try {
-        const payloadBase64 = credential.split('.')[1];
-        const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString());
-        email = decoded.email;
-        name = decoded.name;
-        avatarUrl = decoded.picture;
-        googleId = decoded.sub;
+        const ticket = await googleClient.verifyIdToken({
+          idToken: credential,
+          audience: process.env.GOOGLE_CLIENT_ID
+        });
+        payload = ticket.getPayload();
       } catch (err) {
-        console.error('[Google Credential Decode Error]', err);
+        console.error('[Google Verification Failed]', err.message);
+        return res.status(401).json({
+          success: false,
+          message: 'Google authentication verification failed: ' + err.message
+        });
+      }
+    } else {
+      // Decode JWT payload if GOOGLE_CLIENT_ID is awaiting configuration in .env
+      try {
+        const base64Url = credential.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
+      } catch (err) {
+        return res.status(400).json({ success: false, message: 'Invalid Google credential token' });
       }
     }
 
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Google account email is required' });
+    if (!payload || !payload.email) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unable to extract verified email from Google credential.'
+      });
     }
 
+    const { email, name, picture, sub } = payload;
     const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user exists in database
     let user = await User.findOne({
       $or: [
         { email: normalizedEmail },
-        ...(googleId ? [{ googleId }] : [])
+        { googleId: sub }
       ]
     });
 
     if (!user) {
-      // First account is admin, subsequent accounts are teachers
+      // First account is Admin, subsequent accounts are Teachers
       const userCount = await User.countDocuments();
       const isFirstAccount = userCount === 0;
       const role = isFirstAccount ? 'admin' : 'teacher';
@@ -163,18 +201,18 @@ router.post('/google', async (req, res) => {
         password: randomPassword,
         role,
         isFirstAccount,
-        googleId: googleId || null,
-        avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
+        googleId: sub,
+        avatarUrl: picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
       });
     } else {
-      // Update Google ID or avatar if available
+      // Link Google ID or updated avatar
       let modified = false;
-      if (googleId && !user.googleId) {
-        user.googleId = googleId;
+      if (!user.googleId) {
+        user.googleId = sub;
         modified = true;
       }
-      if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes('unsplash.com'))) {
-        user.avatarUrl = avatarUrl;
+      if (picture && (!user.avatarUrl || user.avatarUrl.includes('unsplash.com'))) {
+        user.avatarUrl = picture;
         modified = true;
       }
       if (modified) await user.save();
@@ -184,42 +222,7 @@ router.post('/google', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Signed in with Google as ${user.name}`,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-        isFirstAccount: user.isFirstAccount
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// @route   POST /api/auth/demo-login
-// @desc    1-Click Quick Demo Login (for Admin or Teacher testing)
-router.post('/demo-login', async (req, res) => {
-  try {
-    const { role } = req.body;
-    const targetRole = role === 'teacher' ? 'teacher' : 'admin';
-
-    let user = await User.findOne({ role: targetRole });
-    if (!user) {
-      user = await User.findOne();
-    }
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'No demo accounts found' });
-    }
-
-    const token = generateToken(user);
-    res.json({
-      success: true,
-      message: `Signed in as ${user.role.toUpperCase()}: ${user.name}`,
+      message: `Authenticated with Google as ${user.name}`,
       token,
       user: {
         id: user._id,
