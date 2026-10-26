@@ -1110,7 +1110,6 @@ async function renderStudentsDirectory() {
           </div>
         </div>
       `).join('');
-    }
   } catch (error) {
     console.log('[Students Directory Load]', error);
   }
