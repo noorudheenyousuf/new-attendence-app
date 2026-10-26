@@ -1058,12 +1058,27 @@ async function renderStudentsDirectory() {
       : allStudents.filter(s => s.class === filterClass).length;
 
     // Update Live Count Badges in Students Header
+    // USER DIRECTIVE: "Make students total div with round square small color fill div...dont show second div if selected class is all"
     const totalCountEl = document.getElementById('students-count-total');
     const classCountEl = document.getElementById('students-count-class');
     const classNameEl = document.getElementById('students-count-class-name');
+    const classContainerEl = document.getElementById('students-count-class-container');
+
     if (totalCountEl) totalCountEl.innerText = allStudents.length;
-    if (classCountEl) classCountEl.innerText = classCount;
-    if (classNameEl) classNameEl.innerText = filterClass === 'all' ? 'All' : filterClass;
+
+    if (filterClass === 'all') {
+      if (classContainerEl) {
+        classContainerEl.classList.add('hidden');
+        classContainerEl.classList.remove('inline-flex', 'flex');
+      }
+    } else {
+      if (classContainerEl) {
+        classContainerEl.classList.remove('hidden');
+        classContainerEl.classList.add('inline-flex');
+      }
+      if (classNameEl) classNameEl.innerText = filterClass;
+      if (classCountEl) classCountEl.innerText = classCount;
+    }
 
     // Filter by class
     let students = filterClass === 'all' ? allStudents : allStudents.filter(s => s.class === filterClass);
@@ -1289,12 +1304,28 @@ async function updateModalStudentCounts() {
     if (allRes.success && allRes.data) {
       const allStudents = allRes.data;
       const totalCount = allStudents.length;
-      const classCount = selectedClass ? allStudents.filter(s => s.class === selectedClass).length : 0;
+      const classCount = (selectedClass && selectedClass !== 'all')
+        ? allStudents.filter(s => s.class === selectedClass).length
+        : 0;
 
       const modalTotal = document.getElementById('modal-add-total-count');
       const modalClass = document.getElementById('modal-add-class-count');
+      const modalClassName = document.getElementById('modal-add-class-name');
+      const modalClassWrap = document.getElementById('modal-add-class-wrapper');
+
       if (modalTotal) modalTotal.innerText = totalCount;
       if (modalClass) modalClass.innerText = classCount;
+      if (modalClassName) modalClassName.innerText = selectedClass || 'Class';
+
+      if (modalClassWrap) {
+        if (!selectedClass || selectedClass === 'all') {
+          modalClassWrap.classList.add('hidden');
+          modalClassWrap.classList.remove('inline-flex', 'flex');
+        } else {
+          modalClassWrap.classList.remove('hidden');
+          modalClassWrap.classList.add('inline-flex');
+        }
+      }
     }
   } catch (e) {
     console.log('[Modal Counts Error]', e);

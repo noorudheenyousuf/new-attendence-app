@@ -377,13 +377,17 @@
           <div class="flex items-center gap-2 flex-wrap">
             <h2 class="text-base font-extrabold text-[var(--text-main)]">Students</h2>
             <!-- Total & Selected Class Student Counters -->
-            <div class="flex items-center gap-1.5 text-[11px] font-bold">
-              <span class="px-2.5 py-0.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] shadow-sm">
-                Total: <span id="students-count-total" class="text-[#245b70] dark:text-cyan-400 font-black">0</span>
-              </span>
-              <span class="px-2.5 py-0.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] shadow-sm">
-                <span id="students-count-class-name">Class</span>: <span id="students-count-class" class="text-[#245b70] dark:text-cyan-400 font-black">0</span>
-              </span>
+            <div class="flex items-center gap-1.5 text-xs font-bold">
+              <!-- Total students: round square small color fill div -->
+              <div id="students-count-total-container" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm font-semibold select-none">
+                <span>Total:</span>
+                <span id="students-count-total" class="font-black text-white">0</span>
+              </div>
+              <!-- Selected class count: hidden if selected class is 'all' -->
+              <div id="students-count-class-container" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-slate-700/80 text-[var(--text-main)] shadow-sm font-semibold select-none">
+                <span id="students-count-class-name">Class</span>:
+                <span id="students-count-class" class="text-[#245b70] dark:text-cyan-400 font-black">0</span>
+              </div>
             </div>
           </div>
           <button onclick="openStudentModal()" class="touch-btn px-3.5 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md flex-shrink-0">
@@ -562,7 +566,16 @@
       <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
         <div>
           <h3 class="font-extrabold text-base text-[var(--text-main)]">Add Student</h3>
-          <p class="text-[11px] text-[var(--text-sub)]">Total: <b id="modal-add-total-count" class="text-[#245b70] dark:text-cyan-400 font-black">0</b> • In Selected Class: <b id="modal-add-class-count" class="text-[#245b70] dark:text-cyan-400 font-black">0</b></p>
+          <div class="flex items-center gap-1.5 mt-0.5 text-[11px] font-bold">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-sm">
+              <span>Total:</span>
+              <span id="modal-add-total-count" class="font-black">0</span>
+            </span>
+            <span id="modal-add-class-wrapper" class="hidden items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-[var(--text-main)] shadow-sm">
+              <span id="modal-add-class-name">Class</span>:
+              <span id="modal-add-class-count" class="text-[#245b70] dark:text-cyan-400 font-black">0</span>
+            </span>
+          </div>
         </div>
         <button onclick="closeStudentModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
       </div>

@@ -17,14 +17,14 @@ router.use(adminMiddleware);
 // @desc    Admin export complete database backup as JSON
 router.get('/export', async (req, res) => {
   try {
-    const classes = await Class.find();
-    const subjects = await Subject.find();
-    const students = await Student.find();
-    const attendance = await Attendance.find();
-    const settings = await AppSettings.findOne();
+    const classes = await Class.find().lean();
+    const subjects = await Subject.find().lean();
+    const students = await Student.find().lean();
+    const attendance = await Attendance.find().lean();
+    const settings = await AppSettings.findOne().lean();
 
     const backupData = {
-      appName: settings ? settings.appName : 'REGISTERLY',
+      appName: (settings && settings.appName) ? settings.appName : 'REGISTERLY',
       exportDate: new Date().toISOString(),
       classes,
       subjects,
@@ -35,7 +35,7 @@ router.get('/export', async (req, res) => {
 
     await ActivityLog.create({
       action: 'Database Backup Exported',
-      details: `${students.length} Students, ${classes.length} Classes, ${attendance.length} Attendance Records`,
+      details: `${students.length} Students, ${classes.length} Classes, ${subjects.length} Subjects, ${attendance.length} Attendance Records (full details)`,
       performedBy: (req.user && req.user.name) ? req.user.name : 'Admin',
       role: (req.user && req.user.role) ? req.user.role : 'admin',
       entityType: 'backup',
@@ -60,53 +60,77 @@ router.post('/import', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid backup file format' });
     }
 
-    // Restore classes
+    // 1. Restore classes
     if (Array.isArray(classes) && classes.length > 0) {
       for (const c of classes) {
-        await Class.findOneAndUpdate({ name: c.name }, c, { upsert: true });
-      }
-    }
-
-    // Restore subjects
-    if (Array.isArray(subjects) && subjects.length > 0) {
-      for (const s of subjects) {
-        await Subject.findOneAndUpdate({ subjectCode: s.subjectCode }, s, { upsert: true });
-      }
-    }
-
-    // Restore students
-    if (Array.isArray(students) && students.length > 0) {
-      for (const st of students) {
-        await Student.findOneAndUpdate({ studentId: st.studentId }, st, { upsert: true });
-      }
-    }
-
-    // Restore attendance
-    if (Array.isArray(attendance) && attendance.length > 0) {
-      for (const att of attendance) {
-        await Attendance.findOneAndUpdate(
-          { date: att.date, class: att.class, subject: att.subject },
-          att,
-          { upsert: true }
+        if (!c.name) continue;
+        const { _id, __v, ...cData } = c;
+        await Class.findOneAndUpdate(
+          { name: c.name },
+          { $set: cData },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
         );
       }
     }
 
-    // Restore settings
+    // 2. Restore subjects
+    if (Array.isArray(subjects) && subjects.length > 0) {
+      for (const s of subjects) {
+        if (!s.subjectCode && !s.name) continue;
+        const filter = s.subjectCode ? { subjectCode: s.subjectCode } : { name: s.name };
+        const { _id, __v, ...sData } = s;
+        await Subject.findOneAndUpdate(
+          filter,
+          { $set: sData },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      }
+    }
+
+    // 3. Restore students (Full student details: address, familyDetails, academicStatus, photoUrl, etc.)
+    if (Array.isArray(students) && students.length > 0) {
+      for (const st of students) {
+        if (!st.studentId) continue;
+        const { _id, __v, ...stData } = st;
+        await Student.findOneAndUpdate(
+          { studentId: st.studentId },
+          { $set: stData },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      }
+    }
+
+    // 4. Restore attendance
+    if (Array.isArray(attendance) && attendance.length > 0) {
+      for (const att of attendance) {
+        const { _id, __v, ...attData } = att;
+        await Attendance.findOneAndUpdate(
+          { date: att.date, class: att.class, subject: att.subject },
+          { $set: attData },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      }
+    }
+
+    // 5. Restore settings
     if (settings && (settings.appName || settings.schoolName)) {
-      await AppSettings.findOneAndUpdate({}, settings, { upsert: true });
+      const { _id, __v, ...setData } = settings;
+      await AppSettings.findOneAndUpdate({}, { $set: setData }, { upsert: true, new: true });
     }
 
     await ActivityLog.create({
-      action: 'Database Restored from Backup',
-      details: `Import completed by Admin ${req.user.name}`,
-      performedBy: req.user.name,
-      role: 'admin',
+      action: 'Database Backup Restored',
+      details: `${students ? students.length : 0} Students with full details, ${classes ? classes.length : 0} Classes, ${subjects ? subjects.length : 0} Subjects restored`,
+      performedBy: (req.user && req.user.name) ? req.user.name : 'Admin',
+      role: (req.user && req.user.role) ? req.user.role : 'admin',
       entityType: 'backup',
       canUndo: false
     });
 
-    res.json({ success: true, message: 'Database restored successfully from backup' });
+    res.json({
+      success: true,
+      message: 'Database backup imported successfully. All students and details restored.'
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
