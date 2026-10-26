@@ -76,9 +76,23 @@ const API = {
     return this.request('/auth/me');
   },
 
+  async updateProfile(name, avatarUrl) {
+    return this.request('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ name, avatarUrl })
+    });
+  },
+
   // Classes
   async getClasses() {
     return this.request('/classes');
+  },
+
+  async reorderClasses(orderedIds) {
+    return this.request('/classes/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ orderedIds })
+    });
   },
 
   async addClass(name, classTeacher) {
@@ -104,6 +118,13 @@ const API = {
   // Subjects
   async getSubjects() {
     return this.request('/subjects');
+  },
+
+  async reorderSubjects(orderedIds) {
+    return this.request('/subjects/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ orderedIds })
+    });
   },
 
   async addSubject(data) {
@@ -172,8 +193,8 @@ const API = {
   },
 
   // Reports
-  async getClassReport(className, period = 'all-year', subject = 'whole') {
-    const params = new URLSearchParams({ class: className, period, subject });
+  async getClassReport(className, year = 'all', period = 'all-year', subject = 'whole') {
+    const params = new URLSearchParams({ class: className, year, period, subject });
     return this.request(`/reports/class?${params.toString()}`);
   },
 
@@ -212,7 +233,13 @@ const API = {
   },
 
   async makeTeacherAdmin(id) {
-    return this.request(`/admin/teachers/${id}/make-admin`, {
+    return this.request(`/admin/teachers/${id}/toggle-admin`, {
+      method: 'PUT'
+    });
+  },
+
+  async toggleTeacherAdmin(id) {
+    return this.request(`/admin/teachers/${id}/toggle-admin`, {
       method: 'PUT'
     });
   },

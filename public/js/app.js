@@ -105,9 +105,9 @@ async function loadCurrentUser() {
     }
   }
 
-  // Not authenticated: prompt user to sign in or test demo
+  // Not authenticated: prompt user to sign in
   currentUser = null;
-  currentRole = 'guest';
+  currentRole = null;
   updateUserUI();
   openAuthModal();
 }
@@ -251,6 +251,54 @@ function populateClassDropdowns() {
   if (newStudentClass) newStudentClass.innerHTML = optionsHtml;
 }
 
+// Drag & Drop Sorting for Classes
+let draggedClassIndex = null;
+
+function handleClassDragStart(e, index) {
+  draggedClassIndex = index;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function handleClassDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const item = e.currentTarget;
+  if (!item.classList.contains('drag-over')) {
+    item.classList.add('drag-over');
+  }
+}
+
+function handleClassDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function handleClassDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('#class-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+}
+
+async function handleClassDrop(e, targetIndex) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (draggedClassIndex === null || draggedClassIndex === targetIndex) return;
+
+  const movedClass = classesList.splice(draggedClassIndex, 1)[0];
+  classesList.splice(targetIndex, 0, movedClass);
+  draggedClassIndex = null;
+
+  renderClassesList();
+  populateClassDropdowns();
+
+  try {
+    const orderedIds = classesList.map(c => c._id);
+    await API.reorderClasses(orderedIds);
+    showToast('Class order updated!');
+  } catch (err) {
+    console.error('[Reorder Classes Error]', err);
+  }
+}
+
 function renderClassesList() {
   const container = document.getElementById('class-cards-container');
   if (!container) return;
@@ -260,10 +308,24 @@ function renderClassesList() {
     return;
   }
 
-  container.innerHTML = classesList.map(c => `
-    <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between">
+  container.innerHTML = classesList.map((c, index) => `
+    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between"
+         draggable="true"
+         ondragstart="handleClassDragStart(event, ${index})"
+         ondragover="handleClassDragOver(event, ${index})"
+         ondragleave="handleClassDragLeave(event)"
+         ondragend="handleClassDragEnd(event)"
+         ondrop="handleClassDrop(event, ${index})">
       <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-xl text-white font-black text-sm flex items-center justify-center custom-gradient-header flex-shrink-0">
+        <!-- Drag Handle Icon -->
+        <div class="text-[var(--text-sub)] hover:text-[#245b70] cursor-grab active:cursor-grabbing p-1" title="Drag to reorder class">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+          </svg>
+        </div>
+        <div class="w-10 h-10 rounded-xl text-white font-black text-sm flex items-center justify-center custom-gradient-header flex-shrink-0">
           ${c.name.replace(/[^0-9]/g, '') || c.name.slice(0, 3)}
         </div>
         <div>
@@ -381,6 +443,54 @@ function populateSubjectDropdowns() {
   }
 }
 
+// Drag & Drop Sorting for Subjects
+let draggedSubjectIndex = null;
+
+function handleSubjectDragStart(e, index) {
+  draggedSubjectIndex = index;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+
+function handleSubjectDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const item = e.currentTarget;
+  if (!item.classList.contains('drag-over')) {
+    item.classList.add('drag-over');
+  }
+}
+
+function handleSubjectDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function handleSubjectDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+}
+
+async function handleSubjectDrop(e, targetIndex) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (draggedSubjectIndex === null || draggedSubjectIndex === targetIndex) return;
+
+  const movedSubject = subjectsList.splice(draggedSubjectIndex, 1)[0];
+  subjectsList.splice(targetIndex, 0, movedSubject);
+  draggedSubjectIndex = null;
+
+  renderSubjectsList();
+  populateSubjectDropdowns();
+
+  try {
+    const orderedIds = subjectsList.map(s => s._id);
+    await API.reorderSubjects(orderedIds);
+    showToast('Subject order updated!');
+  } catch (err) {
+    console.error('[Reorder Subjects Error]', err);
+  }
+}
+
 function renderSubjectsList() {
   const container = document.getElementById('subject-cards-container');
   if (!container) return;
@@ -390,15 +500,31 @@ function renderSubjectsList() {
     return;
   }
 
-  container.innerHTML = subjectsList.map(s => `
-    <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between">
-      <div>
-        <div class="flex items-center gap-2">
-          <h3 class="font-bold text-[var(--text-main)] text-sm">${s.name}</h3>
-          <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70]">${s.subjectCode}</span>
+  container.innerHTML = subjectsList.map((s, index) => `
+    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between"
+         draggable="true"
+         ondragstart="handleSubjectDragStart(event, ${index})"
+         ondragover="handleSubjectDragOver(event, ${index})"
+         ondragleave="handleSubjectDragLeave(event)"
+         ondragend="handleSubjectDragEnd(event)"
+         ondrop="handleSubjectDrop(event, ${index})">
+      <div class="flex items-center gap-3">
+        <!-- Drag Handle Icon -->
+        <div class="text-[var(--text-sub)] hover:text-[#245b70] cursor-grab active:cursor-grabbing p-1" title="Drag to reorder subject">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+          </svg>
         </div>
-        ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5">Teacher: ${s.teacher}</p>` : ''}
-        <div class="text-[11px] text-[#245b70] font-semibold mt-0.5">Classes: ${s.assignedClasses.join(', ') || 'None'}</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="font-bold text-[var(--text-main)] text-sm">${s.name}</h3>
+            <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70]">${s.subjectCode}</span>
+          </div>
+          ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5">Teacher: ${s.teacher}</p>` : ''}
+          <div class="text-[11px] text-[#245b70] font-semibold mt-0.5">Classes: ${s.assignedClasses.join(', ') || 'None'}</div>
+        </div>
       </div>
       <div class="flex items-center gap-1.5">
         <button onclick="openEditSubjectModal('${s._id}', '${s.name}', '${s.subjectCode}', '${s.teacher || ''}', '${s.assignedClasses.join(', ')}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
@@ -502,9 +628,11 @@ async function loadAttendanceRoster() {
     // 2. Fetch existing attendance for this date & class
     const attRes = await API.getAttendance(currentDateStr, currentClass, currentSubject);
     attendanceRecords = [];
+    const saveBtnText = document.getElementById('btn-save-attendance-text');
 
-    if (attRes.success && attRes.data && Array.isArray(attRes.data.records)) {
+    if (attRes.success && attRes.data && Array.isArray(attRes.data.records) && attRes.data.records.length > 0) {
       attendanceRecords = attRes.data.records;
+      if (saveBtnText) saveBtnText.innerText = 'Update Attendance (Session Already Taken)';
     } else {
       // Default to Present
       attendanceRecords = studentsList.map(st => ({
@@ -512,6 +640,7 @@ async function loadAttendanceRoster() {
         status: 'P',
         note: ''
       }));
+      if (saveBtnText) saveBtnText.innerText = 'Save Attendance';
     }
 
     renderAttendanceList();
@@ -623,7 +752,9 @@ async function saveAttendance() {
     };
     const res = await API.saveAttendance(payload);
     if (res.success) {
-      showToast('Attendance saved & logged successfully!');
+      showToast('Attendance saved & updated successfully!');
+      const saveBtnText = document.getElementById('btn-save-attendance-text');
+      if (saveBtnText) saveBtnText.innerText = 'Update Attendance (Session Already Taken)';
       await loadActivityLogs();
       await loadReport();
     }
@@ -657,15 +788,17 @@ function changeDate(delta) {
 // "only show main name in filters not in the bracket"
 async function loadReport() {
   const repClassEl = document.getElementById('report-class');
+  const repYearEl = document.getElementById('report-year');
   const repPeriodEl = document.getElementById('report-period');
   const repSubEl = document.getElementById('report-subject');
 
   const repClass = repClassEl ? repClassEl.value : (currentClass || 'Class 10');
+  const repYear = repYearEl ? repYearEl.value : 'all';
   const repPeriod = repPeriodEl ? repPeriodEl.value : 'all-year';
   const repSubject = repSubEl ? repSubEl.value : 'whole';
 
   try {
-    const res = await API.getClassReport(repClass, repPeriod, repSubject);
+    const res = await API.getClassReport(repClass, repYear, repPeriod, repSubject);
     if (res.success) {
       renderReportTable(res.data, res.summary);
     }
@@ -731,17 +864,34 @@ function renderReportTable(data, summary) {
 }
 
 // Student Log Modal (When clicking "Log")
+// USER DIRECTIVE: "in report of students, in the log button click add in the window also their attendance like....present in green,,,absent in red ....late in yellew present at the top of log window"
 async function openStudentLogModal(studentId, name, roll) {
   document.getElementById('log-modal-title').innerText = `Attendance Logs - ${name}`;
   document.getElementById('log-modal-subtitle').innerText = `Roll #${roll} • ID: ${studentId}`;
+
+  // Reset top badges
+  const statP = document.getElementById('log-stat-present');
+  const statA = document.getElementById('log-stat-absent');
+  const statL = document.getElementById('log-stat-late');
+  if (statP) statP.innerText = '0';
+  if (statA) statA.innerText = '0';
+  if (statL) statL.innerText = '0';
+
   const listContainer = document.getElementById('student-logs-list');
-  if (listContainer) listContainer.innerHTML = `<div class="p-3 text-xs text-center">Loading logs...</div>`;
+  if (listContainer) listContainer.innerHTML = `<div class="p-3 text-xs text-center text-[var(--text-sub)]">Loading logs...</div>`;
 
   document.getElementById('modal-student-log').classList.remove('hidden');
 
   try {
     const res = await API.getStudentLogs(studentId);
     if (res.success && res.logs) {
+      const pCount = res.logs.filter(l => l.status === 'P').length;
+      const aCount = res.logs.filter(l => l.status === 'A').length;
+      const lCount = res.logs.filter(l => l.status === 'L').length;
+      if (statP) statP.innerText = pCount;
+      if (statA) statA.innerText = aCount;
+      if (statL) statL.innerText = lCount;
+
       if (res.logs.length === 0) {
         listContainer.innerHTML = `<div class="p-3 text-xs text-center text-[var(--text-sub)]">No attendance sessions recorded yet.</div>`;
         return;
@@ -754,8 +904,8 @@ async function openStudentLogModal(studentId, name, roll) {
             <div class="text-[10px] text-[var(--text-sub)]">${log.period} ${log.note ? '• ' + log.note : ''}</div>
           </div>
           <span class="px-2.5 py-0.5 rounded-md font-black text-xs ${
-            log.status === 'P' ? 'bg-emerald-100 text-emerald-800' :
-            log.status === 'A' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+            log.status === 'P' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' :
+            log.status === 'A' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
           }">${log.statusText}</span>
         </div>
       `).join('');
@@ -825,17 +975,53 @@ async function renderStudentsDirectory() {
   }
 }
 
-// Student Photo Upload Helper (Data URL Base64)
+// Image Compression Helper via HTML5 Canvas (ensures photos are optimized and under 60KB)
+function compressImage(file, maxWidth = 500, maxHeight = 500, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Student Photo Upload Helper (Data URL Base64 with Canvas Compression)
 let newStudentBase64Photo = '';
 let editStudentBase64Photo = '';
 
-function handlePhotoUpload(event, mode) {
+async function handlePhotoUpload(event, mode) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const base64 = e.target.result;
+  try {
+    showToast('Optimizing photo...');
+    const base64 = await compressImage(file, 500, 500, 0.82);
     if (mode === 'new') {
       newStudentBase64Photo = base64;
       const preview = document.getElementById('new-preview-photo');
@@ -845,9 +1031,82 @@ function handlePhotoUpload(event, mode) {
       const preview = document.getElementById('edit-preview-photo');
       if (preview) preview.src = base64;
     }
-    showToast('Photo selected!');
-  };
-  reader.readAsDataURL(file);
+    showToast('Photo selected & optimized!');
+  } catch (error) {
+    console.error('[Photo Upload Error]', error);
+    showToast('Failed to process image. Please try another photo.', true);
+  }
+}
+
+// ================= USER PROFILE EDIT MODAL =================
+// USER DIRECTIVE: "all accounts can be change their names and photo by clicking their photo"
+let editUserBase64Photo = '';
+
+function openProfileEditModal() {
+  if (!currentUser) {
+    showToast('Please sign in first', true);
+    openAuthModal();
+    return;
+  }
+
+  editUserBase64Photo = currentUser.avatarUrl || '';
+  const preview = document.getElementById('edit-profile-avatar-preview') || document.getElementById('user-profile-preview');
+  if (preview) preview.src = currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+
+  const nameInput = document.getElementById('edit-profile-name-input') || document.getElementById('user-profile-name');
+  if (nameInput) nameInput.value = currentUser.name || '';
+
+  const emailInput = document.getElementById('edit-profile-email-input') || document.getElementById('user-profile-email');
+  if (emailInput) emailInput.value = currentUser.email || '';
+
+  const modal = document.getElementById('modal-edit-profile');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeProfileEditModal() {
+  const modal = document.getElementById('modal-edit-profile');
+  if (modal) modal.classList.add('hidden');
+  editUserBase64Photo = '';
+}
+
+async function handleUserProfilePhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    showToast('Optimizing photo...');
+    const base64 = await compressImage(file, 400, 400, 0.85);
+    editUserBase64Photo = base64;
+    const preview = document.getElementById('edit-profile-avatar-preview') || document.getElementById('user-profile-preview');
+    if (preview) preview.src = base64;
+    showToast('Photo uploaded!');
+  } catch (error) {
+    console.error('[User Photo Upload]', error);
+    showToast('Failed to process photo', true);
+  }
+}
+
+async function handleSaveProfile(event) {
+  if (event) event.preventDefault();
+  const nameInput = document.getElementById('edit-profile-name-input') || document.getElementById('user-profile-name');
+  const name = nameInput ? nameInput.value.trim() : '';
+
+  if (!name) {
+    showToast('Please enter your name', true);
+    return;
+  }
+
+  try {
+    const res = await API.updateProfile(name, editUserBase64Photo);
+    if (res.success && res.user) {
+      currentUser = res.user;
+      updateUserUI();
+      closeProfileEditModal();
+      showToast('Profile updated successfully!');
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to update profile', true);
+  }
 }
 
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
@@ -1155,39 +1414,50 @@ async function loadAdminTeachersList() {
     const res = await API.getTeachers();
     if (res.success && res.data) {
       const teachers = res.data;
-      container.innerHTML = teachers.map(t => `
-        <div class="p-2.5 bg-white dark:bg-slate-900 rounded-xl border flex items-center justify-between">
-          <div>
-            <div class="font-bold text-[var(--text-main)] text-xs">
-              ${t.name}
-              ${t.role === 'admin' ? '<span class="text-[9px] font-black text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded ml-1">Admin</span>' : '<span class="text-[9px] font-bold text-blue-800 bg-blue-100 px-1.5 py-0.2 rounded ml-1">Teacher</span>'}
+      container.innerHTML = teachers.map(t => {
+        const isAdmin = t.role === 'admin';
+        return `
+          <div class="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-2 shadow-sm">
+            <div class="min-w-0">
+              <div class="font-bold text-[var(--text-main)] text-xs flex items-center gap-1.5 flex-wrap">
+                <span class="truncate">${t.name}</span>
+                ${isAdmin ? '<span class="text-[9px] font-black text-amber-800 bg-amber-100 dark:bg-amber-900/60 dark:text-amber-300 px-1.5 py-0.5 rounded">Admin</span>' : '<span class="text-[9px] font-bold text-blue-800 bg-blue-100 dark:bg-blue-900/60 dark:text-blue-300 px-1.5 py-0.5 rounded">Teacher</span>'}
+              </div>
+              <div class="text-[10px] text-[var(--text-sub)] truncate">${t.email}</div>
             </div>
-            <div class="text-[10px] text-[var(--text-sub)]">${t.email}</div>
-          </div>
-          <div class="flex items-center gap-1.5">
-            ${t.role !== 'admin' ? `
-              <button onclick="makeTeacherAdmin('${t._id}', '${t.name}')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-[#245b70] text-white">
-                Make Admin
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <button onclick="toggleTeacherAdminRole('${t._id}', '${t.name.replace(/'/g, "\\'")}', '${t.role}')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold transition shadow-sm ${
+                isAdmin ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-[#245b70] hover:bg-[#1b4454] text-white'
+              }">
+                ${isAdmin ? 'Remove Admin' : 'Make Admin'}
               </button>
-            ` : '<span class="text-xs font-bold text-emerald-600">Active Admin</span>'}
-            <button onclick="editTeacherName('${t._id}', '${t.name}')" class="px-2 py-1 rounded-lg text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
-              Edit
-            </button>
+              <button onclick="editTeacherName('${t._id}', '${t.name.replace(/'/g, "\\'")}')" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition">
+                Edit
+              </button>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
   } catch (error) {
     console.log('[Teachers Load]', error);
   }
 }
 
-async function makeTeacherAdmin(id, name) {
+// USER DIRECTIVE: "also make an option to unadmin the admined accounts for admin by clicking the same button"
+async function toggleTeacherAdminRole(id, name, currentRole) {
+  const isCurrentlyAdmin = currentRole === 'admin';
+  const actionText = isCurrentlyAdmin ? `remove Admin privileges from "${name}"` : `make "${name}" an Admin`;
+  if (!confirm(`Are you sure you want to ${actionText}?`)) return;
+
   try {
-    const res = await API.makeTeacherAdmin(id);
+    const res = await API.toggleTeacherAdmin(id);
     if (res.success) {
-      showToast(`${name} is now an Admin!`);
+      showToast(res.message || `${name} role updated to ${res.data.role}!`);
       await loadAdminTeachersList();
+      if (currentUser && currentUser._id === id) {
+        await loadCurrentUser();
+      }
     }
   } catch (error) {
     showToast(error.message, true);
@@ -1236,20 +1506,19 @@ async function importBackupData(event) {
 }
 
 // ================= DATA CONTROLS (ADMIN ONLY) =================
-// USER DIRECTIVE: "add option for reset the app for admin and clear data button"
+// USER DIRECTIVE:
+// "clear data for only clear data of attendence of whole class, not teachers, students, class ,subjects,details"
 async function handleClearDataPrompt() {
   const confirmed = confirm(
-    "⚠️ CAUTION: Are you sure you want to clear ALL data?\n\n" +
-    "This will delete all classes, subjects, students, and attendance records. Your admin account will remain active so you can start fresh."
+    "⚠️ CLEAR ATTENDANCE DATA:\n\n" +
+    "Are you sure you want to clear attendance records? Teachers, students, classes, subjects, and student details will NOT be deleted."
   );
   if (!confirmed) return;
 
   try {
     const res = await API.clearData();
     if (res.success) {
-      showToast('All data has been cleared!');
-      await loadClasses();
-      await loadSubjects();
+      showToast('All attendance records have been cleared!');
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
@@ -1259,34 +1528,30 @@ async function handleClearDataPrompt() {
   }
 }
 
+// USER DIRECTIVE:
+// "reset button for clear all app data...like new"
 async function handleResetAppPrompt() {
   const confirmed = confirm(
-    "⚠️ FACTORY RESET: Are you sure you want to reset REGISTERLY to factory defaults?\n\n" +
-    "This will restore demo classes, subjects, students (IDs starting from 2000), sample attendance, and reset app/school names."
+    "⚠️ FULL APP RESET (LIKE NEW):\n\n" +
+    "Are you sure you want to wipe all app data like new? All students, classes, subjects, attendance, logs, and settings will be completely reset."
   );
   if (!confirmed) return;
 
   try {
     const res = await API.resetApp();
     if (res.success) {
-      showToast('App reset to factory defaults!');
+      showToast('App has been reset like brand new!');
       await loadAppSettings();
       await loadClasses();
       await loadSubjects();
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
+      await renderStudentsDirectory();
     }
   } catch (error) {
     showToast(error.message, true);
   }
-}
-
-// Signout
-function handleSignout() {
-  API.setToken(null);
-  showToast('Signed out successfully');
-  openAuthModal();
 }
 
 // ================= TAB NAVIGATION =================
@@ -1360,13 +1625,22 @@ function closeSubjectModal() { document.getElementById('modal-add-subject').clas
 function openAuthModal() {
   const modal = document.getElementById('auth-modal');
   if (modal) modal.classList.remove('hidden');
+  const closeBtn = document.getElementById('auth-close-btn');
+  if (closeBtn) {
+    if (!currentUser) {
+      closeBtn.classList.add('hidden');
+    } else {
+      closeBtn.classList.remove('hidden');
+    }
+  }
   clearAuthAlert();
   renderGoogleButton();
 }
 
 function closeAuthModal() {
   if (!currentUser) {
-    showToast('Signed in as Guest. Tap Profile to sign in anytime.');
+    showToast('Please sign in to access REGISTERLY', true);
+    return;
   }
   const modal = document.getElementById('auth-modal');
   if (modal) modal.classList.add('hidden');
@@ -1715,11 +1989,13 @@ async function handleEmailRegister(e) {
 }
 
 // Signout
+// USER DIRECTIVE: "sign out error fix it .....not come out side the app to the login page"
 function handleSignout() {
   API.setToken(null);
   currentUser = null;
-  currentRole = 'guest';
+  currentRole = null;
   updateUserUI();
+  selectTopTab('attendance');
   showToast('Signed out successfully');
   openAuthModal();
 }

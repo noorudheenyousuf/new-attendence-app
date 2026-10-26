@@ -5,10 +5,29 @@ const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 
 // @route   GET /api/classes
-// @desc    Get all classes
+// @desc    Get all classes sorted by custom order
 router.get('/', async (req, res) => {
   try {
-    const classes = await Class.find().sort({ name: 1 });
+    const classes = await Class.find().sort({ order: 1, createdAt: 1 });
+    res.json({ success: true, data: classes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/classes/reorder
+// @desc    Update classes display order via drag-and-drop
+router.put('/reorder', authMiddleware, async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ success: false, message: 'orderedIds array required' });
+    }
+    const updatePromises = orderedIds.map((id, index) =>
+      Class.findByIdAndUpdate(id, { order: index })
+    );
+    await Promise.all(updatePromises);
+    const classes = await Class.find().sort({ order: 1, createdAt: 1 });
     res.json({ success: true, data: classes });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

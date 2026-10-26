@@ -8,7 +8,7 @@ const Subject = require('../models/Subject');
 // @desc    Whole class students report with roll, sessions, present, absent, late, percent
 router.get('/class', async (req, res) => {
   try {
-    const { class: className, period, subject } = req.query;
+    const { class: className, year, period, subject } = req.query;
     if (!className) {
       return res.status(400).json({ success: false, message: 'Class parameter is required' });
     }
@@ -24,11 +24,15 @@ router.get('/class', async (req, res) => {
       attendanceFilter.subject = subject;
     }
 
-    // Period / Month filter ('all-year' means all records)
-    if (period && period !== 'all-year') {
-      const monthStr = String(period).padStart(2, '0');
-      // Matches dates like YYYY-MM-DD where MM is monthStr
-      attendanceFilter.date = { $regex: `^\\d{4}-${monthStr}-` };
+    // Year and Period / Month filters
+    const hasSpecificYear = year && year !== 'all' && year !== 'all-year';
+    const hasSpecificMonth = period && period !== 'all-year' && period !== 'all';
+
+    const yearPattern = hasSpecificYear ? year : '\\d{4}';
+    const monthPattern = hasSpecificMonth ? String(period).padStart(2, '0') : '\\d{2}';
+
+    if (hasSpecificYear || hasSpecificMonth) {
+      attendanceFilter.date = { $regex: `^${yearPattern}-${monthPattern}-` };
     }
 
     const attendanceDocs = await Attendance.find(attendanceFilter);

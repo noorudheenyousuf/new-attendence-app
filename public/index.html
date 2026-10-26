@@ -63,9 +63,9 @@
             </svg>
           </button>
 
-          <!-- Clean Profile Photo -->
-          <div class="flex items-center gap-1.5 cursor-pointer" onclick="selectTopTab('settings')">
-            <img id="user-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" alt="Profile" class="w-9 h-9 rounded-xl object-cover shadow-sm">
+          <!-- Clean Profile Photo (Click to update photo and name) -->
+          <div class="flex items-center gap-1.5 cursor-pointer" onclick="openProfileEditModal()" title="Click to update your photo and name">
+            <img id="user-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" alt="Profile" class="w-9 h-9 rounded-xl object-cover shadow-sm hover:scale-105 active:scale-95 transition">
             <div class="text-left hidden sm:block">
               <div class="text-xs font-bold leading-tight text-white" id="header-profile-name">
                 Sarah Jenkins
@@ -174,9 +174,9 @@
         </div>
 
         <div class="pt-1">
-          <button onclick="saveAttendance()" class="touch-btn w-full custom-gradient-btn font-extrabold text-sm sm:text-base rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-98 transition">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-            <span>Save & Submit Attendance</span>
+          <button onclick="saveAttendance()" id="btn-save-attendance" class="touch-btn w-full custom-gradient-btn font-extrabold text-sm sm:text-base rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-98 transition">
+            <svg id="btn-save-attendance-icon" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span id="btn-save-attendance-text">Save Attendance</span>
           </button>
         </div>
       </section>
@@ -193,19 +193,31 @@
             </button>
           </div>
 
-          <!-- Filters with ONLY main names (NO brackets) -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+          <!-- Filters: Class, Year, Month, Subject (No brackets) -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
             <div>
               <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Class</label>
-              <select id="report-class" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+              <select id="report-class" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
                 <!-- Populated via loadClasses() -->
               </select>
             </div>
 
             <div>
-              <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Period / Month</label>
-              <select id="report-period" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
-                <option value="all-year">All Year</option>
+              <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Year</label>
+              <select id="report-year" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
+                <option value="all">All Years</option>
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+                <option value="2028">2028</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Month</label>
+              <select id="report-period" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
+                <option value="all-year">All Months</option>
                 <option value="1">January</option>
                 <option value="2">February</option>
                 <option value="3">March</option>
@@ -223,7 +235,7 @@
 
             <div>
               <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Subject</label>
-              <select id="report-subject" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+              <select id="report-subject" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
                 <!-- Populated via loadSubjects() with ONLY main names -->
               </select>
             </div>
@@ -266,12 +278,15 @@
 
       <!-- 3. SETTINGS VIEW -->
       <section id="view-settings" class="hidden space-y-3.5">
-        <!-- Profile Card -->
+        <!-- Profile Card (Click Photo to Update Photo and Name) -->
         <div class="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm text-center">
-          <div class="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-2.5">
-            <img id="settings-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=face" class="w-full h-full rounded-2xl object-cover border-2 border-[#245b70] shadow-md">
+          <div class="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-2.5 cursor-pointer group" onclick="openProfileEditModal()" title="Click to update your photo and name">
+            <img id="settings-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=face" class="w-full h-full rounded-2xl object-cover border-2 border-[#245b70] shadow-md group-hover:scale-105 active:scale-95 transition">
+            <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg custom-gradient-btn text-white flex items-center justify-center shadow-sm">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </div>
           </div>
-          <h3 class="font-extrabold text-sm sm:text-base text-[var(--text-main)]" id="settings-name-display">Sarah Jenkins</h3>
+          <h3 class="font-extrabold text-sm sm:text-base text-[var(--text-main)] cursor-pointer hover:text-[#245b70] transition" onclick="openProfileEditModal()" id="settings-name-display">Sarah Jenkins</h3>
           <p class="text-xs text-[var(--text-sub)] font-medium" id="settings-email-display">sarah.jenkins@stxavier.edu</p>
           <div class="inline-flex items-center gap-1 mt-1.5 px-2.5 py-0.5 bg-[#245b70]/10 text-[#245b70] dark:text-teal-300 text-xs font-bold rounded-full" id="settings-role-badge">
             Admin (First Account)
@@ -296,10 +311,10 @@
 
         <!-- ADMIN ONLY SECTION (Hidden for regular teachers) -->
         <div id="admin-settings-section" class="space-y-3">
-          <!-- Button to Admin Panel -->
+          <!-- Button to Admin Panel (EXACT NAME: Open Admin Panel) -->
           <button onclick="openAdminPanel()" class="touch-btn w-full custom-gradient-btn font-extrabold text-xs sm:text-sm rounded-2xl shadow-md flex items-center justify-center gap-2 active:scale-98 transition">
             <svg class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
-            <span>Open Admin Panel (School, App & Teachers)</span>
+            <span>Open Admin Panel</span>
           </button>
 
           <!-- Backup Options (Admin only) -->
@@ -311,7 +326,7 @@
             
             <div class="grid grid-cols-2 gap-2">
               <button onclick="exportBackupData()" class="touch-btn bg-[var(--bg-page)] hover:bg-[#245b70]/10 text-[var(--text-main)] border border-[var(--border-color)] rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center transition">
-                <svg class="w-4 h-4 text-[#245b70]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <svg class="w-4 h-4 text-[#245b70]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                 <span class="text-xs font-bold">Export Backup</span>
               </button>
 
@@ -320,28 +335,6 @@
                 <svg class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                 <span class="text-xs font-bold">Import / Restore</span>
               </label>
-            </div>
-          </div>
-
-          <!-- Admin Data Controls (Clear Data & Reset App) -->
-          <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-rose-200 dark:border-rose-950/60 shadow-sm space-y-2.5">
-            <h4 class="text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Admin Data Controls</span>
-              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-900 dark:text-rose-300">Admin Only</span>
-            </h4>
-            <p class="text-[11px] text-[var(--text-sub)]">
-              Clear all records or reset REGISTERLY back to initial demo factory state.
-            </p>
-            <div class="grid grid-cols-2 gap-2">
-              <button onclick="handleClearDataPrompt()" class="touch-btn btn-clear-data rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center transition font-bold text-xs shadow-sm">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                <span>Clear All Data</span>
-              </button>
-
-              <button onclick="handleResetAppPrompt()" class="touch-btn btn-reset-app rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center transition font-bold text-xs shadow-sm">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"/><path d="M22 11.5A10 10 0 0 0 3.2 7.2M2 12.5a10 10 0 0 0 18.8 4.2"/></svg>
-                <span>Reset App Defaults</span>
-              </button>
             </div>
           </div>
         </div>
@@ -854,6 +847,22 @@
         <button onclick="closeStudentLogModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
       </div>
 
+      <!-- Top Badges: Present in Green, Absent in Red, Late in Yellow -->
+      <div class="grid grid-cols-3 gap-2">
+        <div class="p-2 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center shadow-sm">
+          <div class="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">PRESENT</div>
+          <div class="text-base font-black text-emerald-800 dark:text-emerald-200" id="log-stat-present">0</div>
+        </div>
+        <div class="p-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center shadow-sm">
+          <div class="text-[10px] font-bold text-rose-700 dark:text-rose-300">ABSENT</div>
+          <div class="text-base font-black text-rose-800 dark:text-rose-200" id="log-stat-absent">0</div>
+        </div>
+        <div class="p-2 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-center shadow-sm">
+          <div class="text-[10px] font-bold text-amber-700 dark:text-amber-300">LATE</div>
+          <div class="text-base font-black text-amber-800 dark:text-amber-200" id="log-stat-late">0</div>
+        </div>
+      </div>
+
       <div class="space-y-2 max-h-60 overflow-y-auto pr-1" id="student-logs-list">
         <!-- Populated via openStudentLogModal() -->
       </div>
@@ -861,6 +870,49 @@
       <button onclick="closeStudentLogModal()" class="touch-btn w-full bg-slate-100 dark:bg-slate-800 text-[var(--text-main)] font-bold text-xs rounded-xl">
         Close Logs
       </button>
+    </div>
+  </div>
+
+  <!-- ================= USER PROFILE EDIT MODAL (Click Photo to Update Photo & Name) ================= -->
+  <div id="modal-edit-profile" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3.5 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] space-y-4">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <h3 class="font-extrabold text-sm sm:text-base text-[var(--text-main)]">Edit Profile</h3>
+        <button onclick="closeProfileEditModal()" class="w-8 h-8 rounded-full bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <!-- Photo Picker -->
+      <div class="flex flex-col items-center gap-2">
+        <div class="relative group">
+          <img id="edit-profile-avatar-preview" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=face" class="w-24 h-24 rounded-3xl object-cover border-2 border-[#245b70] shadow-md">
+          <label class="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl custom-gradient-btn text-white flex items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 transition" title="Change Photo">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            <input type="file" accept="image/*" class="hidden" onchange="handleUserProfilePhotoUpload(event)">
+          </label>
+        </div>
+        <span class="text-[11px] text-[var(--text-sub)] font-medium">Tap camera to upload new photo</span>
+      </div>
+
+      <!-- Name Input -->
+      <div>
+        <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Your Full Name</label>
+        <input type="text" id="edit-profile-name-input" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs sm:text-sm font-bold text-[var(--text-main)] focus:ring-2 focus:ring-[#245b70] focus:outline-none">
+      </div>
+
+      <!-- Email Input (Read-only) -->
+      <div>
+        <label class="block text-xs font-bold text-[var(--text-sub)] mb-1">Email Address</label>
+        <input type="email" id="edit-profile-email-input" readonly class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-sub)] cursor-not-allowed">
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button type="button" onclick="closeProfileEditModal()" class="touch-btn flex-1 bg-[var(--bg-page)] text-[var(--text-sub)] font-bold text-xs rounded-xl hover:text-[var(--text-main)] transition">
+          Cancel
+        </button>
+        <button type="button" onclick="handleSaveProfile()" id="btn-save-profile" class="touch-btn flex-1 custom-gradient-btn text-white font-black text-xs rounded-xl shadow-md active:scale-98 transition">
+          Save Profile
+        </button>
+      </div>
     </div>
   </div>
 
@@ -900,6 +952,29 @@
         </div>
         <div class="space-y-1.5 text-xs" id="admin-teachers-list">
           <!-- Populated via loadAdminTeachersList() -->
+        </div>
+      </div>
+
+      <!-- Admin Data Controls (Clear Attendance Data & Reset App) -->
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-rose-200 dark:border-rose-950/60 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-wide">Data Controls</div>
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-900 dark:text-rose-300">Admin Actions</span>
+        </div>
+        <p class="text-[11px] text-[var(--text-sub)] leading-relaxed">
+          • <b>Clear Data:</b> Clears attendance records of whole class (students, teachers, classes, and subjects remain safe).<br>
+          • <b>Reset App:</b> Clears all app data like new.
+        </p>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="handleClearDataPrompt()" class="touch-btn btn-clear-data rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center transition font-bold text-xs shadow-sm">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            <span>Clear Attendance Data</span>
+          </button>
+
+          <button onclick="handleResetAppPrompt()" class="touch-btn btn-reset-app rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center transition font-bold text-xs shadow-sm">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"/><path d="M22 11.5A10 10 0 0 0 3.2 7.2M2 12.5a10 10 0 0 0 18.8 4.2"/></svg>
+            <span>Reset App (Like New)</span>
+          </button>
         </div>
       </div>
     </div>
@@ -978,7 +1053,7 @@
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Email or Username</label>
           <div class="relative">
             <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-            <input type="text" id="login-email" required placeholder="e.g. sarah.jenkins@stxavier.edu or admin" class="touch-input w-full rounded-xl pl-10 pr-3 text-xs sm:text-sm font-semibold border focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
+            <input type="text" id="login-email" required placeholder="e.g. sarah.jenkins@stxavier.edu or admin" class="touch-input w-full rounded-xl pl-10 pr-3 text-xs sm:text-sm font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
           </div>
         </div>
 
@@ -989,7 +1064,7 @@
           </div>
           <div class="relative">
             <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            <input type="password" id="login-password" required placeholder="Enter password" class="touch-input w-full rounded-xl pl-10 pr-11 text-xs sm:text-sm font-semibold border focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
+            <input type="password" id="login-password" required placeholder="Enter password" class="touch-input w-full rounded-xl pl-10 pr-11 text-xs sm:text-sm font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
             <button type="button" onclick="togglePasswordVisibility('login-password', 'eye-icon-login')" class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sub)] hover:text-[var(--text-main)] p-1">
               <svg id="eye-icon-login" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
@@ -1009,7 +1084,7 @@
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Full Name</label>
           <div class="relative">
             <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-            <input type="text" id="register-name" required placeholder="e.g. Prof. Alan Walker" class="touch-input w-full rounded-xl pl-10 pr-3 text-xs sm:text-sm font-semibold border focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
+            <input type="text" id="register-name" required placeholder="e.g. Prof. Alan Walker" class="touch-input w-full rounded-xl pl-10 pr-3 text-xs sm:text-sm font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
           </div>
         </div>
 
@@ -1017,7 +1092,7 @@
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Email Address</label>
           <div class="relative">
             <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            <input type="email" id="register-email" required placeholder="alan.walker@stxavier.edu" class="touch-input w-full rounded-xl pl-10 pr-3 text-xs sm:text-sm font-semibold border focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
+            <input type="email" id="register-email" required placeholder="alan.walker@stxavier.edu" class="touch-input w-full rounded-xl pl-10 pr-3 text-xs sm:text-sm font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
           </div>
         </div>
 
@@ -1025,7 +1100,7 @@
           <div>
             <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Password</label>
             <div class="relative">
-              <input type="password" id="register-password" required minlength="6" placeholder="Min 6 chars" class="touch-input w-full rounded-xl pl-3 pr-9 text-xs sm:text-sm font-semibold border focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
+              <input type="password" id="register-password" required minlength="6" placeholder="Min 6 chars" class="touch-input w-full rounded-xl pl-3 pr-9 text-xs sm:text-sm font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
               <button type="button" onclick="togglePasswordVisibility('register-password', 'eye-icon-reg')" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)] hover:text-[var(--text-main)] p-1">
                 <svg id="eye-icon-reg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
               </button>
@@ -1033,7 +1108,7 @@
           </div>
           <div>
             <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Confirm Password</label>
-            <input type="password" id="register-confirm" required minlength="6" placeholder="Re-enter password" class="touch-input w-full rounded-xl px-3 text-xs sm:text-sm font-semibold border focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
+            <input type="password" id="register-confirm" required minlength="6" placeholder="Re-enter password" class="touch-input w-full rounded-xl px-3 text-xs sm:text-sm font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-[#245b70] focus:outline-none shadow-sm">
           </div>
         </div>
 

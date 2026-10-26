@@ -113,6 +113,36 @@ body.dark-mode textarea {
   border-color: #243c47 !important;
 }
 
+#auth-modal input {
+  background-color: #ffffff !important;
+  color: #14323d !important;
+  border-color: #cbd5e1 !important;
+}
+body.dark-mode #auth-modal input {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+/* Drag and drop sorting styles */
+.drag-item {
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.drag-item:active {
+  cursor: grabbing;
+}
+.drag-item.dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+  border: 2px dashed #245b70 !important;
+}
+.drag-item.drag-over {
+  border-top: 3px solid #245b70 !important;
+  transform: translateY(2px);
+}
+
 input::placeholder, textarea::placeholder {
   color: var(--text-sub) !important;
   opacity: 0.7;

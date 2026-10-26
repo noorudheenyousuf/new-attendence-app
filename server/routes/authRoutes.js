@@ -297,4 +297,40 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   PUT /api/auth/profile
+// @desc    USER DIRECTIVE: All accounts can change their names and photo by clicking their photo
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { name, avatarUrl } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (name && name.trim()) {
+      user.name = name.trim();
+    }
+    if (avatarUrl) {
+      user.avatarUrl = avatarUrl;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully!',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        isFirstAccount: user.isFirstAccount
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

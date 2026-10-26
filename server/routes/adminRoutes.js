@@ -144,73 +144,73 @@ router.put('/teachers/:id', async (req, res) => {
   }
 });
 
-// @route   PUT /api/admin/teachers/:id/make-admin
-// @desc    Promote teacher account to Admin
-router.put('/teachers/:id/make-admin', async (req, res) => {
+// @route   PUT /api/admin/teachers/:id/toggle-admin (also supports /make-admin)
+// @desc    Toggle account between Admin and Teacher role
+router.put(['/teachers/:id/toggle-admin', '/teachers/:id/make-admin'], async (req, res) => {
   try {
     const teacher = await User.findById(req.params.id);
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Account not found' });
     }
 
-    teacher.role = 'admin';
+    // Toggle role: if admin, become teacher; if teacher, become admin
+    const newRole = teacher.role === 'admin' ? 'teacher' : 'admin';
+    teacher.role = newRole;
     await teacher.save();
 
+    const isNowAdmin = newRole === 'admin';
     await ActivityLog.create({
-      action: `Account Promoted to Admin: ${teacher.name}`,
-      details: `Promoted by Admin ${req.user.name}`,
+      action: isNowAdmin ? `Account Promoted to Admin: ${teacher.name}` : `Admin Privileges Removed: ${teacher.name}`,
+      details: isNowAdmin ? `Promoted by Admin ${req.user.name}` : `Demoted to Teacher by Admin ${req.user.name}`,
       performedBy: req.user.name,
       role: 'admin',
       entityType: 'settings',
       canUndo: false
     });
 
-    res.json({ success: true, message: `${teacher.name} is now an Admin`, data: teacher });
+    res.json({
+      success: true,
+      message: isNowAdmin ? `${teacher.name} is now an Admin` : `${teacher.name} is now a Teacher`,
+      data: teacher
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // @route   POST /api/admin/clear-data
-// @desc    Admin clears all students, attendance, subjects, classes and activity logs
+// @desc    USER DIRECTIVE: Clear ONLY whole class attendance data (keeps teachers, students, class, subjects, details intact)
 router.post('/clear-data', async (req, res) => {
   try {
-    const Student = require('../models/Student');
     const Attendance = require('../models/Attendance');
-    const Subject = require('../models/Subject');
-    const Class = require('../models/Class');
 
-    await Student.deleteMany({});
     await Attendance.deleteMany({});
-    await Subject.deleteMany({});
-    await Class.deleteMany({});
-    await ActivityLog.deleteMany({});
 
     await ActivityLog.create({
-      action: 'All Data Cleared',
-      details: 'Classes, subjects, students, and attendance records cleared by Admin',
+      action: 'Attendance Records Cleared',
+      details: 'All class attendance records cleared by Admin (students, classes, subjects preserved)',
       performedBy: req.user.name,
       role: 'admin',
-      entityType: 'settings',
+      entityType: 'attendance',
       canUndo: false
     });
 
-    res.json({ success: true, message: 'All application data has been cleared.' });
+    res.json({ success: true, message: 'All class attendance records have been cleared. Students, classes, and subjects remain intact.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // @route   POST /api/admin/reset-app
-// @desc    Admin resets app to factory state (re-seeds default classes, subjects, students, and settings)
+// @desc    USER DIRECTIVE: Clear all app data like new
 router.post('/reset-app', async (req, res) => {
   try {
     const Student = require('../models/Student');
     const Attendance = require('../models/Attendance');
     const Subject = require('../models/Subject');
     const Class = require('../models/Class');
-    const seedInitialData = require('../utils/seed');
 
+    // Clear all app records like brand new
     await Student.deleteMany({});
     await Attendance.deleteMany({});
     await Subject.deleteMany({});
@@ -220,22 +220,20 @@ router.post('/reset-app', async (req, res) => {
     let settings = await AppSettings.findOne();
     if (settings) {
       settings.appName = 'REGISTERLY';
-      settings.schoolName = 'St. Xavier Higher Secondary School';
+      settings.schoolName = '';
       await settings.save();
     }
 
-    await seedInitialData();
-
     await ActivityLog.create({
-      action: 'App Reset to Default State',
-      details: 'Restored sample classes, subjects, students (starting at ID 2000), and settings',
+      action: 'Application Reset Like New',
+      details: 'All data cleared like brand new by Admin',
       performedBy: req.user.name,
       role: 'admin',
       entityType: 'settings',
       canUndo: false
     });
 
-    res.json({ success: true, message: 'Application has been reset to factory defaults.' });
+    res.json({ success: true, message: 'Application has been reset like brand new. All data cleared.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

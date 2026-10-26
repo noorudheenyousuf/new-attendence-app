@@ -12,6 +12,10 @@ const classSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  order: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

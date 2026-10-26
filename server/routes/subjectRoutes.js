@@ -5,10 +5,29 @@ const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 
 // @route   GET /api/subjects
-// @desc    Get all subjects
+// @desc    Get all subjects sorted by custom order
 router.get('/', async (req, res) => {
   try {
-    const subjects = await Subject.find().sort({ name: 1 });
+    const subjects = await Subject.find().sort({ order: 1, createdAt: 1 });
+    res.json({ success: true, data: subjects });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/subjects/reorder
+// @desc    Update subjects display order via drag-and-drop
+router.put('/reorder', authMiddleware, async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ success: false, message: 'orderedIds array required' });
+    }
+    const updatePromises = orderedIds.map((id, index) =>
+      Subject.findByIdAndUpdate(id, { order: index })
+    );
+    await Promise.all(updatePromises);
+    const subjects = await Subject.find().sort({ order: 1, createdAt: 1 });
     res.json({ success: true, data: subjects });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
