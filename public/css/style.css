@@ -17,8 +17,19 @@
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* App Shell Layout - Fixes bottom navigation bar from scrolling away */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* THEME: User's exact custom gradient */
 :root {
+  color-scheme: light;
   --primary-color: #245b70;
   --secondary-teal: #43888a;
   --header-gradient: linear-gradient(135deg, #245b70, #43888a);
@@ -34,6 +45,7 @@
 
 /* Dark Mode Theme */
 body.dark-mode {
+  color-scheme: dark;
   --bg-page: #0c1519;
   --card-bg: #142229;
   --text-main: #f0f7f9;
@@ -57,15 +69,48 @@ body.dark-mode {
   opacity: 0.95;
 }
 
-/* Inputs, selects, and textareas - Guarantee clean light mode & dark mode readability */
+/* Inputs, selects, and textareas - Strictly prevent black inputs in white mode */
 input, select, textarea {
   background-color: var(--input-bg) !important;
   color: var(--input-text) !important;
   border-color: var(--input-border) !important;
 }
+body:not(.dark-mode) input,
+body:not(.dark-mode) select,
+body:not(.dark-mode) textarea {
+  background-color: #ffffff !important;
+  color: #14323d !important;
+  border-color: #cbd5e1 !important;
+}
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background-color: #101d23 !important;
+  color: #f0f7f9 !important;
+  border-color: #243c47 !important;
+}
+
 input::placeholder, textarea::placeholder {
   color: var(--text-sub) !important;
   opacity: 0.7;
+}
+
+/* Print Button: User Directive "print button make dark in light mode" */
+.btn-print {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border: 1px solid #0f172a !important;
+}
+.btn-print:hover {
+  background-color: #1e293b !important;
+}
+body.dark-mode .btn-print {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+}
+body.dark-mode .btn-print:hover {
+  background-color: #334155 !important;
 }
 
 /* Signout Button: User Directive "signout button gave lightorange when lightmode" */
@@ -104,6 +149,60 @@ body.dark-mode .btn-delete {
 body.dark-mode .btn-delete:hover {
   background-color: #b91c1c !important;
   color: #ffffff !important;
+}
+
+/* Data Controls: Clear Data & Reset App */
+.btn-clear-data {
+  background-color: #fee2e2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fca5a5 !important;
+}
+.btn-clear-data:hover {
+  background-color: #fecaca !important;
+}
+body.dark-mode .btn-clear-data {
+  background-color: rgba(127, 29, 29, 0.35) !important;
+  color: #fca5a5 !important;
+  border: 1px solid #991b1b !important;
+}
+body.dark-mode .btn-clear-data:hover {
+  background-color: rgba(127, 29, 29, 0.55) !important;
+}
+
+.btn-reset-app {
+  background-color: #fef3c7 !important;
+  color: #b45309 !important;
+  border: 1px solid #fcd34d !important;
+}
+.btn-reset-app:hover {
+  background-color: #fde68a !important;
+}
+body.dark-mode .btn-reset-app {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+  color: #fcd34d !important;
+  border: 1px solid #92400e !important;
+}
+body.dark-mode .btn-reset-app:hover {
+  background-color: rgba(120, 53, 15, 0.55) !important;
+}
+
+/* Activity Logs: User Directive "actitity log only five logs show ....other will scroll" */
+.activity-logs-scroll {
+  max-height: 295px;
+  overflow-y: auto;
+}
+.activity-logs-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.activity-logs-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.activity-logs-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+body.dark-mode .activity-logs-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
 }
 
 /* Report Status Badges: Excellent, Regular, Warning, Critical */

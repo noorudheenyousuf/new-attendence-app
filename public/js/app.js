@@ -1174,6 +1174,53 @@ async function importBackupData(event) {
   }
 }
 
+// ================= DATA CONTROLS (ADMIN ONLY) =================
+// USER DIRECTIVE: "add option for reset the app for admin and clear data button"
+async function handleClearDataPrompt() {
+  const confirmed = confirm(
+    "⚠️ CAUTION: Are you sure you want to clear ALL data?\n\n" +
+    "This will delete all classes, subjects, students, and attendance records. Your admin account will remain active so you can start fresh."
+  );
+  if (!confirmed) return;
+
+  try {
+    const res = await API.clearData();
+    if (res.success) {
+      showToast('All data has been cleared!');
+      await loadClasses();
+      await loadSubjects();
+      await loadAttendanceRoster();
+      await loadReport();
+      await loadActivityLogs();
+    }
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function handleResetAppPrompt() {
+  const confirmed = confirm(
+    "⚠️ FACTORY RESET: Are you sure you want to reset REGISTERLY to factory defaults?\n\n" +
+    "This will restore demo classes, subjects, students (IDs starting from 2000), sample attendance, and reset app/school names."
+  );
+  if (!confirmed) return;
+
+  try {
+    const res = await API.resetApp();
+    if (res.success) {
+      showToast('App reset to factory defaults!');
+      await loadAppSettings();
+      await loadClasses();
+      await loadSubjects();
+      await loadAttendanceRoster();
+      await loadReport();
+      await loadActivityLogs();
+    }
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
 // Signout
 function handleSignout() {
   API.setToken(null);

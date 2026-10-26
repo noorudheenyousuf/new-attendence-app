@@ -8,11 +8,18 @@
   <meta name="theme-color" content="#245b70">
   <link rel="stylesheet" href="/css/style.css">
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <script>
+    if (window.tailwind) {
+      tailwind.config = {
+        darkMode: 'class'
+      };
+    }
+  </script>
 </head>
-<body id="app-body" class="bg-[var(--bg-page)] text-[var(--text-main)] antialiased min-h-screen flex flex-col transition-colors duration-300">
+<body id="app-body" class="bg-[var(--bg-page)] text-[var(--text-main)] antialiased h-screen h-[100dvh] overflow-hidden flex flex-col transition-colors duration-300">
 
-  <!-- ================= APP CONTAINER ================= -->
-  <div class="w-full max-w-2xl mx-auto min-h-screen flex flex-col bg-[var(--card-bg)] border-x border-[var(--border-color)] shadow-xl relative transition-colors duration-300">
+  <!-- ================= APP CONTAINER (Fixed Shell: Nav stays pinned at bottom) ================= -->
+  <div class="w-full max-w-2xl mx-auto h-full flex flex-col bg-[var(--card-bg)] border-x border-[var(--border-color)] shadow-xl relative transition-colors duration-300 overflow-hidden">
 
     <!-- ================= HEADER (Fluid & Zero Overflow on Narrow Screens) ================= -->
     <header class="custom-gradient-header text-white px-3.5 pt-3.5 pb-3 shadow-lg flex-shrink-0 sticky top-0 z-30">
@@ -83,7 +90,7 @@
     </header>
 
     <!-- ================= MAIN CONTENT VIEWPORT ================= -->
-    <main class="flex-1 overflow-y-auto p-3 sm:p-4 bg-[var(--bg-page)] pb-28 transition-colors duration-300">
+    <main class="flex-1 overflow-y-auto p-3 sm:p-4 bg-[var(--bg-page)] pb-6 transition-colors duration-300">
 
       <!-- 1. ATTENDANCE VIEW -->
       <section id="view-attendance" class="space-y-3.5">
@@ -172,7 +179,8 @@
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
           <div class="flex items-center justify-between">
             <h2 class="text-sm sm:text-base font-bold text-[var(--text-main)]">Whole Class Report</h2>
-            <button onclick="printReport()" class="touch-btn px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-bold rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition">
+            <!-- Print Button (Dark in Light Mode as instructed) -->
+            <button onclick="printReport()" class="touch-btn px-3.5 btn-print text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition">
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
               <span>Print</span>
             </button>
@@ -291,16 +299,38 @@
               </label>
             </div>
           </div>
+
+          <!-- Admin Data Controls (Clear Data & Reset App) -->
+          <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-rose-200 dark:border-rose-950/60 shadow-sm space-y-2.5">
+            <h4 class="text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Admin Data Controls</span>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-900 dark:text-rose-300">Admin Only</span>
+            </h4>
+            <p class="text-[11px] text-[var(--text-sub)]">
+              Clear all records or reset REGISTERLY back to initial demo factory state.
+            </p>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="handleClearDataPrompt()" class="touch-btn btn-clear-data rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center transition font-bold text-xs shadow-sm">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                <span>Clear All Data</span>
+              </button>
+
+              <button onclick="handleResetAppPrompt()" class="touch-btn btn-reset-app rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center transition font-bold text-xs shadow-sm">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"/><path d="M22 11.5A10 10 0 0 0 3.2 7.2M2 12.5a10 10 0 0 0 18.8 4.2"/></svg>
+                <span>Reset App Defaults</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- Activity Logs (With present, absent, late counts; Undo only shown for admin!) -->
+        <!-- Activity Logs (Only five logs show in view, other will scroll) -->
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
           <h4 class="text-xs font-bold text-[var(--text-sub)] uppercase tracking-wider flex items-center justify-between">
             <span>Activity Logs</span>
             <span class="text-[10px] text-[#245b70] font-semibold">Live history</span>
           </h4>
           
-          <div class="space-y-2 text-xs" id="activity-logs-container">
+          <div class="space-y-2 text-xs activity-logs-scroll pr-1" id="activity-logs-container">
             <!-- Populated via loadActivityLogs() -->
           </div>
         </div>
@@ -374,8 +404,8 @@
 
     </main>
 
-    <!-- ================= BOTTOM THREE TABS (Add Class, Subjects, Students) ================= -->
-    <footer class="absolute bottom-0 left-0 right-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-3 py-1.5 flex items-center justify-around shadow-2xl z-20 no-print">
+    <!-- ================= BOTTOM THREE TABS (Add Class, Subjects, Students - Fixed DOCKED) ================= -->
+    <footer class="flex-shrink-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-3 py-1.5 flex items-center justify-around shadow-2xl z-20 no-print">
       <button onclick="selectBottomTab('classes')" id="bottom-tab-classes" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
         <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
         <span class="text-[11px] font-bold">Add Class</span>
@@ -535,7 +565,7 @@
                 Choose Photo
               </button>
             </div>
-            <input type="text" id="auto-student-id" value="2000" readonly class="touch-input w-full bg-white dark:bg-slate-900 border border-[#245b70] rounded-xl px-3 text-sm font-black text-[#245b70] cursor-not-allowed">
+            <input type="text" id="auto-student-id" value="2000" readonly class="touch-input w-full  border border-[#245b70] rounded-xl px-3 text-sm font-black text-[#245b70] cursor-not-allowed">
           </div>
         </div>
 
@@ -559,11 +589,11 @@
         <!-- Address -->
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
           <div class="text-[10px] font-black text-[#245b70] uppercase">Address Details</div>
-          <input type="text" id="new-student-address" placeholder="Full Address / House Name" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+          <input type="text" id="new-student-address" placeholder="Full Address / House Name" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
           <div class="grid grid-cols-3 gap-1.5">
-            <input type="text" id="new-student-place" placeholder="Place" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="new-student-district" placeholder="District" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="new-student-state" placeholder="State" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="new-student-place" placeholder="Place" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="new-student-district" placeholder="District" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="new-student-state" placeholder="State" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
           </div>
         </div>
 
@@ -571,12 +601,12 @@
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
           <div class="text-[10px] font-black text-[#245b70] uppercase">Family Details</div>
           <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="new-student-father" placeholder="Father's Name" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="new-student-mother" placeholder="Mother's Name" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="new-student-father" placeholder="Father's Name" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="new-student-mother" placeholder="Mother's Name" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <input type="tel" id="new-student-mobile-normal" placeholder="Father Mobile (Normal)" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
-            <input type="tel" id="new-student-mobile-wa" placeholder="WhatsApp Number" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
+            <input type="tel" id="new-student-mobile-normal" placeholder="Father Mobile (Normal)" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
+            <input type="tel" id="new-student-mobile-wa" placeholder="WhatsApp Number" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
           </div>
         </div>
 
@@ -586,15 +616,15 @@
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Year Joined College</label>
-              <input type="number" id="new-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" value="2024" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
+              <input type="number" id="new-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" value="2024" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
             </div>
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Rank</label>
-              <input type="text" id="new-student-rank" placeholder="Rank" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+              <input type="text" id="new-student-rank" placeholder="Rank" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
             </div>
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Previous College</label>
-              <input type="text" id="new-student-college" placeholder="Previous College" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+              <input type="text" id="new-student-college" placeholder="Previous College" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
             </div>
           </div>
         </div>
@@ -634,7 +664,7 @@
                 Change Photo
               </button>
             </div>
-            <input type="text" id="edit-student-id" readonly class="touch-input w-full bg-slate-100 dark:bg-slate-800 border border-[#245b70] rounded-xl px-3 text-sm font-black text-[#245b70] cursor-not-allowed">
+            <input type="text" id="edit-student-id" readonly class="touch-input w-full border border-[#245b70] rounded-xl px-3 text-sm font-black text-[#245b70] cursor-not-allowed">
           </div>
         </div>
 
@@ -658,11 +688,11 @@
         <!-- Address -->
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
           <div class="text-[10px] font-black text-[#245b70] uppercase">Address Details</div>
-          <input type="text" id="edit-student-address" placeholder="Address" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+          <input type="text" id="edit-student-address" placeholder="Address" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
           <div class="grid grid-cols-3 gap-1.5">
-            <input type="text" id="edit-student-place" placeholder="Place" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="edit-student-district" placeholder="District" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="edit-student-state" placeholder="State" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="edit-student-place" placeholder="Place" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="edit-student-district" placeholder="District" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="edit-student-state" placeholder="State" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
           </div>
         </div>
 
@@ -670,17 +700,17 @@
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
           <div class="text-[10px] font-black text-[#245b70] uppercase">Family Details</div>
           <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="edit-student-father" placeholder="Father's Name" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="edit-student-mother" placeholder="Mother's Name" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="edit-student-father" placeholder="Father's Name" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            <input type="text" id="edit-student-mother" placeholder="Mother's Name" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Father's Mobile (Normal)</label>
-              <input type="tel" id="edit-student-mobile-normal" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
+              <input type="tel" id="edit-student-mobile-normal" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
             </div>
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">WhatsApp Number</label>
-              <input type="tel" id="edit-student-mobile-wa" required class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
+              <input type="tel" id="edit-student-mobile-wa" required class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
             </div>
           </div>
         </div>
@@ -691,15 +721,15 @@
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Year Joined College</label>
-              <input type="number" id="edit-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
+              <input type="number" id="edit-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
             </div>
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Rank</label>
-              <input type="text" id="edit-student-rank" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+              <input type="text" id="edit-student-rank" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
             </div>
             <div>
               <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Previous College</label>
-              <input type="text" id="edit-student-college" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
+              <input type="text" id="edit-student-college" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
             </div>
           </div>
         </div>
@@ -825,11 +855,11 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">App Name</label>
-            <input type="text" id="admin-input-app-name" value="REGISTERLY" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <input type="text" id="admin-input-app-name" value="REGISTERLY" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
           </div>
           <div>
             <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">School Name</label>
-            <input type="text" id="admin-input-school-name" value="St. Xavier Higher Secondary School" class="touch-input w-full bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <input type="text" id="admin-input-school-name" value="St. Xavier Higher Secondary School" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
           </div>
         </div>
         <button onclick="saveAdminSchoolSettings()" class="touch-btn w-full bg-[#245b70] text-white font-bold text-xs rounded-xl">
@@ -854,7 +884,7 @@
 
   <!-- ================= AUTH MODAL (Google & Username/Password) ================= -->
   <div id="auth-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
-    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+    <div class=" w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-xl font-black text-slate-900 dark:text-white">Sign in to REGISTERLY</h2>
         <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">✕</button>
@@ -868,11 +898,11 @@
       <form onsubmit="handleEmailLogin(event)" class="space-y-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Email / Username</label>
-          <input type="email" id="login-email" required value="sarah.jenkins@stxavier.edu" class="touch-input w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 text-sm font-semibold text-slate-900 dark:text-white">
+          <input type="email" id="login-email" required value="sarah.jenkins@stxavier.edu" class="touch-input w-full  border rounded-xl px-4 text-sm font-semibold text-slate-900 dark:text-white">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Password</label>
-          <input type="password" id="login-password" required value="password123" class="touch-input w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 text-sm font-semibold text-slate-900 dark:text-white">
+          <input type="password" id="login-password" required value="password123" class="touch-input w-full  border rounded-xl px-4 text-sm font-semibold text-slate-900 dark:text-white">
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-2">
           Sign In

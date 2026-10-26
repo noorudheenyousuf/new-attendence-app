@@ -171,4 +171,74 @@ router.put('/teachers/:id/make-admin', async (req, res) => {
   }
 });
 
+// @route   POST /api/admin/clear-data
+// @desc    Admin clears all students, attendance, subjects, classes and activity logs
+router.post('/clear-data', async (req, res) => {
+  try {
+    const Student = require('../models/Student');
+    const Attendance = require('../models/Attendance');
+    const Subject = require('../models/Subject');
+    const Class = require('../models/Class');
+
+    await Student.deleteMany({});
+    await Attendance.deleteMany({});
+    await Subject.deleteMany({});
+    await Class.deleteMany({});
+    await ActivityLog.deleteMany({});
+
+    await ActivityLog.create({
+      action: 'All Data Cleared',
+      details: 'Classes, subjects, students, and attendance records cleared by Admin',
+      performedBy: req.user.name,
+      role: 'admin',
+      entityType: 'settings',
+      canUndo: false
+    });
+
+    res.json({ success: true, message: 'All application data has been cleared.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/admin/reset-app
+// @desc    Admin resets app to factory state (re-seeds default classes, subjects, students, and settings)
+router.post('/reset-app', async (req, res) => {
+  try {
+    const Student = require('../models/Student');
+    const Attendance = require('../models/Attendance');
+    const Subject = require('../models/Subject');
+    const Class = require('../models/Class');
+    const seedInitialData = require('../utils/seed');
+
+    await Student.deleteMany({});
+    await Attendance.deleteMany({});
+    await Subject.deleteMany({});
+    await Class.deleteMany({});
+    await ActivityLog.deleteMany({});
+
+    let settings = await AppSettings.findOne();
+    if (settings) {
+      settings.appName = 'REGISTERLY';
+      settings.schoolName = 'St. Xavier Higher Secondary School';
+      await settings.save();
+    }
+
+    await seedInitialData();
+
+    await ActivityLog.create({
+      action: 'App Reset to Default State',
+      details: 'Restored sample classes, subjects, students (starting at ID 2000), and settings',
+      performedBy: req.user.name,
+      role: 'admin',
+      entityType: 'settings',
+      canUndo: false
+    });
+
+    res.json({ success: true, message: 'Application has been reset to factory defaults.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

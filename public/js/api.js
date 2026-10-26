@@ -212,6 +212,18 @@ const API = {
     });
   },
 
+  async clearData() {
+    return this.request('/admin/clear-data', {
+      method: 'POST'
+    });
+  },
+
+  async resetApp() {
+    return this.request('/admin/reset-app', {
+      method: 'POST'
+    });
+  },
+
   // Backup (Admin Only)
   async importBackup(data) {
     return this.request('/backup/import', {
