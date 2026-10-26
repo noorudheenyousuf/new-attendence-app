@@ -36,6 +36,22 @@ const seedInitialData = async () => {
       console.log('[Seed] First user created as Admin (sarah.jenkins@stxavier.edu / password123)');
     }
 
+    // Sample Teacher
+    const teacherExists = await User.findOne({ role: 'teacher' });
+    if (!teacherExists) {
+      const salt = await bcrypt.genSalt(10);
+      const teacherHash = await bcrypt.hash('teacher123', salt);
+      await User.create({
+        name: 'Dr. Alan Grant',
+        email: 'teacher@stxavier.edu',
+        password: teacherHash,
+        role: 'teacher',
+        isFirstAccount: false,
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face'
+      });
+      console.log('[Seed] Sample Teacher created (teacher@stxavier.edu / teacher123)');
+    }
+
     // 3. Classes
     const classCount = await Class.countDocuments();
     if (classCount === 0) {

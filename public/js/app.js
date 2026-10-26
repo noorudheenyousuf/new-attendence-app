@@ -86,33 +86,56 @@ function showToast(message, isError = false) {
 
 // ================= USER & AUTHENTICATION =================
 async function loadCurrentUser() {
-  try {
-    const res = await API.getMe();
-    if (res.success && res.user) {
-      currentUser = res.user;
-      currentRole = currentUser.role;
-      updateUserUI();
+  const token = API.getToken();
+  if (token) {
+    try {
+      const res = await API.getMe();
+      if (res.success && res.user) {
+        currentUser = res.user;
+        currentRole = currentUser.role;
+        updateUserUI();
+        const authModal = document.getElementById('auth-modal');
+        if (authModal) authModal.classList.add('hidden');
+        return;
+      }
+    } catch (error) {
+      console.log('[Auth Token Expired or Invalid]', error);
+      API.setToken(null);
     }
-  } catch (error) {
-    // If not logged in yet, try default admin
-    currentUser = {
-      name: 'Sarah Jenkins',
-      email: 'sarah.jenkins@stxavier.edu',
-      role: 'admin',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
-    };
-    currentRole = 'admin';
-    updateUserUI();
   }
+
+  // Not authenticated: prompt user to sign in or test demo
+  currentUser = null;
+  currentRole = 'guest';
+  updateUserUI();
+  openAuthModal();
 }
 
 function updateUserUI() {
-  if (!currentUser) return;
-
-  // Header Profile
   const headerName = document.getElementById('header-profile-name');
   const headerRole = document.getElementById('header-profile-role');
   const headerAvatar = document.getElementById('user-avatar-img');
+
+  if (!currentUser) {
+    if (headerName) headerName.innerText = 'Sign In';
+    if (headerRole) headerRole.innerText = 'Guest';
+    if (headerAvatar) headerAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+
+    const settingsName = document.getElementById('settings-name-display');
+    const settingsEmail = document.getElementById('settings-email-display');
+    const settingsRole = document.getElementById('settings-role-badge');
+    const settingsAvatar = document.getElementById('settings-avatar-img');
+    if (settingsName) settingsName.innerText = 'Not Signed In';
+    if (settingsEmail) settingsEmail.innerText = 'Please sign in to manage school';
+    if (settingsRole) settingsRole.innerText = 'Guest Mode';
+    if (settingsAvatar) settingsAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+
+    const adminSection = document.getElementById('admin-settings-section');
+    if (adminSection) adminSection.classList.add('hidden');
+    return;
+  }
+
+  // Header Profile
   if (headerName) headerName.innerText = currentUser.name;
   if (headerRole) headerRole.innerText = currentUser.role === 'admin' ? 'Admin' : 'Teacher';
   if (headerAvatar) headerAvatar.src = currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
@@ -125,10 +148,9 @@ function updateUserUI() {
   if (settingsName) settingsName.innerText = currentUser.name;
   if (settingsEmail) settingsEmail.innerText = currentUser.email;
   if (settingsRole) settingsRole.innerText = currentUser.role === 'admin' ? 'Admin (First Account)' : 'Teacher';
-  if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl;
+  if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
 
   // Visibility based on Role:
-  // USER DIRECTIVE: "other acounts show in setting only profile div and activity logs , sign out"
   const adminSection = document.getElementById('admin-settings-section');
   if (adminSection) {
     if (currentUser.role === 'admin') {
@@ -138,7 +160,7 @@ function updateUserUI() {
     }
   }
 
-  // Reload activity logs to show/hide Undo button based on role
+  // Reload activity logs
   loadActivityLogs();
 }
 
@@ -1332,36 +1354,246 @@ function openClassModal() { document.getElementById('modal-add-class').classList
 function closeClassModal() { document.getElementById('modal-add-class').classList.add('hidden'); }
 function openSubjectModal() { document.getElementById('modal-add-subject').classList.remove('hidden'); }
 function closeSubjectModal() { document.getElementById('modal-add-subject').classList.add('hidden'); }
-function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
-function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+// Auth Modal & Controls
+function openAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) modal.classList.remove('hidden');
+  clearAuthAlert();
+}
 
-async function handleEmailLogin(e) {
-  e.preventDefault();
-  const email = document.getElementById('login-email').value;
-  const password = document.getElementById('login-password').value;
-  try {
-    const res = await API.login(email, password);
-    if (res.success) {
-      showToast('Logged in successfully!');
-      closeAuthModal();
-      await loadCurrentUser();
-      await loadAttendanceRoster();
-    }
-  } catch (error) {
-    showToast(error.message, true);
+function closeAuthModal() {
+  if (!currentUser) {
+    showToast('Signed in as Guest. Tap Profile to sign in anytime.');
+  }
+  const modal = document.getElementById('auth-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// Switch between Sign In and Register tabs
+function switchAuthTab(tab) {
+  const tabSignin = document.getElementById('auth-tab-signin');
+  const tabRegister = document.getElementById('auth-tab-register');
+  const formSignin = document.getElementById('form-signin');
+  const formRegister = document.getElementById('form-register');
+  clearAuthAlert();
+
+  if (tab === 'signin') {
+    if (formSignin) formSignin.classList.remove('hidden');
+    if (formRegister) formRegister.classList.add('hidden');
+    if (tabSignin) tabSignin.className = "flex-1 py-2 rounded-xl text-xs sm:text-sm font-black custom-gradient-btn shadow-sm transition";
+    if (tabRegister) tabRegister.className = "flex-1 py-2 rounded-xl text-xs sm:text-sm font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition";
+  } else {
+    if (formSignin) formSignin.classList.add('hidden');
+    if (formRegister) formRegister.classList.remove('hidden');
+    if (tabRegister) tabRegister.className = "flex-1 py-2 rounded-xl text-xs sm:text-sm font-black custom-gradient-btn shadow-sm transition";
+    if (tabSignin) tabSignin.className = "flex-1 py-2 rounded-xl text-xs sm:text-sm font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition";
   }
 }
 
-async function fakeGoogleLogin() {
+// Show/Hide Password visibility toggle
+function togglePasswordVisibility(inputId, iconId) {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  if (!input) return;
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (icon) {
+      icon.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`;
+    }
+  } else {
+    input.type = 'password';
+    if (icon) {
+      icon.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
+    }
+  }
+}
+
+// Inline Auth Alert Box
+function showAuthAlert(message, isError = true) {
+  const alertEl = document.getElementById('auth-alert');
+  const textEl = document.getElementById('auth-alert-text');
+  const iconEl = document.getElementById('auth-alert-icon');
+  if (!alertEl || !textEl) return;
+
+  textEl.innerText = message;
+  if (iconEl) iconEl.innerText = isError ? '⚠️' : '✅';
+  alertEl.className = `p-3 rounded-2xl text-xs font-semibold flex items-center gap-2 transition-all ${
+    isError ? 'alert-error' : 'alert-success'
+  }`;
+  alertEl.classList.remove('hidden');
+}
+
+function clearAuthAlert() {
+  const alertEl = document.getElementById('auth-alert');
+  if (alertEl) alertEl.classList.add('hidden');
+}
+
+// Quick Fill Demo Credentials
+function quickFillCredentials(email, password) {
+  switchAuthTab('signin');
+  const emailInput = document.getElementById('login-email');
+  const passInput = document.getElementById('login-password');
+  if (emailInput) emailInput.value = email;
+  if (passInput) passInput.value = password;
+  showToast(`Credentials filled for: ${email}`);
+}
+
+// Handle Sign In (Email / Username & Password)
+async function handleEmailLogin(e) {
+  e.preventDefault();
+  clearAuthAlert();
+  const emailInput = document.getElementById('login-email');
+  const passInput = document.getElementById('login-password');
+  const btn = document.getElementById('btn-signin-submit');
+
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passInput ? passInput.value : '';
+
+  if (!email || !password) {
+    showAuthAlert('Please enter your username/email and password', true);
+    return;
+  }
+
+  const originalBtnText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>Signing In...</span>`;
+  }
+
   try {
-    const res = await API.googleLogin('Sarah Jenkins', 'sarah.jenkins@stxavier.edu');
+    const res = await API.login(email, password);
     if (res.success) {
-      showToast('Signed in with Google');
+      showToast(res.message || `Welcome back, ${res.user.name}!`);
       closeAuthModal();
       await loadCurrentUser();
+      await loadAppSettings();
+      await loadClasses();
+      await loadSubjects();
       await loadAttendanceRoster();
+      await loadReport();
+      await loadActivityLogs();
     }
   } catch (error) {
-    showToast(error.message, true);
+    showAuthAlert(error.message || 'Invalid username/email or password', true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnText;
+    }
   }
+}
+
+// Handle Register (Create New Account)
+async function handleEmailRegister(e) {
+  e.preventDefault();
+  clearAuthAlert();
+
+  const nameInput = document.getElementById('register-name');
+  const emailInput = document.getElementById('register-email');
+  const passInput = document.getElementById('register-password');
+  const confirmInput = document.getElementById('register-confirm');
+  const btn = document.getElementById('btn-register-submit');
+
+  const name = nameInput ? nameInput.value.trim() : '';
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passInput ? passInput.value : '';
+  const confirmPass = confirmInput ? confirmInput.value : '';
+
+  if (!name || !email || !password) {
+    showAuthAlert('Please fill in all required fields', true);
+    return;
+  }
+
+  if (password.length < 6) {
+    showAuthAlert('Password must be at least 6 characters long', true);
+    return;
+  }
+
+  if (password !== confirmPass) {
+    showAuthAlert('Passwords do not match. Please re-enter.', true);
+    return;
+  }
+
+  const originalBtnText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>Creating Account...</span>`;
+  }
+
+  try {
+    const res = await API.register(name, email, password);
+    if (res.success) {
+      showToast(res.message || 'Account created successfully!');
+      closeAuthModal();
+      await loadCurrentUser();
+      await loadAppSettings();
+      await loadClasses();
+      await loadSubjects();
+      await loadAttendanceRoster();
+      await loadReport();
+      await loadActivityLogs();
+    }
+  } catch (error) {
+    showAuthAlert(error.message || 'Registration failed', true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnText;
+    }
+  }
+}
+
+// Google Sign-In Chooser
+function openGoogleAccountChooser() {
+  const modal = document.getElementById('modal-google-chooser');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeGoogleAccountChooser() {
+  const modal = document.getElementById('modal-google-chooser');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function authenticateWithGoogleProfile(name, email, avatarUrl) {
+  closeGoogleAccountChooser();
+  try {
+    const res = await API.googleLogin(name, email, avatarUrl);
+    if (res.success) {
+      showToast(res.message || `Signed in with Google as ${res.user.name}`);
+      closeAuthModal();
+      await loadCurrentUser();
+      await loadAppSettings();
+      await loadClasses();
+      await loadSubjects();
+      await loadAttendanceRoster();
+      await loadReport();
+      await loadActivityLogs();
+    }
+  } catch (error) {
+    showAuthAlert('Google authentication failed: ' + error.message, true);
+  }
+}
+
+async function promptCustomGoogleAccount() {
+  closeGoogleAccountChooser();
+  const email = prompt('Enter your Google Account Email:');
+  if (!email || !email.trim()) return;
+  const name = prompt('Enter your Full Name:', email.split('@')[0]) || email.split('@')[0];
+
+  authenticateWithGoogleProfile(
+    name.trim(),
+    email.trim().toLowerCase(),
+    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face'
+  );
+}
+
+// Signout
+function handleSignout() {
+  API.setToken(null);
+  currentUser = null;
+  currentRole = 'guest';
+  updateUserUI();
+  showToast('Signed out successfully');
+  openAuthModal();
 }

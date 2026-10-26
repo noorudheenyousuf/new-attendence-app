@@ -69,6 +69,29 @@ body.dark-mode {
   opacity: 0.95;
 }
 
+/* Auth Alert Box */
+.alert-error {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  border: 1px solid #fca5a5 !important;
+}
+body.dark-mode .alert-error {
+  background-color: rgba(127, 29, 29, 0.4) !important;
+  color: #fca5a5 !important;
+  border: 1px solid #991b1b !important;
+}
+
+.alert-success {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border: 1px solid #6ee7b7 !important;
+}
+body.dark-mode .alert-success {
+  background-color: rgba(6, 78, 59, 0.4) !important;
+  color: #6ee7b7 !important;
+  border: 1px solid #047857 !important;
+}
+
 /* Inputs, selects, and textareas - Strictly prevent black inputs in white mode */
 input, select, textarea {
   background-color: var(--input-bg) !important;
