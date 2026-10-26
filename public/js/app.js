@@ -10,11 +10,12 @@ let studentsList = [];
 let attendanceRecords = []; // [{ studentId, status, note }]
 let currentDateStr = new Date().toISOString().slice(0, 10);
 let currentClass = 'Class 10';
-let currentSubject = 'all';
+let currentSubject = '';
 
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   initServiceWorker();
+  updateDateDisplay();
   selectTopTab('attendance');
   await initGoogleAuth();
   await loadCurrentUser();
@@ -444,9 +445,20 @@ function populateSubjectDropdowns() {
   // USER DIRECTIVE: "only show main name in filters not in the bracket"
   const optionsHtml = subjectsList.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
 
+  // USER DIRECTIVE: "in attendance ....avoid 'all subjects' from the filter"
   if (selSubject) {
-    selSubject.innerHTML = `<option value="all">All Subjects</option>` + optionsHtml;
+    if (subjectsList.length > 0) {
+      selSubject.innerHTML = optionsHtml;
+      if (!currentSubject || currentSubject === 'all' || !subjectsList.some(s => s.name === currentSubject)) {
+        currentSubject = subjectsList[0].name;
+      }
+      selSubject.value = currentSubject;
+    } else {
+      selSubject.innerHTML = `<option value="General">General</option>`;
+      currentSubject = 'General';
+    }
   }
+
   if (repSubject) {
     repSubject.innerHTML = `<option value="whole">All Subjects</option>` + optionsHtml;
   }
@@ -807,20 +819,69 @@ async function saveAttendance() {
   }
 }
 
-function changeDate(delta) {
-  const d = new Date(currentDateStr);
-  d.setDate(d.getDate() + delta);
-  currentDateStr = d.toISOString().slice(0, 10);
-
+function updateDateDisplay() {
+  const parts = currentDateStr.split('-');
+  const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
   const displayEl = document.getElementById('current-date');
   const dayEl = document.getElementById('current-day');
-  if (displayEl) displayEl.innerText = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const pickerEl = document.getElementById('attendance-date-picker');
+
+  if (displayEl) {
+    displayEl.innerText = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
   if (dayEl) {
     const todayStr = new Date().toISOString().slice(0, 10);
-    dayEl.innerText = currentDateStr === todayStr ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' });
-  }
+    const yest = new Date();
+    yest.setDate(yest.getDate() - 1);
+    const yestStr = yest.toISOString().slice(0, 10);
 
+    if (currentDateStr === todayStr) {
+      dayEl.innerText = 'Today';
+    } else if (currentDateStr === yestStr) {
+      dayEl.innerText = 'Yesterday';
+    } else {
+      dayEl.innerText = d.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+  }
+  if (pickerEl) {
+    pickerEl.value = currentDateStr;
+  }
+}
+
+// USER DIRECTIVE: "when click the today date...... show 'date input' with app theme ui.not remove the date up and down arrows"
+function changeDate(delta) {
+  const parts = currentDateStr.split('-');
+  const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  d.setDate(d.getDate() + delta);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  currentDateStr = `${year}-${month}-${day}`;
+
+  updateDateDisplay();
   loadAttendanceRoster();
+}
+
+function handleDatePickerChange(event) {
+  if (!event.target.value) return;
+  currentDateStr = event.target.value;
+  updateDateDisplay();
+  loadAttendanceRoster();
+}
+
+function openDatePicker() {
+  const pickerEl = document.getElementById('attendance-date-picker');
+  if (pickerEl) {
+    if (typeof pickerEl.showPicker === 'function') {
+      try {
+        pickerEl.showPicker();
+      } catch (e) {
+        pickerEl.focus();
+      }
+    } else {
+      pickerEl.focus();
+    }
+  }
 }
 
 // ================= REPORT PAGE =================
@@ -977,23 +1038,51 @@ function printReport() {
 
 // ================= STUDENTS DIRECTORY =================
 // USER DIRECTIVE:
-// "add class filter in add students, and when update student show the all inputs to edit"
-// "add edit and delete to students"
+// "in add students show total students numbers and the no. of students in selected class"
+// "change student directory to students or avoid it if not space"
 async function renderStudentsDirectory() {
   const container = document.getElementById('student-directory-cards');
   const classFilterEl = document.getElementById('student-class-filter');
+  const searchInput = document.getElementById('student-search-input');
   const filterClass = classFilterEl ? classFilterEl.value : 'all';
+  const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
   try {
-    const res = await API.getStudents(filterClass);
-    if (res.success) {
-      const students = res.data;
-      if (!container) return;
+    // 1. Fetch all students to know accurate total count
+    const allRes = await API.getStudents('all');
+    const allStudents = (allRes.success && allRes.data) ? allRes.data : [];
 
-      if (students.length === 0) {
-        container.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No students found.</div>`;
-        return;
-      }
+    // Calculate class count
+    const classCount = filterClass === 'all'
+      ? allStudents.length
+      : allStudents.filter(s => s.class === filterClass).length;
+
+    // Update Live Count Badges in Students Header
+    const totalCountEl = document.getElementById('students-count-total');
+    const classCountEl = document.getElementById('students-count-class');
+    const classNameEl = document.getElementById('students-count-class-name');
+    if (totalCountEl) totalCountEl.innerText = allStudents.length;
+    if (classCountEl) classCountEl.innerText = classCount;
+    if (classNameEl) classNameEl.innerText = filterClass === 'all' ? 'All' : filterClass;
+
+    // Filter by class
+    let students = filterClass === 'all' ? allStudents : allStudents.filter(s => s.class === filterClass);
+
+    // Filter by search query if any
+    if (searchTerm) {
+      students = students.filter(s =>
+        (s.name && s.name.toLowerCase().includes(searchTerm)) ||
+        (s.roll && String(s.roll).includes(searchTerm)) ||
+        (s.studentId && String(s.studentId).includes(searchTerm))
+      );
+    }
+
+    if (!container) return;
+
+    if (students.length === 0) {
+      container.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No students found.</div>`;
+      return;
+    }
 
       container.innerHTML = students.map(st => `
         <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
@@ -1192,12 +1281,35 @@ async function handleSaveProfile(event) {
   }
 }
 
+// USER DIRECTIVE: "in add students show total students numbers and the no. of students in selected class"
+async function updateModalStudentCounts() {
+  try {
+    const classSelect = document.getElementById('new-student-class');
+    const selectedClass = classSelect ? classSelect.value : '';
+    const allRes = await API.getStudents('all');
+    if (allRes.success && allRes.data) {
+      const allStudents = allRes.data;
+      const totalCount = allStudents.length;
+      const classCount = selectedClass ? allStudents.filter(s => s.class === selectedClass).length : 0;
+
+      const modalTotal = document.getElementById('modal-add-total-count');
+      const modalClass = document.getElementById('modal-add-class-count');
+      if (modalTotal) modalTotal.innerText = totalCount;
+      if (modalClass) modalClass.innerText = classCount;
+    }
+  } catch (e) {
+    console.log('[Modal Counts Error]', e);
+  }
+}
+
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
   const preview = document.getElementById('new-preview-photo');
   if (preview) preview.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+
+  await updateModalStudentCounts();
 
   try {
     const res = await API.getNextStudentId();
