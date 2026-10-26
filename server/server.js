@@ -35,6 +35,7 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/classes', require('./routes/classRoutes'));
 app.use('/api/subjects', require('./routes/subjectRoutes'));
 app.use('/api/students', require('./routes/studentRoutes'));
+app.use('/api/teachers', require('./routes/teacherRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));

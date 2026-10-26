@@ -416,10 +416,38 @@
         </div>
       </section>
 
+      <!-- 7. TEACHERS VIEW -->
+      <section id="view-teachers" class="hidden space-y-3.5">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-base font-extrabold text-[var(--text-main)]">Teachers</h2>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm font-semibold select-none text-xs">
+              <span>Total:</span>
+              <span id="teachers-count-total" class="font-black text-white">0</span>
+            </div>
+          </div>
+          <button onclick="openAddTeacherModal()" class="touch-btn px-3.5 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md flex-shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Add Teacher</span>
+          </button>
+        </div>
+
+        <!-- Search Bar for Teachers -->
+        <div class="relative">
+          <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="teacher-search-input" oninput="renderTeachersList()" placeholder="Search teachers by name, email, class or subject..." class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl pl-9 pr-3 text-xs sm:text-sm font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-sm">
+        </div>
+
+        <!-- Teachers Cards Container -->
+        <div class="space-y-3" id="teachers-cards-container">
+          <!-- Populated via renderTeachersList() -->
+        </div>
+      </section>
+
     </main>
 
-    <!-- ================= BOTTOM THREE TABS (Add Class, Subjects, Students - Fixed DOCKED) ================= -->
-    <footer class="flex-shrink-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-3 py-1.5 flex items-center justify-around shadow-2xl z-20 no-print">
+    <!-- ================= BOTTOM FOUR TABS (Add Class, Subjects, Students, Teachers - Fixed DOCKED) ================= -->
+    <footer class="flex-shrink-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-2 py-1.5 flex items-center justify-around shadow-2xl z-20 no-print">
       <button onclick="selectBottomTab('classes')" id="bottom-tab-classes" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
         <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
         <span class="text-[11px] font-bold">Add Class</span>
@@ -433,6 +461,11 @@
       <button onclick="selectBottomTab('students')" id="bottom-tab-students" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
         <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
         <span class="text-[11px] font-bold">Students</span>
+      </button>
+
+      <button onclick="selectBottomTab('teachers')" id="bottom-tab-teachers" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
+        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span class="text-[11px] font-bold">Teachers</span>
       </button>
     </footer>
 
@@ -453,7 +486,9 @@
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Class Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
-          <input type="text" id="input-class-teacher" placeholder="e.g. Mr. David Miller (optional)" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+          <select id="input-class-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+            <option value="">-- Select Class Teacher (optional) --</option>
+          </select>
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
           Save Class
@@ -477,7 +512,9 @@
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Class Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
-          <input type="text" id="edit-class-teacher" placeholder="Optional" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+          <select id="edit-class-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+            <option value="">-- Select Class Teacher (optional) --</option>
+          </select>
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
           Save Changes
@@ -505,7 +542,9 @@
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
-          <input type="text" id="input-sub-teacher" placeholder="Optional" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+          <select id="input-sub-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+            <option value="">-- Select Teacher (optional) --</option>
+          </select>
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
@@ -542,7 +581,9 @@
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
-          <input type="text" id="edit-sub-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+          <select id="edit-sub-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+            <option value="">-- Select Teacher (optional) --</option>
+          </select>
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
@@ -557,6 +598,207 @@
           Save Changes
         </button>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= ADD TEACHER MODAL ================= -->
+  <div id="modal-add-teacher" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-lg rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[92vh] overflow-y-auto space-y-3.5">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div>
+          <h3 class="font-extrabold text-base text-[var(--text-main)]">Add Teacher</h3>
+          <p class="text-[11px] text-[var(--text-sub)]">Matches Google login email to connect profile & photo</p>
+        </div>
+        <button onclick="closeAddTeacherModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveTeacher(event)" class="space-y-3.5">
+        <!-- Photo Preview / Upload (Email connected or custom upload) -->
+        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center gap-3">
+          <div class="relative w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden border border-[var(--border-color)] flex-shrink-0 cursor-pointer group shadow-inner" onclick="document.getElementById('new-teacher-photo-file').click()" title="Click to upload custom teacher photo">
+            <img id="new-teacher-preview-photo" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-80 group-hover:opacity-100 transition text-white">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+          </div>
+          <input type="file" id="new-teacher-photo-file" accept="image/*" class="hidden" onchange="handleTeacherPhotoUpload(event, 'new')">
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold text-[var(--text-main)]">Teacher Photo <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold ml-1" id="new-teacher-photo-label">(Email Linked)</span></p>
+            <p class="text-[11px] text-[var(--text-sub)] leading-tight">Click photo to upload, or enter Google Email below to sync avatar automatically.</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Teacher Full Name</label>
+          <input type="text" id="new-teacher-name" required placeholder="e.g. Dr. Sarah Jenkins" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
+            <span>Email Address</span>
+            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Google Auth Connected</span>
+          </label>
+          <input type="email" id="new-teacher-email" required oninput="handleTeacherEmailInput('new')" placeholder="e.g. sarah.jenkins@gmail.com" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+        </div>
+
+        <!-- Classes to teach -->
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
+            <span>Classes to Teach</span>
+            <span class="text-[10px] text-[var(--text-sub)] font-normal">Check all that apply</span>
+          </label>
+          <div id="new-teacher-classes-container" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+            <!-- Dynamic checkboxes -->
+          </div>
+        </div>
+
+        <!-- Subjects to teach -->
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
+            <span>Subjects to Teach</span>
+            <span class="text-[10px] text-[var(--text-sub)] font-normal">Check all that apply</span>
+          </label>
+          <div id="new-teacher-subjects-container" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+            <!-- Dynamic checkboxes -->
+          </div>
+        </div>
+
+        <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-2">
+          Save Teacher
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= EDIT TEACHER MODAL ================= -->
+  <div id="modal-edit-teacher" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-lg rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[92vh] overflow-y-auto space-y-3.5">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div>
+          <h3 class="font-extrabold text-base text-[var(--text-main)]">Edit Teacher</h3>
+          <p class="text-[11px] text-[var(--text-sub)]">Update profile details, email & class/subject assignments</p>
+        </div>
+        <button onclick="closeEditTeacherModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <form onsubmit="handleUpdateTeacher(event)" class="space-y-3.5">
+        <input type="hidden" id="edit-teacher-id">
+
+        <!-- Photo Preview / Upload -->
+        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center gap-3">
+          <div class="relative w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden border border-[var(--border-color)] flex-shrink-0 cursor-pointer group shadow-inner" onclick="document.getElementById('edit-teacher-photo-file').click()" title="Click to upload custom photo">
+            <img id="edit-teacher-preview-photo" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-80 group-hover:opacity-100 transition text-white">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+          </div>
+          <input type="file" id="edit-teacher-photo-file" accept="image/*" class="hidden" onchange="handleTeacherPhotoUpload(event, 'edit')">
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold text-[var(--text-main)]">Teacher Photo</p>
+            <p class="text-[11px] text-[var(--text-sub)] leading-tight">Click photo to upload new image or change avatar.</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Teacher Full Name</label>
+          <input type="text" id="edit-teacher-name" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
+            <span>Email Address</span>
+            <span id="edit-teacher-google-badge" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold"></span>
+          </label>
+          <input type="email" id="edit-teacher-email" required oninput="handleTeacherEmailInput('edit')" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+        </div>
+
+        <!-- Classes to teach -->
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
+            <span>Classes to Teach</span>
+            <span class="text-[10px] text-[var(--text-sub)] font-normal">Check all that apply</span>
+          </label>
+          <div id="edit-teacher-classes-container" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+            <!-- Dynamic checkboxes -->
+          </div>
+        </div>
+
+        <!-- Subjects to teach -->
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
+            <span>Subjects to Teach</span>
+            <span class="text-[10px] text-[var(--text-sub)] font-normal">Check all that apply</span>
+          </label>
+          <div id="edit-teacher-subjects-container" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-32 overflow-y-auto p-2 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+            <!-- Dynamic checkboxes -->
+          </div>
+        </div>
+
+        <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-2">
+          Save Changes
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= TEACHER ACTIVITY & SESSION LOG MODAL ================= -->
+  <div id="modal-teacher-log" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-2xl rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[92vh] overflow-y-auto space-y-4">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+        <div class="flex items-center gap-3">
+          <img id="tlog-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" class="w-12 h-12 rounded-2xl object-cover border border-[var(--border-color)] shadow-sm">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 id="tlog-name" class="font-extrabold text-base text-[var(--text-main)]">Teacher Name</h3>
+              <span id="tlog-google-status" class="px-2 py-0.5 rounded-lg text-[10px] font-bold"></span>
+            </div>
+            <p id="tlog-email" class="text-xs text-[var(--text-sub)]">email@domain.com</p>
+          </div>
+        </div>
+        <button onclick="closeTeacherLogModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <!-- Quick Summary Badges (Sessions, Days, Classes) -->
+      <div class="grid grid-cols-3 gap-2">
+        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] text-center">
+          <p class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Total Sessions</p>
+          <p id="tlog-total-sessions" class="text-xl font-black text-[#245b70] dark:text-cyan-400">0</p>
+        </div>
+        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] text-center">
+          <p class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Days Attended</p>
+          <p id="tlog-total-days" class="text-xl font-black text-emerald-600 dark:text-emerald-400">0</p>
+        </div>
+        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] text-center">
+          <p class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Classes Taught</p>
+          <p id="tlog-classes-count" class="text-xl font-black text-indigo-600 dark:text-indigo-400">0</p>
+        </div>
+      </div>
+
+      <!-- Assigned Classes & Subjects display -->
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-1.5">
+        <div class="flex items-start gap-2 text-xs">
+          <span class="font-bold text-[var(--text-sub)] min-w-[70px] pt-0.5">Classes:</span>
+          <div id="tlog-assigned-classes" class="flex flex-wrap gap-1"></div>
+        </div>
+        <div class="flex items-start gap-2 text-xs">
+          <span class="font-bold text-[var(--text-sub)] min-w-[70px] pt-0.5">Subjects:</span>
+          <div id="tlog-assigned-subjects" class="flex flex-wrap gap-1"></div>
+        </div>
+      </div>
+
+      <!-- Filters inside Log: Class filter -->
+      <div class="flex items-center justify-between gap-2">
+        <h4 class="text-xs font-extrabold text-[var(--text-main)] uppercase tracking-wider">Attendance Sessions History</h4>
+        <select id="tlog-filter-class" onchange="filterTeacherLogSessions()" class="touch-input text-xs font-bold bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-[var(--text-main)]">
+          <option value="all">All Classes</option>
+        </select>
+      </div>
+
+      <!-- Sessions List -->
+      <div id="tlog-sessions-container" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+        <!-- Dynamic session rows -->
+      </div>
     </div>
   </div>
 

@@ -244,14 +244,18 @@ router.post('/google', async (req, res) => {
         avatarUrl: picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
       });
     } else {
-      // Link Google ID or updated avatar
+      // Connect existing teacher profile with Google authentication
       let modified = false;
-      if (sub && !user.googleId) {
+      if (sub && user.googleId !== sub) {
         user.googleId = sub;
         modified = true;
       }
-      if (picture && (!user.avatarUrl || user.avatarUrl.includes('unsplash.com'))) {
+      if (picture && user.avatarUrl !== picture) {
         user.avatarUrl = picture;
+        modified = true;
+      }
+      if (name && (!user.name || user.name.toLowerCase() === 'teacher' || user.name === user.email.split('@')[0])) {
+        user.name = name;
         modified = true;
       }
       if (modified) await user.save();
@@ -269,6 +273,9 @@ router.post('/google', async (req, res) => {
         email: user.email,
         role: user.role,
         avatarUrl: user.avatarUrl,
+        assignedClasses: user.assignedClasses || [],
+        assignedSubjects: user.assignedSubjects || [],
+        googleConnected: Boolean(user.googleId),
         isFirstAccount: user.isFirstAccount
       }
     });
@@ -281,15 +288,22 @@ router.post('/google', async (req, res) => {
 // @desc    Get current user profile
 router.get('/me', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
     res.json({
       success: true,
       user: {
-        id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        role: req.user.role,
-        avatarUrl: req.user.avatarUrl,
-        isFirstAccount: req.user.isFirstAccount
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        assignedClasses: user.assignedClasses || [],
+        assignedSubjects: user.assignedSubjects || [],
+        googleConnected: Boolean(user.googleId),
+        isFirstAccount: user.isFirstAccount
       }
     });
   } catch (error) {

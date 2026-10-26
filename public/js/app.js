@@ -356,12 +356,11 @@ function renderClassesList() {
 }
 
 let activeEditClassId = null;
-function openEditClassModal(id, name, teacher) {
+async function openEditClassModal(id, name, teacher) {
   activeEditClassId = id;
   const nameInput = document.getElementById('edit-class-name');
-  const teacherInput = document.getElementById('edit-class-teacher');
   if (nameInput) nameInput.value = name;
-  if (teacherInput) teacherInput.value = teacher;
+  await populateTeacherDropdowns('edit-class-teacher', teacher || '');
   const modal = document.getElementById('modal-edit-class');
   if (modal) modal.classList.remove('hidden');
 }
@@ -585,10 +584,10 @@ function getSelectedClassCheckboxes(containerId) {
   return Array.from(checkboxes).map(cb => cb.value);
 }
 
-function openSubjectModal() {
+async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
   document.getElementById('input-sub-code').value = '';
-  document.getElementById('input-sub-teacher').value = '';
+  await populateTeacherDropdowns('input-sub-teacher', '');
   renderClassCheckboxes('add-sub-classes-container', []);
   document.getElementById('modal-add-subject').classList.remove('hidden');
 }
@@ -617,11 +616,11 @@ async function handleSaveSubject(e) {
 }
 
 let activeEditSubjectId = null;
-function openEditSubjectModal(id, name, code, teacher, classes) {
+async function openEditSubjectModal(id, name, code, teacher, classes) {
   activeEditSubjectId = id;
   document.getElementById('edit-sub-name').value = name;
   document.getElementById('edit-sub-code').value = code || '';
-  document.getElementById('edit-sub-teacher').value = teacher || '';
+  await populateTeacherDropdowns('edit-sub-teacher', teacher || '');
   const selectedList = classes ? classes.split(',').map(c => c.trim()).filter(Boolean) : [];
   renderClassCheckboxes('edit-sub-classes-container', selectedList);
   document.getElementById('modal-edit-subject').classList.remove('hidden');
@@ -1863,7 +1862,7 @@ function selectTopTab(tab) {
     }
   });
 
-  ['classes', 'subjects', 'students'].forEach(t => {
+  ['classes', 'subjects', 'students', 'teachers'].forEach(t => {
     const btn = document.getElementById(`bottom-tab-${t}`);
     if (btn) btn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition";
   });
@@ -1873,7 +1872,7 @@ function selectTopTab(tab) {
 }
 
 function selectBottomTab(tab) {
-  ['attendance', 'report', 'settings', 'classes', 'subjects', 'students'].forEach(v => {
+  ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
   });
@@ -1881,7 +1880,7 @@ function selectBottomTab(tab) {
   const activeEl = document.getElementById(`view-${tab}`);
   if (activeEl) activeEl.classList.remove('hidden');
 
-  ['classes', 'subjects', 'students'].forEach(t => {
+  ['classes', 'subjects', 'students', 'teachers'].forEach(t => {
     const btn = document.getElementById(`bottom-tab-${t}`);
     if (btn) {
       if (t === tab) {
@@ -1902,11 +1901,18 @@ function selectBottomTab(tab) {
   if (tab === 'classes') renderClassesList();
   if (tab === 'subjects') renderSubjectsList();
   if (tab === 'students') renderStudentsDirectory();
+  if (tab === 'teachers') renderTeachersList();
 }
 
 // Modal triggers
-function openClassModal() { document.getElementById('modal-add-class').classList.remove('hidden'); }
-function closeClassModal() { document.getElementById('modal-add-class').classList.add('hidden'); }
+async function openClassModal() {
+  document.getElementById('input-class-name').value = '';
+  await populateTeacherDropdowns('input-class-teacher', '');
+  document.getElementById('modal-add-class').classList.remove('hidden');
+}
+function closeClassModal() {
+  document.getElementById('modal-add-class').classList.add('hidden');
+}
 // Auth Modal & Controls
 function openAuthModal() {
   const modal = document.getElementById('auth-modal');
@@ -2285,3 +2291,533 @@ function handleSignout() {
   showToast('Signed out successfully');
   openAuthModal();
 }
+
+// =========================================================================
+// TEACHERS MANAGEMENT MODULE (4th Bottom Nav Tab)
+// Connects teacher profile via Google auth email matching
+// =========================================================================
+let cachedTeachersList = [];
+let newTeacherPhotoUrl = '';
+let editTeacherPhotoUrl = '';
+let activeEditTeacherId = null;
+let currentTeacherLogData = null;
+let currentTeacherSessions = [];
+
+// Helper to load teachers list into memory
+async function loadTeachersData() {
+  try {
+    const res = await API.getTeachers();
+    if (res.success && Array.isArray(res.data)) {
+      cachedTeachersList = res.data;
+    }
+  } catch (e) {
+    console.log('[Teachers Load Error]', e);
+  }
+}
+
+// Helper to populate teacher dropdowns in Add/Edit Class & Subject
+async function populateTeacherDropdowns(targetSelectId, selectedValue = '') {
+  if (!cachedTeachersList || cachedTeachersList.length === 0) {
+    await loadTeachersData();
+  }
+  const selectEl = document.getElementById(targetSelectId);
+  if (!selectEl) return;
+
+  const isClassTeacher = targetSelectId.includes('class-teacher');
+  const defaultLabel = isClassTeacher ? '-- Select Class Teacher (optional) --' : '-- Select Teacher (optional) --';
+
+  let optionsHtml = `<option value="">${defaultLabel}</option>`;
+  cachedTeachersList.forEach(t => {
+    const isSel = (selectedValue && (selectedValue === t.name || selectedValue === t.email)) ? 'selected' : '';
+    optionsHtml += `<option value="${escapeHtml(t.name)}" ${isSel}>${escapeHtml(t.name)} (${escapeHtml(t.email)})</option>`;
+  });
+
+  // If previous custom value exists, keep it selectable
+  if (selectedValue && !cachedTeachersList.some(t => t.name === selectedValue || t.email === selectedValue)) {
+    optionsHtml += `<option value="${escapeHtml(selectedValue)}" selected>${escapeHtml(selectedValue)}</option>`;
+  }
+
+  selectEl.innerHTML = optionsHtml;
+}
+
+// Helper to render class checkboxes for Teacher
+function renderTeacherClassCheckboxes(containerId, selectedClasses = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!classesList || classesList.length === 0) {
+    container.innerHTML = `<span class="col-span-full text-xs text-[var(--text-sub)] py-1">No classes available. Add classes first.</span>`;
+    return;
+  }
+
+  container.innerHTML = classesList.map(c => {
+    const isChecked = selectedClasses.includes(c.name) ? 'checked' : '';
+    const safeId = `tc-${containerId}-${c.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    return `
+      <label for="${safeId}" class="flex items-center gap-1.5 p-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs select-none transition">
+        <input type="checkbox" id="${safeId}" value="${escapeHtml(c.name)}" ${isChecked} class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+        <span class="font-bold text-[var(--text-main)] truncate">${escapeHtml(c.name)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+// Helper to render subject checkboxes for Teacher
+function renderTeacherSubjectCheckboxes(containerId, selectedSubjects = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!subjectsList || subjectsList.length === 0) {
+    container.innerHTML = `<span class="col-span-full text-xs text-[var(--text-sub)] py-1">No subjects available. Add subjects first.</span>`;
+    return;
+  }
+
+  container.innerHTML = subjectsList.map(s => {
+    const isChecked = selectedSubjects.includes(s.name) ? 'checked' : '';
+    const safeId = `ts-${containerId}-${s.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    return `
+      <label for="${safeId}" class="flex items-center gap-1.5 p-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs select-none transition">
+        <input type="checkbox" id="${safeId}" value="${escapeHtml(s.name)}" ${isChecked} class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+        <span class="font-bold text-[var(--text-main)] truncate">${escapeHtml(s.name)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function getSelectedTeacherCheckboxes(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  const checked = container.querySelectorAll('input[type="checkbox"]:checked');
+  return Array.from(checked).map(cb => cb.value);
+}
+
+// Generate friendly fallback avatar
+function getEmailAvatarPreview(email, name = '') {
+  if (!email && !name) return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+  const label = (name || email || 'Teacher').trim();
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=245b70&color=ffffff&bold=true&rounded=true`;
+}
+
+// Live email typing avatar preview
+function handleTeacherEmailInput(type) {
+  const emailInput = document.getElementById(`${type}-teacher-email`);
+  const nameInput = document.getElementById(`${type}-teacher-name`);
+  const preview = document.getElementById(`${type}-teacher-preview-photo`);
+
+  if (!emailInput || !preview) return;
+  const emailVal = emailInput.value.trim();
+  const nameVal = nameInput ? nameInput.value.trim() : '';
+
+  // Only auto-update preview if no custom photo has been uploaded
+  if (type === 'new' && !newTeacherPhotoUrl) {
+    if (emailVal) {
+      preview.src = getEmailAvatarPreview(emailVal, nameVal);
+    }
+  } else if (type === 'edit' && !editTeacherPhotoUrl) {
+    if (emailVal) {
+      preview.src = getEmailAvatarPreview(emailVal, nameVal);
+    }
+  }
+}
+
+// Photo upload for Teacher
+async function handleTeacherPhotoUpload(e, type) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const preview = document.getElementById(`${type}-teacher-preview-photo`);
+  if (preview) {
+    preview.src = URL.createObjectURL(file);
+  }
+
+  showToast('Uploading teacher photo...');
+  try {
+    const res = await API.uploadPhoto(file, 'teachers');
+    if (res.success && res.url) {
+      if (type === 'new') newTeacherPhotoUrl = res.url;
+      else editTeacherPhotoUrl = res.url;
+      if (preview) preview.src = res.url;
+      showToast('Photo uploaded successfully!');
+    }
+  } catch (err) {
+    console.error('[Photo Upload Error]', err);
+    showToast('Uploaded photo saved locally');
+  }
+}
+
+// USER DIRECTIVE: Render teachers cards in the 4th tab
+async function renderTeachersList() {
+  const container = document.getElementById('teachers-cards-container');
+  const countEl = document.getElementById('teachers-count-total');
+  const searchInput = document.getElementById('teacher-search-input');
+  const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  try {
+    await loadTeachersData();
+    let teachers = cachedTeachersList || [];
+
+    if (countEl) countEl.innerText = teachers.length;
+
+    if (searchTerm) {
+      teachers = teachers.filter(t =>
+        (t.name && t.name.toLowerCase().includes(searchTerm)) ||
+        (t.email && t.email.toLowerCase().includes(searchTerm)) ||
+        (t.assignedClasses && t.assignedClasses.some(c => c.toLowerCase().includes(searchTerm))) ||
+        (t.assignedSubjects && t.assignedSubjects.some(s => s.toLowerCase().includes(searchTerm)))
+      );
+    }
+
+    if (!container) return;
+
+    if (teachers.length === 0) {
+      container.innerHTML = `
+        <div class="bg-[var(--card-bg)] p-6 rounded-2xl border border-[var(--border-color)] text-center text-xs text-[var(--text-sub)]">
+          No teachers found. Click "Add Teacher" above to add your first teacher profile!
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = teachers.map(t => {
+      const avatar = t.avatarUrl || getEmailAvatarPreview(t.email, t.name);
+      const isGoogleLinked = Boolean(t.googleConnected);
+      const roleBadge = t.role === 'admin'
+        ? `<span class="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[10px] border border-amber-500/20">Admin</span>`
+        : `<span class="px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] font-bold text-[10px] border border-[var(--border-color)]">Teacher</span>`;
+
+      const googleStatusBadge = isGoogleLinked
+        ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-md px-1.5 py-0.5" title="Profile connected with verified Google account">
+            <svg class="w-3 h-3 text-emerald-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            Google Linked
+          </span>`
+        : `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 border border-[var(--border-color)] rounded-md px-1.5 py-0.5" title="Matches Google login email to connect profile">
+            Email Connected
+          </span>`;
+
+      const classesPills = (t.assignedClasses && t.assignedClasses.length > 0)
+        ? t.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-900/30 dark:text-cyan-300 font-bold text-xs shadow-sm">${escapeHtml(c)}</span>`).join(' ')
+        : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
+
+      const subjectsPills = (t.assignedSubjects && t.assignedSubjects.length > 0)
+        ? t.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold text-xs shadow-sm">${escapeHtml(s)}</span>`).join(' ')
+        : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
+
+      const sessionsCount = t.sessionCount || 0;
+
+      return `
+        <div class="bg-[var(--card-bg)] p-3.5 sm:p-4 rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition space-y-3">
+          <!-- Top Row: Avatar, Name, Email, Status & Actions -->
+          <div class="flex items-start justify-between gap-2.5">
+            <div class="flex items-center gap-3 min-w-0">
+              <img src="${avatar}" alt="${escapeHtml(t.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[var(--border-color)] shadow-inner flex-shrink-0">
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="font-extrabold text-sm sm:text-base text-[var(--text-main)] truncate">${escapeHtml(t.name)}</h3>
+                  ${roleBadge}
+                  ${googleStatusBadge}
+                </div>
+                <p class="text-xs text-[var(--text-sub)] font-medium truncate mt-0.5">${escapeHtml(t.email)}</p>
+              </div>
+            </div>
+
+            <!-- Action buttons: Log, Edit, Delete -->
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <button onclick="openTeacherLogModal('${t._id}')" class="px-2.5 py-1.5 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 hover:bg-[#245b70] hover:text-white text-xs font-bold transition flex items-center gap-1 shadow-sm" title="View attendance session logs">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Log (${sessionsCount})</span>
+              </button>
+
+              <button onclick="openEditTeacherModal('${t._id}')" title="Edit Teacher" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              </button>
+
+              <button onclick="handleDeleteTeacher('${t._id}', '${escapeQuotes(t.name)}')" title="Delete Teacher" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom: Classes to teach & Subjects to teach -->
+          <div class="bg-[var(--bg-page)] p-2.5 rounded-xl border border-[var(--border-color)] space-y-1.5 text-xs">
+            <div class="flex items-start gap-2">
+              <span class="font-bold text-[var(--text-sub)] min-w-[65px] pt-0.5">Classes:</span>
+              <div class="flex flex-wrap gap-1 flex-1">${classesPills}</div>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="font-bold text-[var(--text-sub)] min-w-[65px] pt-0.5">Subjects:</span>
+              <div class="flex flex-wrap gap-1 flex-1">${subjectsPills}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (error) {
+    console.error('[Render Teachers List Error]', error);
+  }
+}
+
+// Add Teacher Modal
+function openAddTeacherModal() {
+  newTeacherPhotoUrl = '';
+  const preview = document.getElementById('new-teacher-preview-photo');
+  if (preview) preview.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+
+  document.getElementById('new-teacher-name').value = '';
+  document.getElementById('new-teacher-email').value = '';
+
+  renderTeacherClassCheckboxes('new-teacher-classes-container', []);
+  renderTeacherSubjectCheckboxes('new-teacher-subjects-container', []);
+
+  document.getElementById('modal-add-teacher').classList.remove('hidden');
+}
+
+function closeAddTeacherModal() {
+  document.getElementById('modal-add-teacher').classList.add('hidden');
+  newTeacherPhotoUrl = '';
+}
+
+async function handleSaveTeacher(e) {
+  e.preventDefault();
+  const name = document.getElementById('new-teacher-name').value.trim();
+  const email = document.getElementById('new-teacher-email').value.trim();
+  const assignedClasses = getSelectedTeacherCheckboxes('new-teacher-classes-container');
+  const assignedSubjects = getSelectedTeacherCheckboxes('new-teacher-subjects-container');
+
+  if (!name || !email) {
+    showToast('Name and email are required', true);
+    return;
+  }
+
+  try {
+    const res = await API.addTeacher({
+      name,
+      email,
+      avatarUrl: newTeacherPhotoUrl,
+      assignedClasses,
+      assignedSubjects
+    });
+
+    if (res.success) {
+      showToast(res.message || `Teacher "${name}" added!`);
+      closeAddTeacherModal();
+      await renderTeachersList();
+    }
+  } catch (err) {
+    showToast(err.message || 'Error adding teacher', true);
+  }
+}
+
+// Edit Teacher Modal
+async function openEditTeacherModal(id) {
+  activeEditTeacherId = id;
+  const teacher = (cachedTeachersList || []).find(t => t._id === id);
+  if (!teacher) return;
+
+  editTeacherPhotoUrl = teacher.avatarUrl || '';
+
+  const idInput = document.getElementById('edit-teacher-id');
+  const nameInput = document.getElementById('edit-teacher-name');
+  const emailInput = document.getElementById('edit-teacher-email');
+  const preview = document.getElementById('edit-teacher-preview-photo');
+  const googleBadge = document.getElementById('edit-teacher-google-badge');
+
+  if (idInput) idInput.value = teacher._id;
+  if (nameInput) nameInput.value = teacher.name;
+  if (emailInput) emailInput.value = teacher.email;
+  if (preview) preview.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
+
+  if (googleBadge) {
+    googleBadge.innerText = teacher.googleConnected ? 'Google Linked' : 'Email Connected';
+    googleBadge.className = teacher.googleConnected
+      ? 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold'
+      : 'text-[10px] text-slate-500 font-bold';
+  }
+
+  renderTeacherClassCheckboxes('edit-teacher-classes-container', teacher.assignedClasses || []);
+  renderTeacherSubjectCheckboxes('edit-teacher-subjects-container', teacher.assignedSubjects || []);
+
+  document.getElementById('modal-edit-teacher').classList.remove('hidden');
+}
+
+function closeEditTeacherModal() {
+  document.getElementById('modal-edit-teacher').classList.add('hidden');
+  activeEditTeacherId = null;
+  editTeacherPhotoUrl = '';
+}
+
+async function handleUpdateTeacher(e) {
+  e.preventDefault();
+  if (!activeEditTeacherId) return;
+
+  const name = document.getElementById('edit-teacher-name').value.trim();
+  const email = document.getElementById('edit-teacher-email').value.trim();
+  const assignedClasses = getSelectedTeacherCheckboxes('edit-teacher-classes-container');
+  const assignedSubjects = getSelectedTeacherCheckboxes('edit-teacher-subjects-container');
+
+  try {
+    const res = await API.editTeacher(activeEditTeacherId, {
+      name,
+      email,
+      avatarUrl: editTeacherPhotoUrl,
+      assignedClasses,
+      assignedSubjects
+    });
+
+    if (res.success) {
+      showToast(res.message || `Teacher "${name}" updated!`);
+      closeEditTeacherModal();
+      await renderTeachersList();
+    }
+  } catch (err) {
+    showToast(err.message || 'Error updating teacher', true);
+  }
+}
+
+// Delete Teacher
+async function handleDeleteTeacher(id, name) {
+  if (!confirm(`Are you sure you want to remove teacher "${name}"?`)) return;
+
+  try {
+    const res = await API.deleteTeacher(id);
+    if (res.success) {
+      showToast(res.message || `Teacher "${name}" removed.`);
+      await renderTeachersList();
+    }
+  } catch (err) {
+    showToast(err.message || 'Error deleting teacher', true);
+  }
+}
+
+// =========================================================================
+// TEACHER ACTIVITY & SESSION LOG MODAL
+// USER DIRECTIVE: "also a 'log' button for how many class attended in which days in which class also how many sessions"
+// =========================================================================
+async function openTeacherLogModal(teacherId) {
+  const modal = document.getElementById('modal-teacher-log');
+  if (modal) modal.classList.remove('hidden');
+
+  // Loading placeholders
+  const nameEl = document.getElementById('tlog-name');
+  const emailEl = document.getElementById('tlog-email');
+  const avatarEl = document.getElementById('tlog-avatar');
+  const sessionsCountEl = document.getElementById('tlog-total-sessions');
+  const daysCountEl = document.getElementById('tlog-total-days');
+  const classesCountEl = document.getElementById('tlog-classes-count');
+  const sessionsContainer = document.getElementById('tlog-sessions-container');
+  const filterSelect = document.getElementById('tlog-filter-class');
+
+  if (nameEl) nameEl.innerText = 'Loading teacher logs...';
+  if (sessionsContainer) sessionsContainer.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">Fetching attendance sessions...</div>`;
+
+  try {
+    const res = await API.getTeacherLogs(teacherId);
+    if (res.success) {
+      currentTeacherLogData = res;
+      currentTeacherSessions = res.sessions || [];
+
+      const teacher = res.teacher;
+      const stats = res.stats;
+
+      if (nameEl) nameEl.innerText = teacher.name;
+      if (emailEl) emailEl.innerText = teacher.email;
+      if (avatarEl) avatarEl.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
+
+      const statusEl = document.getElementById('tlog-google-status');
+      if (statusEl) {
+        statusEl.innerText = teacher.googleConnected ? 'Google Linked' : 'Email Connected';
+        statusEl.className = teacher.googleConnected
+          ? 'px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+          : 'px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-500/10 text-slate-500 border border-[var(--border-color)]';
+      }
+
+      if (sessionsCountEl) sessionsCountEl.innerText = stats.totalSessions;
+      if (daysCountEl) daysCountEl.innerText = stats.totalDays;
+      if (classesCountEl) classesCountEl.innerText = stats.classesCount;
+
+      // Assigned Classes & Subjects
+      const classesWrap = document.getElementById('tlog-assigned-classes');
+      const subjectsWrap = document.getElementById('tlog-assigned-subjects');
+      if (classesWrap) {
+        classesWrap.innerHTML = (teacher.assignedClasses && teacher.assignedClasses.length > 0)
+          ? teacher.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-xs">${escapeHtml(c)}</span>`).join('')
+          : `<span class="text-xs text-[var(--text-sub)] italic">None</span>`;
+      }
+      if (subjectsWrap) {
+        subjectsWrap.innerHTML = (teacher.assignedSubjects && teacher.assignedSubjects.length > 0)
+          ? teacher.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-xs">${escapeHtml(s)}</span>`).join('')
+          : `<span class="text-xs text-[var(--text-sub)] italic">None</span>`;
+      }
+
+      // Populate Class Filter inside Log Modal
+      if (filterSelect) {
+        let optionsHtml = `<option value="all">All Classes (${stats.totalSessions} sessions)</option>`;
+        (stats.classesList || []).forEach(cl => {
+          const count = currentTeacherSessions.filter(s => s.class === cl).length;
+          optionsHtml += `<option value="${escapeHtml(cl)}">${escapeHtml(cl)} (${count})</option>`;
+        });
+        filterSelect.innerHTML = optionsHtml;
+      }
+
+      renderTeacherLogSessionsList();
+    }
+  } catch (err) {
+    console.error('[Teacher Logs Error]', err);
+    if (sessionsContainer) {
+      sessionsContainer.innerHTML = `<div class="p-4 text-center text-xs text-rose-500">Failed to load teacher logs: ${err.message}</div>`;
+    }
+  }
+}
+
+function filterTeacherLogSessions() {
+  renderTeacherLogSessionsList();
+}
+
+function renderTeacherLogSessionsList() {
+  const sessionsContainer = document.getElementById('tlog-sessions-container');
+  const filterSelect = document.getElementById('tlog-filter-class');
+  const selectedClass = filterSelect ? filterSelect.value : 'all';
+
+  if (!sessionsContainer) return;
+
+  let filtered = currentTeacherSessions || [];
+  if (selectedClass !== 'all') {
+    filtered = filtered.filter(s => s.class === selectedClass);
+  }
+
+  if (filtered.length === 0) {
+    sessionsContainer.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No attendance sessions recorded for this selection.</div>`;
+    return;
+  }
+
+  sessionsContainer.innerHTML = filtered.map(s => {
+    const summary = s.summary || { total: 0, present: 0, absent: 0, late: 0, percentage: 0 };
+    return `
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-3 text-xs hover:border-[#245b70] transition shadow-sm">
+        <div class="space-y-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-extrabold text-[var(--text-main)] text-xs">${escapeHtml(s.date)}</span>
+            <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[11px]">${escapeHtml(s.class)}</span>
+            <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[11px]">${escapeHtml(s.subject || 'All Subjects')}</span>
+          </div>
+          <p class="text-[11px] text-[var(--text-sub)]">Marked by: <span class="font-bold text-[var(--text-main)]">${escapeHtml(s.markedBy || 'Teacher')}</span></p>
+        </div>
+
+        <!-- Present / Absent / Late Badges -->
+        <div class="flex items-center gap-1.5 flex-shrink-0 text-[11px] font-bold">
+          <span class="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">${summary.present} P</span>
+          <span class="px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">${summary.absent} A</span>
+          <span class="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">${summary.late} L</span>
+          <span class="px-2 py-0.5 rounded-lg bg-[#245b70] text-white font-extrabold">${summary.percentage}%</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function closeTeacherLogModal() {
+  const modal = document.getElementById('modal-teacher-log');
+  if (modal) modal.classList.add('hidden');
+  currentTeacherLogData = null;
+  currentTeacherSessions = [];
+}
+

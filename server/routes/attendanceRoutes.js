@@ -46,6 +46,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const summary = { total, present, absent, late, percentage };
     const markedBy = req.user ? req.user.name : 'Teacher';
+    const markedByEmail = (req.user && req.user.email) ? req.user.email.toLowerCase() : '';
 
     const previousDoc = await Attendance.findOne({ date, class: className, subject: targetSubject });
 
@@ -57,7 +58,8 @@ router.post('/', authMiddleware, async (req, res) => {
         subject: targetSubject,
         records,
         summary,
-        markedBy
+        markedBy,
+        markedByEmail
       },
       { upsert: true, new: true }
     );

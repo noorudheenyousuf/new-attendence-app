@@ -42,6 +42,10 @@ const attendanceSchema = new mongoose.Schema({
     type: String,
     default: 'Admin'
   },
+  markedByEmail: {
+    type: String,
+    default: ''
+  },
   createdAt: {
     type: Date,
     default: Date.now

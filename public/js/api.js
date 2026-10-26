@@ -236,21 +236,36 @@ const API = {
     });
   },
 
+  // Teachers API
   async getTeachers() {
-    return this.request('/admin/teachers');
+    return this.request('/teachers');
   },
 
-  async addTeacher(name, email, password) {
-    return this.request('/admin/teachers', {
+  async getTeacherById(id) {
+    return this.request(`/teachers/${id}`);
+  },
+
+  async getTeacherLogs(id) {
+    return this.request(`/teachers/${id}/logs`);
+  },
+
+  async addTeacher(teacherData) {
+    const body = (typeof teacherData === 'object' && teacherData !== null)
+      ? teacherData
+      : { name: arguments[0], email: arguments[1], password: arguments[2] };
+    return this.request('/teachers', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify(body)
     });
   },
 
-  async editTeacher(id, name) {
-    return this.request(`/admin/teachers/${id}`, {
+  async editTeacher(id, updateData) {
+    const body = (typeof updateData === 'object' && updateData !== null)
+      ? updateData
+      : { name: updateData };
+    return this.request(`/teachers/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name })
+      body: JSON.stringify(body)
     });
   },
 
@@ -267,7 +282,7 @@ const API = {
   },
 
   async deleteTeacher(id) {
-    return this.request(`/admin/teachers/${id}`, {
+    return this.request(`/teachers/${id}`, {
       method: 'DELETE'
     });
   },

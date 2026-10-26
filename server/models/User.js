@@ -34,6 +34,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  assignedClasses: [{
+    type: String,
+    trim: true
+  }],
+  assignedSubjects: [{
+    type: String,
+    trim: true
+  }],
+  phone: {
+    type: String,
+    default: ''
+  },
   createdAt: {
     type: Date,
     default: Date.now
