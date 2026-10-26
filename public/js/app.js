@@ -15,6 +15,7 @@ let currentSubject = 'all';
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   initServiceWorker();
+  selectTopTab('attendance');
   await loadCurrentUser();
   await loadAppSettings();
   await loadClasses();
@@ -22,6 +23,42 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAttendanceRoster();
   await loadReport();
   await loadActivityLogs();
+});
+
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.classList.remove('hidden');
+  const card = document.getElementById('settings-install-card');
+  if (card) card.classList.remove('hidden');
+});
+
+async function triggerPwaInstall() {
+  if (!deferredPrompt) {
+    showToast('To install in Chrome, open menu (⋮) > "Install app" or "Add to Home screen"');
+    return;
+  }
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    showToast('Installing REGISTERLY...');
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) btn.classList.add('hidden');
+    const card = document.getElementById('settings-install-card');
+    if (card) card.classList.add('hidden');
+  }
+  deferredPrompt = null;
+}
+
+window.addEventListener('appinstalled', () => {
+  showToast('REGISTERLY installed as a native app!');
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.classList.add('hidden');
+  const card = document.getElementById('settings-install-card');
+  if (card) card.classList.add('hidden');
+  deferredPrompt = null;
 });
 
 function initServiceWorker() {
