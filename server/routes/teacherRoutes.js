@@ -9,7 +9,7 @@ const authMiddleware = require('../middleware/auth');
 
 // Helper to get Gravatar URL based on email
 function getGravatarUrl(email) {
-  if (!email) return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+  if (!email) return '';
   const cleanEmail = email.trim().toLowerCase();
   const hash = crypto.createHash('md5').update(cleanEmail).digest('hex');
   return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=150`;
@@ -181,31 +181,34 @@ router.get('/:id/logs', async (req, res) => {
 });
 
 // @route   POST /api/teachers
-// @desc    USER DIRECTIVE: Add teacher with photo(email-connected), name, email, assigned classes & subjects
+// @desc    USER DIRECTIVE: Add teacher with name, optional email, photo, assigned classes & subjects
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, email, password, avatarUrl, assignedClasses, assignedSubjects, phone } = req.body;
 
-    if (!name || !email) {
-      return res.status(400).json({ success: false, message: 'Teacher name and email are required' });
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Teacher name is required' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    const existing = await User.findOne({ email: normalizedEmail });
-    if (existing) {
-      return res.status(400).json({
-        success: false,
-        message: `An account with email "${normalizedEmail}" already exists. You can edit this teacher.`
-      });
+    let normalizedEmail = undefined;
+    if (email && email.trim()) {
+      normalizedEmail = email.toLowerCase().trim();
+      const existing = await User.findOne({ email: normalizedEmail });
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: `An account with email "${normalizedEmail}" already exists. You can edit this teacher.`
+        });
+      }
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password || 'teacher123', salt);
 
-    // Fallback avatar: provided photoUrl or email gravatar
+    // Fallback avatar: provided photoUrl, or email gravatar, or empty (simple account avatar)
     const finalAvatar = avatarUrl && avatarUrl.trim()
       ? avatarUrl.trim()
-      : getGravatarUrl(normalizedEmail);
+      : (normalizedEmail ? getGravatarUrl(normalizedEmail) : '');
 
     const classesArray = Array.isArray(assignedClasses)
       ? assignedClasses.map(c => String(c).trim()).filter(Boolean)
@@ -215,20 +218,24 @@ router.post('/', authMiddleware, async (req, res) => {
       ? assignedSubjects.map(s => String(s).trim()).filter(Boolean)
       : (typeof assignedSubjects === 'string' && assignedSubjects.trim() ? assignedSubjects.split(',').map(s => s.trim()).filter(Boolean) : []);
 
-    const newTeacher = await User.create({
+    const teacherData = {
       name: name.trim(),
-      email: normalizedEmail,
       password: hashedPassword,
       role: 'teacher',
       avatarUrl: finalAvatar,
       assignedClasses: classesArray,
       assignedSubjects: subjectsArray,
       phone: phone ? String(phone).trim() : ''
-    });
+    };
+    if (normalizedEmail) {
+      teacherData.email = normalizedEmail;
+    }
+
+    const newTeacher = await User.create(teacherData);
 
     await ActivityLog.create({
       action: `Teacher Profile Created: ${newTeacher.name}`,
-      details: `Email: ${newTeacher.email} | Classes: ${classesArray.join(', ') || 'None'} | Subjects: ${subjectsArray.join(', ') || 'None'}`,
+      details: `Email: ${newTeacher.email || 'None'} | Classes: ${classesArray.join(', ') || 'None'} | Subjects: ${subjectsArray.join(', ') || 'None'}`,
       performedBy: req.user ? req.user.name : 'Admin',
       role: req.user ? req.user.role : 'admin',
       entityType: 'settings',
@@ -237,11 +244,11 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: `Teacher "${newTeacher.name}" created successfully. Profile will connect upon Google login.`,
+      message: `Teacher "${newTeacher.name}" created successfully.` + (newTeacher.email ? ' Profile will connect upon Google login.' : ''),
       data: {
         id: newTeacher._id,
         name: newTeacher.name,
-        email: newTeacher.email,
+        email: newTeacher.email || '',
         role: newTeacher.role,
         avatarUrl: newTeacher.avatarUrl,
         assignedClasses: newTeacher.assignedClasses,
@@ -265,17 +272,21 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Teacher not found' });
     }
 
-    const oldName = teacher.name;
     if (name && name.trim()) teacher.name = name.trim();
 
-    if (email && email.trim()) {
-      const normalizedEmail = email.toLowerCase().trim();
-      if (normalizedEmail !== teacher.email) {
-        const conflict = await User.findOne({ email: normalizedEmail, _id: { $ne: teacher._id } });
-        if (conflict) {
-          return res.status(400).json({ success: false, message: `Email "${normalizedEmail}" is already in use by another account.` });
+    if (email !== undefined) {
+      const trimmedEmail = (email || '').toLowerCase().trim();
+      if (trimmedEmail) {
+        if (trimmedEmail !== (teacher.email || '')) {
+          const conflict = await User.findOne({ email: trimmedEmail, _id: { $ne: teacher._id } });
+          if (conflict) {
+            return res.status(400).json({ success: false, message: `Email "${trimmedEmail}" is already in use by another account.` });
+          }
+          teacher.email = trimmedEmail;
         }
-        teacher.email = normalizedEmail;
+      } else {
+        teacher.email = undefined;
+        teacher.googleId = null;
       }
     }
 

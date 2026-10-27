@@ -18,7 +18,7 @@ router.get('/settings', async (req, res) => {
     if (!settings) {
       settings = await AppSettings.create({
         appName: 'REGISTERLY',
-        schoolName: 'St. Xavier Higher Secondary School'
+        schoolName: ''
       });
     }
     res.json({ success: true, data: settings });
@@ -36,8 +36,8 @@ router.put('/settings', async (req, res) => {
     if (!settings) {
       settings = new AppSettings();
     }
-    if (appName) settings.appName = appName;
-    if (schoolName) settings.schoolName = schoolName;
+    if (appName !== undefined) settings.appName = (appName || '').trim();
+    if (schoolName !== undefined) settings.schoolName = (schoolName || '').trim();
     settings.updatedAt = new Date();
     await settings.save();
 

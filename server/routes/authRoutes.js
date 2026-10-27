@@ -241,7 +241,7 @@ router.post('/google', async (req, res) => {
         role,
         isFirstAccount,
         googleId: sub,
-        avatarUrl: picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
+        avatarUrl: picture || ''
       });
     } else {
       // Connect existing teacher profile with Google authentication

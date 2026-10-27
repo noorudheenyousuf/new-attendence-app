@@ -8,14 +8,17 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true,
     lowercase: true,
-    trim: true
+    trim: true,
+    default: undefined
   },
   password: {
     type: String,
-    required: true
+    required: false,
+    default: ''
   },
   role: {
     type: String,
@@ -24,7 +27,7 @@ const userSchema = new mongoose.Schema({
   },
   avatarUrl: {
     type: String,
-    default: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
+    default: ''
   },
   isFirstAccount: {
     type: Boolean,

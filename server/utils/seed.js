@@ -14,10 +14,21 @@ const seedInitialData = async () => {
     if (!settings) {
       settings = await AppSettings.create({
         appName: 'REGISTERLY',
-        schoolName: 'St. Xavier Higher Secondary School'
+        schoolName: ''
       });
       console.log('[Seed] Default App Settings initialized');
     }
+
+    // Ensure sparse unique index on email
+    try {
+      await User.collection.dropIndex('email_1');
+    } catch (e) {
+      // ignore if index doesn't exist
+    }
+    await User.syncIndexes();
+
+    // Clean up any previously seeded demo teacher
+    await User.deleteMany({ email: 'teacher@stxavier.edu' });
 
     // 2. Default First User (Admin)
     const userCount = await User.countDocuments();
@@ -26,39 +37,23 @@ const seedInitialData = async () => {
       const hashedPassword = await bcrypt.hash('password123', salt);
 
       await User.create({
-        name: 'Sarah Jenkins',
-        email: 'sarah.jenkins@stxavier.edu',
+        name: 'Admin',
+        email: 'admin@school.internal',
         password: hashedPassword,
         role: 'admin',
         isFirstAccount: true,
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
+        avatarUrl: ''
       });
-      console.log('[Seed] First user created as Admin (sarah.jenkins@stxavier.edu / password123)');
-    }
-
-    // Sample Teacher
-    const teacherExists = await User.findOne({ role: 'teacher' });
-    if (!teacherExists) {
-      const salt = await bcrypt.genSalt(10);
-      const teacherHash = await bcrypt.hash('teacher123', salt);
-      await User.create({
-        name: 'Dr. Alan Grant',
-        email: 'teacher@stxavier.edu',
-        password: teacherHash,
-        role: 'teacher',
-        isFirstAccount: false,
-        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face'
-      });
-      console.log('[Seed] Sample Teacher created (teacher@stxavier.edu / teacher123)');
+      console.log('[Seed] First user created as Admin (admin@school.internal / password123)');
     }
 
     // 3. Classes
     const classCount = await Class.countDocuments();
     if (classCount === 0) {
       await Class.insertMany([
-        { name: 'Class 10', classTeacher: 'Mr. David Miller' },
-        { name: 'Class 9', classTeacher: 'Ms. Rachel Green' },
-        { name: 'Class 11', classTeacher: 'Dr. Alan Grant' }
+        { name: 'Class 10', classTeacher: '' },
+        { name: 'Class 9', classTeacher: '' },
+        { name: 'Class 11', classTeacher: '' }
       ]);
       console.log('[Seed] Sample classes initialized');
     }
@@ -67,9 +62,9 @@ const seedInitialData = async () => {
     const subjectCount = await Subject.countDocuments();
     if (subjectCount === 0) {
       await Subject.insertMany([
-        { name: 'Mathematics', subjectCode: 'MATH101', teacher: 'Sarah Jenkins', assignedClasses: ['Class 10', 'Class 9'] },
-        { name: 'Physics', subjectCode: 'PHY201', teacher: 'Dr. Alan Grant', assignedClasses: ['Class 10', 'Class 11'] },
-        { name: 'English', subjectCode: 'ENG102', teacher: 'Ms. Rachel Green', assignedClasses: ['Class 10', 'Class 9'] }
+        { name: 'Mathematics', subjectCode: 'MATH101', teacher: '', assignedClasses: ['Class 10', 'Class 9'] },
+        { name: 'Physics', subjectCode: 'PHY201', teacher: '', assignedClasses: ['Class 10', 'Class 11'] },
+        { name: 'English', subjectCode: 'ENG102', teacher: '', assignedClasses: ['Class 10', 'Class 9'] }
       ]);
       console.log('[Seed] Sample subjects initialized');
     }
@@ -126,13 +121,13 @@ const seedInitialData = async () => {
           { studentId: 2002, status: 'A', note: 'Fever' }
         ],
         summary: { total: 3, present: 2, absent: 1, late: 0, percentage: 66.7 },
-        markedBy: 'Sarah Jenkins'
+        markedBy: 'Admin'
       });
 
       await ActivityLog.create({
         action: 'Attendance Marked: Class 10',
         details: '2 Present, 1 Absent, 0 Late (66.7%) • Initial Setup',
-        performedBy: 'Sarah Jenkins',
+        performedBy: 'Admin',
         role: 'admin',
         counts: { present: 2, absent: 1, late: 0 },
         entityType: 'attendance',

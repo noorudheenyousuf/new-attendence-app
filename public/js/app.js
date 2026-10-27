@@ -1,4 +1,5 @@
 // Main Application Controller for REGISTERLY
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E";
 let currentUser = null;
 let currentRole = 'admin'; // 'admin' or 'teacher'
 let isDarkMode = false;
@@ -138,7 +139,7 @@ function updateUserUI() {
   if (!currentUser) {
     if (headerName) headerName.innerText = 'Sign In';
     if (headerRole) headerRole.innerText = 'Guest';
-    if (headerAvatar) headerAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+    if (headerAvatar) headerAvatar.src = DEFAULT_AVATAR;
 
     const settingsName = document.getElementById('settings-name-display');
     const settingsEmail = document.getElementById('settings-email-display');
@@ -146,8 +147,11 @@ function updateUserUI() {
     const settingsAvatar = document.getElementById('settings-avatar-img');
     if (settingsName) settingsName.innerText = 'Not Signed In';
     if (settingsEmail) settingsEmail.innerText = 'Please sign in to manage school';
-    if (settingsRole) settingsRole.innerText = 'Guest Mode';
-    if (settingsAvatar) settingsAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+    if (settingsRole) {
+      settingsRole.innerText = 'Guest Mode';
+      settingsRole.classList.remove('hidden');
+    }
+    if (settingsAvatar) settingsAvatar.src = DEFAULT_AVATAR;
 
     const adminSection = document.getElementById('admin-settings-section');
     if (adminSection) adminSection.classList.add('hidden');
@@ -155,19 +159,22 @@ function updateUserUI() {
   }
 
   // Header Profile
-  if (headerName) headerName.innerText = currentUser.name;
+  if (headerName) headerName.innerText = currentUser.name || 'User';
   if (headerRole) headerRole.innerText = currentUser.role === 'admin' ? 'Admin' : 'Teacher';
-  if (headerAvatar) headerAvatar.src = currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+  if (headerAvatar) headerAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
 
   // Settings Card
   const settingsName = document.getElementById('settings-name-display');
   const settingsEmail = document.getElementById('settings-email-display');
   const settingsRole = document.getElementById('settings-role-badge');
   const settingsAvatar = document.getElementById('settings-avatar-img');
-  if (settingsName) settingsName.innerText = currentUser.name;
-  if (settingsEmail) settingsEmail.innerText = currentUser.email;
-  if (settingsRole) settingsRole.innerText = currentUser.role === 'admin' ? 'Admin (First Account)' : 'Teacher';
-  if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+  if (settingsName) settingsName.innerText = currentUser.name || 'User';
+  if (settingsEmail) settingsEmail.innerText = currentUser.email || 'No email linked';
+  if (settingsRole) {
+    settingsRole.innerText = currentUser.role === 'admin' ? 'Admin (First Account)' : 'Teacher';
+    settingsRole.classList.remove('hidden');
+  }
+  if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
 
   // Visibility based on Role:
   const adminSection = document.getElementById('admin-settings-section');
@@ -200,19 +207,67 @@ function toggleDarkMode() {
 }
 
 // ================= APP SETTINGS (App Name & School Name) =================
+function updateHeaderBranding(appName, schoolName) {
+  const appEl = document.getElementById('header-app-name');
+  const schoolEl = document.getElementById('school-name-display');
+  const rawApp = (appName !== undefined && appName !== null ? String(appName) : '').trim();
+  const rawSchool = (schoolName !== undefined && schoolName !== null ? String(schoolName) : '').trim();
+
+  if (!rawApp && !rawSchool) {
+    if (appEl) {
+      appEl.innerText = '';
+      appEl.classList.add('hidden');
+    }
+    if (schoolEl) {
+      schoolEl.innerText = '';
+      schoolEl.classList.add('hidden');
+    }
+  } else if (rawApp && !rawSchool) {
+    if (appEl) {
+      appEl.innerText = rawApp;
+      appEl.className = "font-black text-xl sm:text-2xl tracking-wider text-white leading-normal truncate";
+      appEl.classList.remove('hidden');
+    }
+    if (schoolEl) {
+      schoolEl.innerText = '';
+      schoolEl.classList.add('hidden');
+    }
+  } else if (!rawApp && rawSchool) {
+    if (appEl) {
+      appEl.innerText = '';
+      appEl.classList.add('hidden');
+    }
+    if (schoolEl) {
+      schoolEl.innerText = rawSchool;
+      schoolEl.className = "font-extrabold text-base sm:text-lg tracking-wide text-white leading-normal truncate";
+      schoolEl.classList.remove('hidden');
+    }
+  } else {
+    if (appEl) {
+      appEl.innerText = rawApp;
+      appEl.className = "font-black text-base sm:text-lg tracking-wider text-white leading-tight truncate";
+      appEl.classList.remove('hidden');
+    }
+    if (schoolEl) {
+      schoolEl.innerText = rawSchool;
+      schoolEl.className = "text-[11px] text-teal-100 font-medium leading-tight truncate";
+      schoolEl.classList.remove('hidden');
+    }
+  }
+}
+
 async function loadAppSettings() {
   try {
     const res = await API.getAdminSettings();
     if (res.success && res.data) {
-      const appNameEl = document.getElementById('header-app-name');
-      const schoolNameEl = document.getElementById('school-name-display');
+      const appName = res.data.appName !== undefined ? res.data.appName : '';
+      const schoolName = res.data.schoolName !== undefined ? res.data.schoolName : '';
+      updateHeaderBranding(appName, schoolName);
+
       const adminAppInput = document.getElementById('admin-input-app-name');
       const adminSchoolInput = document.getElementById('admin-input-school-name');
-
-      if (appNameEl) appNameEl.innerText = res.data.appName || 'REGISTERLY';
-      if (schoolNameEl) schoolNameEl.innerText = res.data.schoolName || '';
-      if (adminAppInput) adminAppInput.value = res.data.appName || 'REGISTERLY';
-      if (adminSchoolInput) adminSchoolInput.value = res.data.schoolName || '';
+      if (adminAppInput) adminAppInput.value = appName;
+      if (adminSchoolInput) adminSchoolInput.value = schoolName;
     }
   } catch (error) {
     console.log('[Settings Load]', error);
@@ -454,29 +509,54 @@ async function loadSubjects() {
   }
 }
 
-function populateSubjectDropdowns() {
-  const selSubject = document.getElementById('sel-subject');
-  const repSubject = document.getElementById('report-subject');
-
-  // USER DIRECTIVE: "only show main name in filters not in the bracket"
-  const optionsHtml = subjectsList.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-
-  // USER DIRECTIVE: "in attendance ....avoid 'all subjects' from the filter"
-  if (selSubject) {
-    if (subjectsList.length > 0) {
-      selSubject.innerHTML = optionsHtml;
-      if (!currentSubject || currentSubject === 'all' || !subjectsList.some(s => s.name === currentSubject)) {
-        currentSubject = subjectsList[0].name;
-      }
-      selSubject.value = currentSubject;
-    } else {
-      selSubject.innerHTML = `<option value="General">General</option>`;
-      currentSubject = 'General';
-    }
+function getAppropriateSubjectsForClass(className) {
+  if (!className || !subjectsList || subjectsList.length === 0) return [];
+  const matched = subjectsList.filter(s => Array.isArray(s.assignedClasses) && s.assignedClasses.includes(className));
+  if (matched.length > 0) {
+    return matched;
   }
+  const unassigned = subjectsList.filter(s => !s.assignedClasses || s.assignedClasses.length === 0);
+  if (unassigned.length > 0) {
+    return unassigned;
+  }
+  return subjectsList;
+}
 
+function updateAttendanceSubjectsDropdown(selectedClass) {
+  const selSubject = document.getElementById('sel-subject');
+  if (!selSubject) return;
+
+  const validSubjects = getAppropriateSubjectsForClass(selectedClass);
+  if (validSubjects.length > 0) {
+    selSubject.innerHTML = validSubjects.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+    if (!currentSubject || currentSubject === 'all' || !validSubjects.some(s => s.name === currentSubject)) {
+      currentSubject = validSubjects[0].name;
+    }
+    selSubject.value = currentSubject;
+  } else {
+    selSubject.innerHTML = `<option value="General">General</option>`;
+    currentSubject = 'General';
+  }
+}
+
+async function handleClassChange() {
+  const selClassEl = document.getElementById('sel-class');
+  if (selClassEl) {
+    currentClass = selClassEl.value;
+  }
+  updateAttendanceSubjectsDropdown(currentClass);
+  await loadAttendanceRoster();
+}
+
+function populateSubjectDropdowns() {
+  const selClassEl = document.getElementById('sel-class');
+  const targetClass = selClassEl ? selClassEl.value : currentClass;
+  updateAttendanceSubjectsDropdown(targetClass);
+
+  const repSubject = document.getElementById('report-subject');
   if (repSubject) {
-    repSubject.innerHTML = `<option value="whole">All Subjects</option>` + optionsHtml;
+    const allOptionsHtml = subjectsList.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+    repSubject.innerHTML = `<option value="whole">All Subjects</option>` + allOptionsHtml;
   }
 }
 
@@ -637,7 +717,6 @@ async function openEditSubjectModal(id, name, code, teacher, classes) {
   activeEditSubjectId = id;
   document.getElementById('edit-sub-name').value = name;
   document.getElementById('edit-sub-code').value = code || '';
-  await populateTeacherDropdowns('edit-sub-teacher', teacher || '');
   const selectedList = classes ? classes.split(',').map(c => c.trim()).filter(Boolean) : [];
   renderClassCheckboxes('edit-sub-classes-container', selectedList);
   document.getElementById('modal-edit-subject').classList.remove('hidden');
@@ -654,7 +733,8 @@ async function handleUpdateSubject(e) {
 
   const name = document.getElementById('edit-sub-name').value.trim();
   const subjectCode = document.getElementById('edit-sub-code').value.trim();
-  const teacher = document.getElementById('edit-sub-teacher').value.trim();
+  const teacherEl = document.getElementById('edit-sub-teacher');
+  const teacher = teacherEl ? teacherEl.value.trim() : '';
   const assignedClasses = getSelectedClassCheckboxes('edit-sub-classes-container');
 
   try {
@@ -745,7 +825,7 @@ function renderAttendanceList() {
         <!-- Student Info: Photo & Name ONLY (No ID and No Roll) - Click Photo to View Details -->
         <div class="flex items-center gap-3 min-w-0">
           <div class="relative flex-shrink-0 cursor-pointer group" onclick="openStudentDetailsModal(${st.studentId})" title="Click to view student details">
-            <img src="${st.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face'}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)] group-hover:scale-105 transition shadow-sm">
+            <img src="${st.photoUrl || DEFAULT_AVATAR}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)] group-hover:scale-105 transition shadow-sm p-1 bg-slate-100 dark:bg-slate-800">
             <span class="absolute -bottom-1 -right-1 text-[9px] font-black px-1.5 py-0.2 rounded-md ${
               isP ? 'bg-emerald-600 text-white' : isA ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
             }">${record.status}</span>
@@ -832,6 +912,28 @@ async function saveAttendance() {
     }
   } catch (error) {
     showToast(error.message, true);
+  }
+}
+
+async function deleteCurrentAttendance() {
+  const promptMsg = `Are you sure you want to delete the recorded attendance for ${currentClass} on ${currentDateStr}${currentSubject ? ' (' + currentSubject + ')' : ''}?`;
+  if (!confirm(promptMsg)) {
+    return;
+  }
+  try {
+    const res = await API.deleteAttendance({
+      date: currentDateStr,
+      class: currentClass,
+      subject: currentSubject
+    });
+    if (res.success) {
+      showToast('Attendance record deleted!');
+      await loadAttendanceRoster();
+      await loadActivityLogs();
+      await loadReport();
+    }
+  } catch (error) {
+    showToast(error.message || 'Error deleting attendance', true);
   }
 }
 
@@ -958,7 +1060,7 @@ function renderReportTable(data, summary) {
       </td>
       <td class="py-2.5 px-2 font-bold">
         <div class="flex items-center gap-2">
-          <img src="${row.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=60&h=60&fit=crop&crop=face'}" class="w-7 h-7 rounded-lg object-cover">
+          <img src="${row.photoUrl || DEFAULT_AVATAR}" class="w-7 h-7 rounded-lg object-cover p-0.5 bg-slate-100 dark:bg-slate-800">
           <div>${row.name}</div>
         </div>
       </td>
@@ -1119,7 +1221,7 @@ async function renderStudentsDirectory() {
         <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2.5 min-w-0">
-              <img src="${st.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face'}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)] flex-shrink-0">
+              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)] flex-shrink-0 p-1 bg-slate-100 dark:bg-slate-800">
               <div class="truncate">
                 <div class="flex items-center gap-1.5">
                   <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
@@ -1241,7 +1343,7 @@ function openProfileEditModal() {
   editUserBase64Photo = currentUser.avatarUrl || '';
   editUserPhotoUrl = currentUser.avatarUrl || '';
   const preview = document.getElementById('edit-profile-avatar-preview') || document.getElementById('user-profile-preview');
-  if (preview) preview.src = currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+  if (preview) preview.src = currentUser.avatarUrl || DEFAULT_AVATAR;
 
   const nameInput = document.getElementById('edit-profile-name-input') || document.getElementById('user-profile-name');
   if (nameInput) nameInput.value = currentUser.name || '';
@@ -1353,7 +1455,7 @@ async function openStudentModal() {
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
   const preview = document.getElementById('new-preview-photo');
-  if (preview) preview.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+  if (preview) preview.src = DEFAULT_AVATAR;
 
   await updateModalStudentCounts();
 
@@ -1391,7 +1493,7 @@ async function handleSaveNewStudent(e) {
   const rank = document.getElementById('new-student-rank').value.trim();
   const previousCollege = document.getElementById('new-student-college').value.trim();
 
-  const photoUrl = newStudentPhotoUrl || newStudentBase64Photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face';
+  const photoUrl = newStudentPhotoUrl || newStudentBase64Photo || DEFAULT_AVATAR;
 
   const payload = {
     name,
@@ -1430,7 +1532,7 @@ async function openEditStudentModal(id) {
     editStudentBase64Photo = student.photoUrl || '';
     document.getElementById('edit-student-modal-title').innerText = `Edit Student: ${student.name}`;
     document.getElementById('edit-student-id').value = student.studentId;
-    document.getElementById('edit-preview-photo').src = student.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face';
+    document.getElementById('edit-preview-photo').src = student.photoUrl || DEFAULT_AVATAR;
     document.getElementById('edit-student-name').value = student.name || '';
     document.getElementById('edit-student-class').value = student.class || '';
     document.getElementById('edit-student-roll').value = student.roll || '';
@@ -1523,7 +1625,7 @@ async function openStudentDetailsModal(studentId) {
     return;
   }
 
-  const photo = student.photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop&crop=face';
+  const photo = student.photoUrl || DEFAULT_AVATAR;
   document.getElementById('details-student-photo').src = photo;
   document.getElementById('details-student-name').innerText = student.name;
   document.getElementById('details-student-id').innerText = `ID: ${student.studentId}`;
@@ -2410,7 +2512,7 @@ function getSelectedTeacherCheckboxes(containerId) {
 
 // Generate friendly fallback avatar
 function getEmailAvatarPreview(email, name = '') {
-  if (!email && !name) return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+  if (!email && !name) return DEFAULT_AVATAR;
   const label = (name || email || 'Teacher').trim();
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=245b70&color=ffffff&bold=true&rounded=true`;
 }
@@ -2427,13 +2529,9 @@ function handleTeacherEmailInput(type) {
 
   // Only auto-update preview if no custom photo has been uploaded
   if (type === 'new' && !newTeacherPhotoUrl) {
-    if (emailVal) {
-      preview.src = getEmailAvatarPreview(emailVal, nameVal);
-    }
+    preview.src = getEmailAvatarPreview(emailVal, nameVal);
   } else if (type === 'edit' && !editTeacherPhotoUrl) {
-    if (emailVal) {
-      preview.src = getEmailAvatarPreview(emailVal, nameVal);
-    }
+    preview.src = getEmailAvatarPreview(emailVal, nameVal);
   }
 }
 
@@ -2507,9 +2605,13 @@ async function renderTeachersList() {
             <svg class="w-3 h-3 text-emerald-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
             Google Linked
           </span>`
-        : `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 border border-[var(--border-color)] rounded-md px-1.5 py-0.5" title="Matches Google login email to connect profile">
-            Email Connected
-          </span>`;
+        : (t.email
+            ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 border border-[var(--border-color)] rounded-md px-1.5 py-0.5" title="Matches Google login email to connect profile">
+                Email Connected
+              </span>`
+            : `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-md px-1.5 py-0.5" title="Edit teacher to link an email address">
+                No Email
+              </span>`);
 
       const classesPills = (t.assignedClasses && t.assignedClasses.length > 0)
         ? t.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-900/30 dark:text-cyan-300 font-bold text-xs shadow-sm">${escapeHtml(c)}</span>`).join(' ')
@@ -2533,7 +2635,7 @@ async function renderTeachersList() {
                   ${roleBadge}
                   ${googleStatusBadge}
                 </div>
-                <p class="text-xs text-[var(--text-sub)] font-medium truncate mt-0.5">${escapeHtml(t.email)}</p>
+                <p class="text-xs text-[var(--text-sub)] font-medium truncate mt-0.5">${t.email ? escapeHtml(t.email) : '<span class="text-slate-400 italic font-normal">No email linked</span>'}</p>
               </div>
             </div>
 
@@ -2577,7 +2679,7 @@ async function renderTeachersList() {
 function openAddTeacherModal() {
   newTeacherPhotoUrl = '';
   const preview = document.getElementById('new-teacher-preview-photo');
-  if (preview) preview.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face';
+  if (preview) preview.src = DEFAULT_AVATAR;
 
   document.getElementById('new-teacher-name').value = '';
   document.getElementById('new-teacher-email').value = '';
@@ -2600,8 +2702,8 @@ async function handleSaveTeacher(e) {
   const assignedClasses = getSelectedTeacherCheckboxes('new-teacher-classes-container');
   const assignedSubjects = getSelectedTeacherCheckboxes('new-teacher-subjects-container');
 
-  if (!name || !email) {
-    showToast('Name and email are required', true);
+  if (!name) {
+    showToast('Teacher name is required', true);
     return;
   }
 
@@ -2640,14 +2742,20 @@ async function openEditTeacherModal(id) {
 
   if (idInput) idInput.value = teacher._id;
   if (nameInput) nameInput.value = teacher.name;
-  if (emailInput) emailInput.value = teacher.email;
+  if (emailInput) emailInput.value = teacher.email || '';
   if (preview) preview.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
 
   if (googleBadge) {
-    googleBadge.innerText = teacher.googleConnected ? 'Google Linked' : 'Email Connected';
-    googleBadge.className = teacher.googleConnected
-      ? 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold'
-      : 'text-[10px] text-slate-500 font-bold';
+    if (teacher.googleConnected) {
+      googleBadge.innerText = 'Google Linked';
+      googleBadge.className = 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold';
+    } else if (teacher.email) {
+      googleBadge.innerText = 'Email Connected';
+      googleBadge.className = 'text-[10px] text-slate-500 font-bold';
+    } else {
+      googleBadge.innerText = 'No Email Linked';
+      googleBadge.className = 'text-[10px] text-amber-600 dark:text-amber-400 font-bold';
+    }
   }
 
   renderTeacherClassCheckboxes('edit-teacher-classes-container', teacher.assignedClasses || []);
@@ -2724,6 +2832,8 @@ async function openTeacherLogModal(teacherId) {
   const filterSelect = document.getElementById('tlog-filter-class');
 
   if (nameEl) nameEl.innerText = 'Loading teacher logs...';
+  if (emailEl) emailEl.innerText = '';
+  if (avatarEl) avatarEl.src = DEFAULT_AVATAR;
   if (sessionsContainer) sessionsContainer.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">Fetching attendance sessions...</div>`;
 
   try {
@@ -2736,15 +2846,21 @@ async function openTeacherLogModal(teacherId) {
       const stats = res.stats;
 
       if (nameEl) nameEl.innerText = teacher.name;
-      if (emailEl) emailEl.innerText = teacher.email;
+      if (emailEl) emailEl.innerText = teacher.email || 'No email linked';
       if (avatarEl) avatarEl.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
 
       const statusEl = document.getElementById('tlog-google-status');
       if (statusEl) {
-        statusEl.innerText = teacher.googleConnected ? 'Google Linked' : 'Email Connected';
-        statusEl.className = teacher.googleConnected
-          ? 'px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-          : 'px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-500/10 text-slate-500 border border-[var(--border-color)]';
+        if (teacher.googleConnected) {
+          statusEl.innerText = 'Google Linked';
+          statusEl.className = 'px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+        } else if (teacher.email) {
+          statusEl.innerText = 'Email Connected';
+          statusEl.className = 'px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-500/10 text-slate-500 border border-[var(--border-color)]';
+        } else {
+          statusEl.innerText = 'No Email Linked';
+          statusEl.className = 'px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
+        }
       }
 
       if (sessionsCountEl) sessionsCountEl.innerText = stats.totalSessions;

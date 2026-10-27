@@ -8,7 +8,7 @@ const appSettingsSchema = new mongoose.Schema({
   },
   schoolName: {
     type: String,
-    default: 'St. Xavier Higher Secondary School',
+    default: '',
     trim: true
   },
   updatedAt: {

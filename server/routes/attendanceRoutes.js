@@ -83,4 +83,37 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/attendance
+// @desc    Delete recorded attendance for date, class, and subject
+router.delete('/', authMiddleware, async (req, res) => {
+  try {
+    const { date, class: className, subject } = req.query;
+    if (!date || !className) {
+      return res.status(400).json({ success: false, message: 'Date and Class are required' });
+    }
+
+    const targetSubject = subject || 'all';
+    const deletedRecord = await Attendance.findOneAndDelete({
+      date,
+      class: className,
+      subject: targetSubject
+    });
+
+    if (deletedRecord) {
+      await ActivityLog.create({
+        action: `Attendance Deleted: ${className}`,
+        details: `Deleted attendance record for ${className} • Subject: ${targetSubject} • Date: ${date}`,
+        performedBy: req.user ? req.user.name : 'Teacher',
+        role: req.user ? req.user.role : 'teacher',
+        entityType: 'attendance',
+        canUndo: false
+      });
+    }
+
+    res.json({ success: true, message: 'Attendance record deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

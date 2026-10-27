@@ -214,6 +214,13 @@ const API = {
     });
   },
 
+  async deleteAttendance(params) {
+    const query = new URLSearchParams(params).toString();
+    return this.request(`/attendance?${query}`, {
+      method: 'DELETE'
+    });
+  },
+
   // Reports
   async getClassReport(className, year = 'all', period = 'all-year', subject = 'whole') {
     const params = new URLSearchParams({ class: className, year, period, subject });
