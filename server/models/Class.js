@@ -12,6 +12,10 @@ const classSchema = new mongoose.Schema({
     default: 'Not Assigned',
     trim: true
   },
+  assignedSubjects: [{
+    type: String,
+    trim: true
+  }],
   order: {
     type: Number,
     default: 0

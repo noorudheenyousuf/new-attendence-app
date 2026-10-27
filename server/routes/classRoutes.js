@@ -35,10 +35,10 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/classes
-// @desc    Add a class (only asks name and optional class teacher)
+// @desc    Add a class (name, optional class teacher, and assigned subjects)
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, classTeacher } = req.body;
+    const { name, classTeacher, assignedSubjects } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, message: 'Class name is required' });
     }
@@ -48,15 +48,20 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Class with this name already exists' });
     }
 
+    const subjectsArray = Array.isArray(assignedSubjects)
+      ? assignedSubjects.map(s => String(s).trim()).filter(Boolean)
+      : [];
+
     const newClass = await Class.create({
       name,
-      classTeacher: classTeacher || 'Not Assigned'
+      classTeacher: classTeacher || 'Not Assigned',
+      assignedSubjects: subjectsArray
     });
 
     // Log action
     await ActivityLog.create({
       action: `Class Added: ${name}`,
-      details: `Teacher: ${classTeacher}`,
+      details: `Teacher: ${classTeacher || 'None'} | Subjects: ${subjectsArray.join(', ') || 'All'}`,
       performedBy: req.user ? req.user.name : 'Admin',
       role: req.user ? req.user.role : 'admin',
       entityType: 'class',
@@ -75,27 +80,38 @@ router.post('/', authMiddleware, async (req, res) => {
 // @desc    Update class
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { name, classTeacher } = req.body;
+    const { name, classTeacher, assignedSubjects } = req.body;
     const oldClass = await Class.findById(req.params.id);
     if (!oldClass) {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
+    const updatePayload = {
+      name: name || oldClass.name,
+      classTeacher: classTeacher !== undefined ? (classTeacher || 'Not Assigned') : oldClass.classTeacher
+    };
+
+    if (assignedSubjects !== undefined) {
+      updatePayload.assignedSubjects = Array.isArray(assignedSubjects)
+        ? assignedSubjects.map(s => String(s).trim()).filter(Boolean)
+        : [];
+    }
+
     const updated = await Class.findByIdAndUpdate(
       req.params.id,
-      { name: name || oldClass.name, classTeacher: classTeacher || 'Not Assigned' },
+      updatePayload,
       { new: true }
     );
 
     await ActivityLog.create({
-      action: `Class Updated: ${name}`,
-      details: `Teacher: ${classTeacher}`,
+      action: `Class Updated: ${name || oldClass.name}`,
+      details: `Teacher: ${classTeacher || oldClass.classTeacher}`,
       performedBy: req.user ? req.user.name : 'Admin',
       role: req.user ? req.user.role : 'admin',
       entityType: 'class',
       entityId: updated._id.toString(),
       canUndo: true,
-      previousState: { name: oldClass.name, classTeacher: oldClass.classTeacher }
+      previousState: { name: oldClass.name, classTeacher: oldClass.classTeacher, assignedSubjects: oldClass.assignedSubjects }
     });
 
     res.json({ success: true, data: updated });

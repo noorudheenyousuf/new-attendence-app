@@ -411,12 +411,13 @@ function renderClassesList() {
           ${c.name.replace(/[^0-9]/g, '') || c.name.slice(0, 3)}
         </div>
         <div>
-          <h3 class="font-bold text-[var(--text-main)] text-sm">${c.name}</h3>
-          <p class="text-xs text-[var(--text-sub)]">Class Teacher: ${c.classTeacher}</p>
+          <h3 class="font-bold text-[var(--text-main)] text-sm">${escapeHtml(c.name)}</h3>
+          <p class="text-xs text-[var(--text-sub)]">Class Teacher: ${escapeHtml(c.classTeacher)}</p>
+          <div class="text-[11px] text-[#245b70] font-semibold mt-0.5">Assigned Subjects: ${(c.assignedSubjects && c.assignedSubjects.length) ? escapeHtml(c.assignedSubjects.join(', ')) : 'All / None'}</div>
         </div>
       </div>
       <div class="flex items-center gap-1.5">
-        <button onclick="openEditClassModal('${c._id}', '${c.name.replace(/'/g, "\\'")}', '${c.classTeacher.replace(/'/g, "\\'")}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
         <button onclick="deleteClass('${c._id}', '${c.name.replace(/'/g, "\\'")}')" title="Delete Class" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
@@ -428,11 +429,16 @@ function renderClassesList() {
 }
 
 let activeEditClassId = null;
-async function openEditClassModal(id, name, teacher) {
+async function openEditClassModal(id) {
   activeEditClassId = id;
+  const cls = (classesList || []).find(c => c._id === id);
+  if (!cls) return;
+
   const nameInput = document.getElementById('edit-class-name');
-  if (nameInput) nameInput.value = name;
-  await populateTeacherDropdowns('edit-class-teacher', teacher || '');
+  if (nameInput) nameInput.value = cls.name;
+  await populateTeacherDropdowns('edit-class-teacher', cls.classTeacher || '');
+  renderSubjectCheckboxesForClass('edit-class-subjects-container', cls.assignedSubjects || []);
+
   const modal = document.getElementById('modal-edit-class');
   if (modal) modal.classList.remove('hidden');
 }
@@ -449,13 +455,15 @@ async function handleUpdateClass(e) {
 
   const name = document.getElementById('edit-class-name').value.trim();
   const classTeacher = document.getElementById('edit-class-teacher').value.trim();
+  const assignedSubjects = getSelectedSubjectCheckboxesForClass('edit-class-subjects-container');
 
   try {
-    const res = await API.updateClass(activeEditClassId, name, classTeacher);
+    const res = await API.updateClass(activeEditClassId, name, classTeacher, assignedSubjects);
     if (res.success) {
       showToast(`Class "${name}" updated!`);
       closeEditClassModal();
       await loadClasses();
+      updateAttendanceSubjectsDropdown(currentClass);
       await loadAttendanceRoster();
     }
   } catch (error) {
@@ -467,14 +475,16 @@ async function handleSaveClass(e) {
   e.preventDefault();
   const name = document.getElementById('input-class-name').value.trim();
   const classTeacher = document.getElementById('input-class-teacher').value.trim();
+  const assignedSubjects = getSelectedSubjectCheckboxesForClass('add-class-subjects-container');
   try {
-    const res = await API.addClass(name, classTeacher);
+    const res = await API.addClass(name, classTeacher, assignedSubjects);
     if (res.success) {
       showToast(`Class "${name}" added!`);
       closeClassModal();
       document.getElementById('input-class-name').value = '';
       document.getElementById('input-class-teacher').value = '';
       await loadClasses();
+      updateAttendanceSubjectsDropdown(currentClass);
       await loadAttendanceRoster();
     }
   } catch (error) {
@@ -511,13 +521,12 @@ async function loadSubjects() {
 
 function getAppropriateSubjectsForClass(className) {
   if (!className || !subjectsList || subjectsList.length === 0) return [];
-  const matched = subjectsList.filter(s => Array.isArray(s.assignedClasses) && s.assignedClasses.includes(className));
-  if (matched.length > 0) {
-    return matched;
-  }
-  const unassigned = subjectsList.filter(s => !s.assignedClasses || s.assignedClasses.length === 0);
-  if (unassigned.length > 0) {
-    return unassigned;
+  const cls = (classesList || []).find(c => c.name === className);
+  if (cls && Array.isArray(cls.assignedSubjects) && cls.assignedSubjects.length > 0) {
+    const matched = subjectsList.filter(s => cls.assignedSubjects.includes(s.name));
+    if (matched.length > 0) {
+      return matched;
+    }
   }
   return subjectsList;
 }
@@ -640,11 +649,10 @@ function renderSubjectsList() {
             <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70]">${s.subjectCode}</span>
           </div>
           ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5">Teacher: ${s.teacher}</p>` : ''}
-          <div class="text-[11px] text-[#245b70] font-semibold mt-0.5">Classes: ${s.assignedClasses.join(', ') || 'None'}</div>
         </div>
       </div>
       <div class="flex items-center gap-1.5">
-        <button onclick="openEditSubjectModal('${s._id}', '${s.name}', '${s.subjectCode}', '${s.teacher || ''}', '${s.assignedClasses.join(', ')}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+        <button onclick="openEditSubjectModal('${s._id}', '${s.name}', '${s.subjectCode}', '${s.teacher || ''}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
         <button onclick="deleteSubject('${s._id}', '${s.name.replace(/'/g, "\\'")}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
@@ -655,28 +663,28 @@ function renderSubjectsList() {
   `).join('');
 }
 
-// Checkbox helper for Subject classes
-function renderClassCheckboxes(containerId, selectedClasses = []) {
+// Checkbox helper for Class assigned subjects
+function renderSubjectCheckboxesForClass(containerId, selectedSubjects = []) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  if (!classesList || classesList.length === 0) {
-    container.innerHTML = `<span class="text-xs text-[var(--text-sub)] col-span-full py-1">No classes created yet. Add classes in "Add Class" tab first.</span>`;
+  if (!subjectsList || subjectsList.length === 0) {
+    container.innerHTML = `<span class="text-xs text-[var(--text-sub)] col-span-full py-1">No subjects created yet. Add subjects in "Subjects" tab first.</span>`;
     return;
   }
 
-  container.innerHTML = classesList.map(c => {
-    const isChecked = selectedClasses.includes(c.name);
+  container.innerHTML = subjectsList.map(s => {
+    const isChecked = selectedSubjects.includes(s.name);
     return `
       <label class="flex items-center gap-1.5 p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs font-bold text-[var(--text-main)] transition shadow-sm select-none">
-        <input type="checkbox" name="${containerId}-cb" value="${c.name}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-[#245b70] focus:ring-[#245b70] accent-[#245b70] cursor-pointer">
-        <span class="truncate">${c.name}</span>
+        <input type="checkbox" name="${containerId}-cb" value="${escapeHtml(s.name)}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-[#245b70] focus:ring-[#245b70] accent-[#245b70] cursor-pointer">
+        <span class="truncate">${escapeHtml(s.name)}</span>
       </label>
     `;
   }).join('');
 }
 
-function getSelectedClassCheckboxes(containerId) {
+function getSelectedSubjectCheckboxesForClass(containerId) {
   const checkboxes = document.querySelectorAll(`input[name="${containerId}-cb"]:checked`);
   return Array.from(checkboxes).map(cb => cb.value);
 }
@@ -684,7 +692,6 @@ function getSelectedClassCheckboxes(containerId) {
 async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
   document.getElementById('input-sub-code').value = '';
-  renderClassCheckboxes('add-sub-classes-container', []);
   document.getElementById('modal-add-subject').classList.remove('hidden');
 }
 
@@ -698,10 +705,9 @@ async function handleSaveSubject(e) {
   const subjectCode = document.getElementById('input-sub-code').value.trim();
   const teacherEl = document.getElementById('input-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
-  const assignedClasses = getSelectedClassCheckboxes('add-sub-classes-container');
 
   try {
-    const res = await API.addSubject({ name, subjectCode, teacher, assignedClasses });
+    const res = await API.addSubject({ name, subjectCode, teacher });
     if (res.success) {
       showToast(`Subject "${name}" added!`);
       closeSubjectModal();
@@ -713,12 +719,10 @@ async function handleSaveSubject(e) {
 }
 
 let activeEditSubjectId = null;
-async function openEditSubjectModal(id, name, code, teacher, classes) {
+async function openEditSubjectModal(id, name, code, teacher) {
   activeEditSubjectId = id;
   document.getElementById('edit-sub-name').value = name;
   document.getElementById('edit-sub-code').value = code || '';
-  const selectedList = classes ? classes.split(',').map(c => c.trim()).filter(Boolean) : [];
-  renderClassCheckboxes('edit-sub-classes-container', selectedList);
   document.getElementById('modal-edit-subject').classList.remove('hidden');
 }
 
@@ -735,10 +739,9 @@ async function handleUpdateSubject(e) {
   const subjectCode = document.getElementById('edit-sub-code').value.trim();
   const teacherEl = document.getElementById('edit-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
-  const assignedClasses = getSelectedClassCheckboxes('edit-sub-classes-container');
 
   try {
-    const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher, assignedClasses });
+    const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher });
     if (res.success) {
       showToast(`Subject "${name}" updated!`);
       closeEditSubjectModal();
@@ -825,7 +828,7 @@ function renderAttendanceList() {
         <!-- Student Info: Photo & Name ONLY (No ID and No Roll) - Click Photo to View Details -->
         <div class="flex items-center gap-3 min-w-0">
           <div class="relative flex-shrink-0 cursor-pointer group" onclick="openStudentDetailsModal(${st.studentId})" title="Click to view student details">
-            <img src="${st.photoUrl || DEFAULT_AVATAR}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)] group-hover:scale-105 transition shadow-sm p-1 bg-slate-100 dark:bg-slate-800">
+            <img src="${st.photoUrl || DEFAULT_AVATAR}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] group-hover:scale-105 transition shadow-sm">
             <span class="absolute -bottom-1 -right-1 text-[9px] font-black px-1.5 py-0.2 rounded-md ${
               isP ? 'bg-emerald-600 text-white' : isA ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
             }">${record.status}</span>
@@ -1060,7 +1063,7 @@ function renderReportTable(data, summary) {
       </td>
       <td class="py-2.5 px-2 font-bold">
         <div class="flex items-center gap-2">
-          <img src="${row.photoUrl || DEFAULT_AVATAR}" class="w-7 h-7 rounded-lg object-cover p-0.5 bg-slate-100 dark:bg-slate-800">
+          <img src="${row.photoUrl || DEFAULT_AVATAR}" class="w-7 h-7 rounded-lg object-cover border border-[#245b70] shadow-sm">
           <div>${row.name}</div>
         </div>
       </td>
@@ -1221,7 +1224,7 @@ async function renderStudentsDirectory() {
         <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2.5 min-w-0">
-              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[var(--border-color)] flex-shrink-0 p-1 bg-slate-100 dark:bg-slate-800">
+              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
               <div class="truncate">
                 <div class="flex items-center gap-1.5">
                   <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
@@ -2027,6 +2030,7 @@ function selectBottomTab(tab) {
 async function openClassModal() {
   document.getElementById('input-class-name').value = '';
   await populateTeacherDropdowns('input-class-teacher', '');
+  renderSubjectCheckboxesForClass('add-class-subjects-container', []);
   document.getElementById('modal-add-class').classList.remove('hidden');
 }
 function closeClassModal() {
@@ -2448,7 +2452,7 @@ async function populateTeacherDropdowns(targetSelectId, selectedValue = '') {
   let optionsHtml = `<option value="">${defaultLabel}</option>`;
   cachedTeachersList.forEach(t => {
     const isSel = (selectedValue && (selectedValue === t.name || selectedValue === t.email)) ? 'selected' : '';
-    optionsHtml += `<option value="${escapeHtml(t.name)}" ${isSel}>${escapeHtml(t.name)} (${escapeHtml(t.email)})</option>`;
+    optionsHtml += `<option value="${escapeHtml(t.name)}" ${isSel}>${escapeHtml(t.name)}</option>`;
   });
 
   // If previous custom value exists, keep it selectable
@@ -2628,7 +2632,7 @@ async function renderTeachersList() {
           <!-- Top Row: Avatar, Name, Email, Status & Actions -->
           <div class="flex items-start justify-between gap-2.5">
             <div class="flex items-center gap-3 min-w-0">
-              <img src="${avatar}" alt="${escapeHtml(t.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[var(--border-color)] shadow-inner flex-shrink-0">
+              <img src="${avatar}" alt="${escapeHtml(t.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[#245b70] shadow-sm flex-shrink-0">
               <div class="min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <h3 class="font-extrabold text-sm sm:text-base text-[var(--text-main)] truncate">${escapeHtml(t.name)}</h3>
