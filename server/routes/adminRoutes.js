@@ -37,7 +37,7 @@ router.use(adminMiddleware);
 // @desc    Update App Name & School Name & Permissions
 router.put('/settings', async (req, res) => {
   try {
-    const { appName, schoolName, allowNonAdminEditDelete } = req.body;
+    const { appName, schoolName, allowNonAdminEditDelete, showTeachersTabToAll } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings();
@@ -45,6 +45,7 @@ router.put('/settings', async (req, res) => {
     if (appName !== undefined) settings.appName = (appName || '').trim();
     if (schoolName !== undefined) settings.schoolName = (schoolName || '').trim();
     if (allowNonAdminEditDelete !== undefined) settings.allowNonAdminEditDelete = Boolean(allowNonAdminEditDelete);
+    if (showTeachersTabToAll !== undefined) settings.showTeachersTabToAll = Boolean(showTeachersTabToAll);
     settings.updatedAt = new Date();
     await settings.save();
 

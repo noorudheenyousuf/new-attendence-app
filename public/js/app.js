@@ -29,7 +29,12 @@ function escapeQuotes(str) {
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
-let appSettings = { appName: 'REGISTERLY', schoolName: '', allowNonAdminEditDelete: false };
+let appSettings = { appName: 'REGISTERLY', schoolName: '', allowNonAdminEditDelete: false, showTeachersTabToAll: true };
+
+function canViewTeachersTab() {
+  if (currentUser && currentUser.role === 'admin') return true;
+  return Boolean(appSettings && appSettings.showTeachersTabToAll !== false);
+}
 
 function canUserEditDelete() {
   if (currentUser && currentUser.role === 'admin') return true;
@@ -62,6 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadReport();
     await loadActivityLogs();
     await checkUnreadMessages();
+    _applyTeachersTabVisibility();
   } catch (err) {
     console.error('[App Init Error]', err);
   } finally {
@@ -300,9 +306,49 @@ async function loadAppSettings() {
       if (toggleEl) {
         toggleEl.checked = Boolean(res.data.allowNonAdminEditDelete);
       }
+      const ttToggle = document.getElementById('admin-toggle-teachers-tab');
+      if (ttToggle) {
+        ttToggle.checked = res.data.showTeachersTabToAll !== false;
+      }
+      _applyTeachersTabVisibility();
     }
   } catch (error) {
     console.log('[Settings Load]', error);
+  }
+}
+
+function _applyTeachersTabVisibility() {
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const canSee = canViewTeachersTab();
+  const btn = document.getElementById('bottom-tab-teachers');
+  if (btn) btn.style.display = (isAdmin || canSee) ? '' : 'none';
+  // If currently on teachers tab but no longer allowed, redirect to classes
+  if (!canSee && !isAdmin) {
+    const teacherView = document.getElementById('view-teachers');
+    if (teacherView && !teacherView.classList.contains('hidden')) {
+      selectBottomTab('classes');
+    }
+  }
+}
+
+async function handleAdminToggleTeachersTab(enabled) {
+  try {
+    // Use a generic settings update — we need a backend field
+    // For now store in appSettings locally and via API
+    const res = await API.updateAdminSettings(
+      appSettings.appName,
+      appSettings.schoolName,
+      { showTeachersTabToAll: enabled }
+    );
+    if (res.success) {
+      if (appSettings) appSettings.showTeachersTabToAll = enabled;
+      _applyTeachersTabVisibility();
+      showToast(enabled ? 'Teachers tab visible to all users' : 'Teachers tab hidden for non-admin accounts');
+    }
+  } catch (error) {
+    showToast('Failed: ' + error.message, true);
+    const toggle = document.getElementById('admin-toggle-teachers-tab');
+    if (toggle) toggle.checked = !enabled;
   }
 }
 
@@ -2740,13 +2786,7 @@ async function renderTeachersList() {
                   ${googleStatusBadge}
                 </div>
                 <p class="text-xs text-[var(--text-sub)] font-medium truncate mt-0.5">${t.email ? escapeHtml(t.email) : '<span class="text-slate-400 italic font-normal">No email linked</span>'}</p>
-                <!-- Year & Filter Summary Badge -->
-                <div class="text-[10px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5 flex items-center gap-1">
-                  <span>${selectedYear === 'all' ? 'All Years' : selectedYear}</span>
-                  <span>·</span>
-                  <span>${selectedClass === 'all' ? 'All Classes' : selectedClass}:</span>
-                  <span class="font-bold">${currentSessions} sessions</span>
-                </div>
+
               </div>
             </div>
 
@@ -3118,8 +3158,10 @@ async function checkUnreadMessages() {
       badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
       if (unreadCount > 0) {
         badge.classList.remove('hidden');
+        badge.style.display = 'flex';
       } else {
         badge.classList.add('hidden');
+        badge.style.display = '';
       }
     }
   } catch (err) {
@@ -3133,7 +3175,7 @@ async function openMessagesModal() {
   await loadMessages();
   try { await API.markMessagesRead(); } catch(_) {}
   const badge = document.getElementById('unread-msg-badge');
-  if (badge) badge.classList.add('hidden');
+  if (badge) { badge.classList.add('hidden'); badge.style.display = ''; }
 }
 
 function closeMessagesModal() {

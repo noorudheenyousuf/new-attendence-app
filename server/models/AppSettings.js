@@ -15,6 +15,10 @@ const appSettingsSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  showTeachersTabToAll: {
+    type: Boolean,
+    default: true
+  },
   updatedAt: {
     type: Date,
     default: Date.now

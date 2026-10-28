@@ -1248,6 +1248,23 @@
         </button>
       </div>
 
+      <!-- Teachers Tab Visibility Toggle -->
+      <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-black text-[var(--text-main)] flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-[#245b70]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>Show Teachers tab to all users</span>
+          </div>
+          <div class="text-[10px] text-[var(--text-sub)] mt-0.5 leading-tight">
+            When disabled, the Teachers tab is hidden for non-admin accounts
+          </div>
+        </div>
+        <label class="switch-label flex-shrink-0" title="Toggle Teachers tab visibility for non-admin users">
+          <input type="checkbox" id="admin-toggle-teachers-tab" onchange="handleAdminToggleTeachersTab(this.checked)" checked>
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
       <!-- Access for Edit / Delete Buttons (User Directive: Enable & Disable Option) -->
       <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-3">
         <div class="min-w-0 flex-1">

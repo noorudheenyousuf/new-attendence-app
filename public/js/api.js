@@ -236,10 +236,10 @@ const API = {
     return this.request('/admin/settings');
   },
 
-  async updateAdminSettings(appName, schoolName) {
+  async updateAdminSettings(appName, schoolName, extra = {}) {
     return this.request('/admin/settings', {
       method: 'PUT',
-      body: JSON.stringify({ appName, schoolName })
+      body: JSON.stringify({ appName, schoolName, ...extra })
     });
   },
 
