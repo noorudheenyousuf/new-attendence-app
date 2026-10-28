@@ -66,6 +66,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('[App Init Error]', err);
   } finally {
     hideSplashLoader();
+    // Poll for new messages every 60 seconds
+    setInterval(checkUnreadMessages, 60000);
   }
 });
 
@@ -81,7 +83,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 async function triggerPwaInstall() {
   if (!deferredPrompt) {
-    showToast('To install in Chrome, open menu (â‹®) > "Install app" or "Add to Home screen"');
+    showToast('To install in Chrome, open menu (☰) > "Install app" or "Add to Home screen"');
     return;
   }
   deferredPrompt.prompt();
@@ -1149,7 +1151,7 @@ function renderReportTable(data, summary) {
 // USER DIRECTIVE: "in report of students, in the log button click add in the window also their attendance like....present in green,,,absent in red ....late in yellew present at the top of log window"
 async function openStudentLogModal(studentId, name, roll) {
   document.getElementById('log-modal-title').innerText = `Attendance Logs - ${name}`;
-  document.getElementById('log-modal-subtitle').innerText = `Roll #${roll} â€¢ ID: ${studentId}`;
+  document.getElementById('log-modal-subtitle').innerText = `Roll #${roll} · ID: ${studentId}`;
 
   // Reset top badges
   const statP = document.getElementById('log-stat-present');
@@ -1286,7 +1288,7 @@ async function renderStudentsDirectory() {
                   <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
                   <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
                 </div>
-                <p class="text-xs text-[var(--text-sub)] truncate">${st.class} â€¢ Roll: ${st.roll}</p>
+                <p class="text-xs text-[var(--text-sub)] truncate">${st.class} · Roll: ${st.roll}</p>
               </div>
             </div>
 
@@ -1977,7 +1979,7 @@ async function importBackupData(event) {
 // "clear data for only clear data of attendence of whole class, not teachers, students, class ,subjects,details"
 async function handleClearDataPrompt() {
   const confirmed = confirm(
-    "âš ï¸ CLEAR ATTENDANCE DATA:\n\n" +
+    "⚠ CLEAR ATTENDANCE DATA:\n\n" +
     "Are you sure you want to clear attendance records? Teachers, students, classes, subjects, and student details will NOT be deleted."
   );
   if (!confirmed) return;
@@ -1999,7 +2001,7 @@ async function handleClearDataPrompt() {
 // "reset button for clear all app data...like new"
 async function handleResetAppPrompt() {
   const confirmed = confirm(
-    "âš ï¸ FULL APP RESET (LIKE NEW):\n\n" +
+    "⚠ FULL APP RESET (LIKE NEW):\n\n" +
     "Are you sure you want to wipe all app data like new? All students, classes, subjects, attendance, logs, and settings will be completely reset."
   );
   if (!confirmed) return;
@@ -2167,7 +2169,7 @@ function showAuthAlert(message, isError = true) {
   if (!alertEl || !textEl) return;
 
   textEl.innerText = message;
-  if (iconEl) iconEl.innerText = isError ? 'âš ï¸' : 'âœ…';
+  if (iconEl) iconEl.innerText = isError ? '⚠' : '✓';
   alertEl.className = `p-3 rounded-2xl text-xs font-semibold flex items-center gap-2 transition-all ${
     isError ? 'alert-error' : 'alert-success'
   }`;
@@ -2741,7 +2743,7 @@ async function renderTeachersList() {
                 <!-- Year & Filter Summary Badge -->
                 <div class="text-[10px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5 flex items-center gap-1">
                   <span>${selectedYear === 'all' ? 'All Years' : selectedYear}</span>
-                  <span>â€¢</span>
+                  <span>·</span>
                   <span>${selectedClass === 'all' ? 'All Classes' : selectedClass}:</span>
                   <span class="font-bold">${currentSessions} sessions</span>
                 </div>
@@ -2750,6 +2752,11 @@ async function renderTeachersList() {
 
             <!-- Action buttons: Log, Edit, Delete -->
             <div class="flex items-center gap-1.5 flex-shrink-0">
+              <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}')" class="px-2.5 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-bold transition flex items-center gap-1 shadow-sm" title="View timetable for this teacher">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>Timetable</span>
+              </button>
+
               <button onclick="openTeacherLogModal('${t._id}')" class="px-2.5 py-1.5 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 hover:bg-[#245b70] hover:text-white text-xs font-bold transition flex items-center gap-1 shadow-sm" title="View attendance session logs">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 <span>${sessionButtonLabel}</span>
@@ -3197,7 +3204,9 @@ async function handleSendMessage(e) {
 }
 
 // ================= TIMETABLE MODULE =================
-let currentTimetableDay = 'Monday';
+let currentTimetableDay = 'all';
+let timetableViewTeacher = null; // null=admin/all view, string=filter to this teacher's slots
+let timetableReadOnly = false;   // true=no add/edit/delete buttons
 let timetableEditingSlotId = null;
 
 async function openTimetableModal() {
@@ -3211,8 +3220,23 @@ async function openTimetableModal() {
       classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
   }
 
-  // Reset to Monday
-  currentTimetableDay = 'Monday';
+  // Set view based on role
+  const isAdminTT = currentUser && currentUser.role === 'admin';
+  if (!timetableViewTeacher && !isAdminTT) {
+    timetableViewTeacher = (currentUser && currentUser.name) || null;
+  }
+  // Show/hide Add button — admin only
+  const addSlotBtn = document.getElementById('btn-add-timetable-slot');
+  if (addSlotBtn) addSlotBtn.classList.toggle('hidden', !isAdminTT || timetableReadOnly);
+  // Update title
+  const ttTitleEl = document.querySelector('#modal-timetable h3');
+  if (ttTitleEl) {
+    if (timetableReadOnly && timetableViewTeacher) ttTitleEl.textContent = timetableViewTeacher + "'s Timetable";
+    else if (timetableViewTeacher && !isAdminTT) ttTitleEl.textContent = 'My Timetable';
+    else ttTitleEl.textContent = 'School Timetable';
+  }
+  // Default to All Days
+  currentTimetableDay = 'all';
   _updateTimetableDayTabs();
   await renderTimetableSlots();
 }
@@ -3225,7 +3249,7 @@ function closeTimetableModal() {
 function _updateTimetableDayTabs() {
   document.querySelectorAll('.tt-day-btn').forEach(btn => {
     const day = btn.getAttribute('data-day');
-    if (day === currentTimetableDay) {
+    if (day === currentTimetableDay || (currentTimetableDay === 'all' && day === 'all')) {
       btn.className = 'tt-day-btn px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm transition font-bold text-xs';
     } else {
       btn.className = 'tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition font-bold text-xs border border-[var(--border-color)]';
@@ -3248,21 +3272,27 @@ async function renderTimetableSlots() {
   const selectedClass = classFilter ? classFilter.value : 'all';
 
   try {
-    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, currentTimetableDay);
+    const dayParam = currentTimetableDay === 'all' ? '' : currentTimetableDay;
+    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam);
     // Backend returns { success: true, data: [...] }
-    const slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+    let slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+    // Filter by teacher if viewing a specific teacher's timetable
+    if (timetableViewTeacher) {
+      slots = slots.filter(s => s.teacher && s.teacher.trim().toLowerCase() === timetableViewTeacher.trim().toLowerCase());
+    }
 
     if (slots.length === 0) {
       container.innerHTML = `
         <div class="text-center py-8 text-xs text-[var(--text-sub)]">
           <svg class="w-10 h-10 mx-auto mb-2 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' Â· ' + escapeHtml(selectedClass) : ''}. Add one!
+          No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' · ' + escapeHtml(selectedClass) : ''}. Add one!
         </div>`;
       return;
     }
 
     container.innerHTML = slots.map(slot => {
-      const editDelBtns = canUserEditDelete() ? `
+      const isAdminUser = currentUser && currentUser.role === 'admin';
+    const editDelBtns = (isAdminUser && !timetableReadOnly) ? `
         <div class="flex gap-1 flex-shrink-0">
           <button onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-7 h-7 rounded-lg bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -3283,8 +3313,8 @@ async function renderTimetableSlots() {
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
                 <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[10px]">${escapeHtml(slot.class || '')}</span>
-                ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">Â· ${escapeHtml(slot.teacher)}</span>` : ''}
-                ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">Â· ${escapeHtml(slot.room)}</span>` : ''}
+                ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">· ${escapeHtml(slot.teacher)}</span>` : ''}
+                ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">· ${escapeHtml(slot.room)}</span>` : ''}
               </div>
             </div>
           </div>
@@ -3377,7 +3407,7 @@ async function handleSaveTimetableSlot(e) {
     timeSlot: (document.getElementById('slot-input-time') || {}).value || '',
     class: (document.getElementById('slot-input-class') || {}).value || '',
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
-    teacher: (document.getElementById('slot-input-teacher') || {}).value || '',
+    teacher: timetableViewTeacher || ((document.getElementById('slot-input-teacher') || {}).value) || '',
     room: (document.getElementById('slot-input-room') || {}).value || '',
   };
 
@@ -3418,4 +3448,29 @@ async function deleteTimetableSlot(id) {
   } catch (err) {
     showToast('Failed to delete slot: ' + err.message, true);
   }
+}
+
+// ---- TIMETABLE HELPERS ----
+
+// Filter subjects dropdown by selected class in add-slot form
+function filterTimetableSubjectsByClass() {
+  const classSelect = document.getElementById('slot-input-class');
+  const subjectSelect = document.getElementById('slot-input-subject');
+  if (!classSelect || !subjectSelect) return;
+  const selectedClass = classSelect.value;
+  const cls = classesList.find(c => (c.name || c) === selectedClass);
+  const subjects = (cls && cls.assignedSubjects && cls.assignedSubjects.length > 0)
+    ? cls.assignedSubjects
+    : subjectsList.map(s => s.name || s);
+  const currentVal = subjectSelect.value;
+  subjectSelect.innerHTML = '<option value="">Select subject…</option>' +
+    subjects.map(s => '<option value="' + escapeHtml(s) + '" ' + (s === currentVal ? 'selected' : '') + '>' + escapeHtml(s) + '</option>').join('');
+}
+
+// Open timetable for a specific teacher (read-only for non-admin, editable for admin)
+async function openTeacherTimetable(teacherName) {
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  timetableViewTeacher = teacherName;
+  timetableReadOnly = !isAdmin; // read-only for non-admin, admin can edit
+  await openTimetableModal();
 }

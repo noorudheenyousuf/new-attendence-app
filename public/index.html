@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1540,7 +1540,8 @@
       <div class="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
         <!-- Day Selector Pills -->
         <div class="flex items-center gap-1 overflow-x-auto pb-1 max-w-full no-scrollbar text-xs font-bold" id="timetable-day-tabs">
-          <button type="button" onclick="selectTimetableDay('Monday')" data-day="Monday" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm transition">Mon</button>
+          <button type="button" onclick="selectTimetableDay('all')" data-day="all" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition font-bold text-xs border border-[var(--border-color)]">All</button>
+          <button type="button" onclick="selectTimetableDay('Monday')" data-day="Monday" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition">Mon</button>
           <button type="button" onclick="selectTimetableDay('Tuesday')" data-day="Tuesday" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition">Tue</button>
           <button type="button" onclick="selectTimetableDay('Wednesday')" data-day="Wednesday" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition">Wed</button>
           <button type="button" onclick="selectTimetableDay('Thursday')" data-day="Thursday" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition">Thu</button>
@@ -1596,7 +1597,7 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Class</label>
-            <select id="slot-input-class" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <select id="slot-input-class" required onchange="filterTimetableSubjectsByClass()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
               <!-- Populated dynamically -->
             </select>
           </div>
@@ -1608,12 +1609,7 @@
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Assigned Teacher (Optional)</label>
-          <select id="slot-input-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
-            <!-- Populated dynamically -->
-          </select>
-        </div>
+                <input type="hidden" id="slot-input-teacher" value="">
 
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Room / Lab / Note (Optional)</label>
