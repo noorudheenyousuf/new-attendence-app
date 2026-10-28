@@ -7,6 +7,8 @@ const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const AppSettings = require('../models/AppSettings');
 const ActivityLog = require('../models/ActivityLog');
+const Message    = require('../models/Message');
+const Timetable  = require('../models/Timetable');
 const authMiddleware = require('../middleware/auth');
 const adminMiddleware = require('../middleware/admin');
 
@@ -25,6 +27,10 @@ router.get('/export', async (req, res) => {
     const attendance = await Attendance.find().lean();
     const settings = await AppSettings.findOne().lean();
 
+    const messages     = await Message.find().lean();
+    const timetable    = await Timetable.find().lean();
+    const activityLogs = await ActivityLog.find().lean();
+
     const backupData = {
       appName: (settings && settings.appName) ? settings.appName : 'REGISTERLY',
       exportDate: new Date().toISOString(),
@@ -33,12 +39,15 @@ router.get('/export', async (req, res) => {
       students,
       teachers,
       attendance,
+      messages,
+      timetable,
+      activityLogs,
       settings
     };
 
     await ActivityLog.create({
       action: 'Database Backup Exported',
-      details: `${students.length} Students, ${teachers.length} Teachers, ${classes.length} Classes, ${subjects.length} Subjects, ${attendance.length} Attendance Records (full details)`,
+      details: `${students.length} Students, ${teachers.length} Teachers, ${classes.length} Classes, ${subjects.length} Subjects, ${attendance.length} Attendance, ${(messages||[]).length} Messages, ${(timetable||[]).length} Timetable slots, ${(activityLogs||[]).length} Activity Logs`,
       performedBy: (req.user && req.user.name) ? req.user.name : 'Admin',
       role: (req.user && req.user.role) ? req.user.role : 'admin',
       entityType: 'backup',
@@ -57,7 +66,7 @@ router.get('/export', async (req, res) => {
 // @desc    Admin import / restore database from JSON file
 router.post('/import', async (req, res) => {
   try {
-    const { classes, subjects, students, teachers, attendance, settings } = req.body;
+    const { classes, subjects, students, teachers, attendance, messages, timetable, activityLogs, settings } = req.body;
 
     if (!Array.isArray(students) && !Array.isArray(classes) && !Array.isArray(teachers)) {
       return res.status(400).json({ success: false, message: 'Invalid backup file format' });
@@ -128,7 +137,28 @@ router.post('/import', async (req, res) => {
       }
     }
 
-    // 6. Restore settings
+    // 6. Restore messages
+    if (Array.isArray(messages) && messages.length > 0) {
+      await Message.deleteMany({});
+      const msgDocs = messages.map(m => { const { _id, __v, ...d } = m; return d; });
+      await Message.insertMany(msgDocs, { ordered: false });
+    }
+
+    // 7. Restore timetable
+    if (Array.isArray(timetable) && timetable.length > 0) {
+      await Timetable.deleteMany({});
+      const ttDocs = timetable.map(t => { const { _id, __v, ...d } = t; return d; });
+      await Timetable.insertMany(ttDocs, { ordered: false });
+    }
+
+    // 8. Restore activity logs
+    if (Array.isArray(activityLogs) && activityLogs.length > 0) {
+      await ActivityLog.deleteMany({});
+      const logDocs = activityLogs.map(l => { const { _id, __v, ...d } = l; return d; });
+      await ActivityLog.insertMany(logDocs, { ordered: false });
+    }
+
+    // 9. Restore settings
     if (settings && (settings.appName || settings.schoolName)) {
       const { _id, __v, ...setData } = settings;
       await AppSettings.findOneAndUpdate({}, { $set: setData }, { upsert: true, new: true });
@@ -136,7 +166,7 @@ router.post('/import', async (req, res) => {
 
     await ActivityLog.create({
       action: 'Database Backup Restored',
-      details: `${students ? students.length : 0} Students, ${teachers ? teachers.length : 0} Teachers, ${classes ? classes.length : 0} Classes, ${subjects ? subjects.length : 0} Subjects restored`,
+      details: `${students ? students.length : 0} Students, ${teachers ? teachers.length : 0} Teachers, ${classes ? classes.length : 0} Classes, ${subjects ? subjects.length : 0} Subjects, ${attendance ? attendance.length : 0} Attendance, ${messages ? messages.length : 0} Messages, ${timetable ? timetable.length : 0} Timetable slots restored`,
       performedBy: (req.user && req.user.name) ? req.user.name : 'Admin',
       role: (req.user && req.user.role) ? req.user.role : 'admin',
       entityType: 'backup',

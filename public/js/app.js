@@ -2774,55 +2774,69 @@ async function renderTeachersList() {
         : `Log (${currentSessions} in ${selectedYear})`;
 
       return `
-        <div class="bg-[var(--card-bg)] p-3.5 sm:p-4 rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition space-y-3">
-          <!-- Top Row: Avatar, Name, Email, Status & Actions -->
-          <div class="flex items-start justify-between gap-2.5">
-            <div class="flex items-center gap-3 min-w-0">
-              <img src="${avatar}" alt="${escapeHtml(t.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[#245b70] shadow-sm flex-shrink-0">
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <h3 class="font-extrabold text-sm sm:text-base text-[var(--text-main)] truncate">${escapeHtml(t.name)}</h3>
-                  ${roleBadge}
-                  ${googleStatusBadge}
-                </div>
-                <p class="text-xs text-[var(--text-sub)] font-medium truncate mt-0.5">${t.email ? escapeHtml(t.email) : '<span class="text-slate-400 italic font-normal">No email linked</span>'}</p>
-
-              </div>
+        <div class="bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition overflow-hidden">
+          <!-- Main row: avatar left, content right -->
+          <div class="flex gap-0">
+            <!-- Left: Avatar column -->
+            <div class="flex-shrink-0 flex flex-col items-center justify-start pt-3.5 px-3 pb-3">
+              <img src="${avatar}" alt="${escapeHtml(t.name)}" class="w-14 h-14 rounded-2xl object-cover border-2 border-[#245b70]/40 shadow-sm">
             </div>
 
-            <!-- Action buttons: Log, Edit, Delete -->
-            <div class="flex items-center gap-1.5 flex-shrink-0">
-              <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}')" class="px-2.5 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-bold transition flex items-center gap-1 shadow-sm" title="View timetable for this teacher">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                <span>Timetable</span>
-              </button>
+            <!-- Right: Content column -->
+            <div class="flex-1 min-w-0 pt-3 pb-3 pr-3 flex flex-col gap-2">
 
-              <button onclick="openTeacherLogModal('${t._id}')" class="px-2.5 py-1.5 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 hover:bg-[#245b70] hover:text-white text-xs font-bold transition flex items-center gap-1 shadow-sm" title="View attendance session logs">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                <span>${sessionButtonLabel}</span>
-              </button>
+              <!-- Row 1: Name + role badge + google badge | Edit + Delete -->
+              <div class="flex items-start justify-between gap-1.5">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <h3 class="font-extrabold text-sm text-[var(--text-main)] leading-tight">${escapeHtml(t.name)}</h3>
+                    ${roleBadge}
+                  </div>
+                  <div class="mt-0.5">${googleStatusBadge}</div>
+                </div>
+                ${canUserEditDelete() ? `
+                <div class="flex items-center gap-1 flex-shrink-0">
+                  <button onclick="openEditTeacherModal('${t._id}')" title="Edit Teacher"
+                    class="w-7 h-7 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button onclick="handleDeleteTeacher('${t._id}', this.getAttribute('data-name'))" data-name="${escapeHtml(t.name)}" title="Delete Teacher"
+                    class="w-7 h-7 rounded-xl btn-delete flex items-center justify-center transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>` : ''}
+              </div>
 
-              ${canUserEditDelete() ? `
-              <button onclick="openEditTeacherModal('${t._id}')" title="Edit Teacher" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              </button>
+              <!-- Row 2: Timetable + Log buttons -->
+              <div class="flex gap-1.5">
+                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}')"
+                  class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-bold transition shadow-sm" title="View timetable">
+                  <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  <span>Timetable</span>
+                </button>
+                <button onclick="openTeacherLogModal('${t._id}')"
+                  class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 hover:bg-[#245b70] hover:text-white text-xs font-bold transition shadow-sm" title="View logs">
+                  <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <span>${sessionButtonLabel}</span>
+                </button>
+              </div>
 
-              <button onclick="handleDeleteTeacher('${t._id}', this.getAttribute('data-name'))" data-name="${escapeHtml(t.name)}" title="Delete Teacher" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
-              ` : ''}
+              <!-- Row 3: Email -->
+              <p class="text-[11px] text-[var(--text-sub)] font-medium truncate leading-tight">
+                ${t.email
+                  ? '<svg class=\'w-3 h-3 inline mr-0.5 text-[var(--text-sub)] opacity-60\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\'><path d=\'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z\'></path><polyline points=\'22,6 12,13 2,6\'></polyline></svg>' + escapeHtml(t.email)
+                  : '<span class=\'text-slate-400 italic font-normal\'>No email linked</span>'}
+              </p>
             </div>
           </div>
 
-          <!-- Bottom: Subjects to teach (Classes row removed as instructed) -->
-          <div class="bg-[var(--bg-page)] p-2.5 rounded-xl border border-[var(--border-color)] space-y-1 text-xs">
-            <div class="flex items-start gap-2">
-              <span class="font-bold text-[var(--text-sub)] min-w-[65px] pt-0.5">Subjects:</span>
-              <div class="flex flex-wrap gap-1 flex-1">${subjectsPills}</div>
-            </div>
+          <!-- Subjects strip at bottom -->
+          <div class="border-t border-[var(--border-color)] bg-[var(--bg-page)] px-3 py-2 flex items-start gap-2">
+            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase tracking-wide pt-0.5 flex-shrink-0">Subjects</span>
+            <div class="flex flex-wrap gap-1 flex-1">${subjectsPills}</div>
           </div>
         </div>
-      `;
+      `
     }).join('');
   } catch (error) {
     console.error('[Render Teachers List Error]', error);
