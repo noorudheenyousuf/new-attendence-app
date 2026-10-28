@@ -244,16 +244,26 @@ const API = {
   },
 
   // Teachers API
-  async getTeachers() {
-    return this.request('/teachers');
+  async getTeachers(year, classFilter) {
+    let url = '/teachers';
+    const params = new URLSearchParams();
+    if (year && year !== 'all') params.append('year', year);
+    if (classFilter && classFilter !== 'all') params.append('class', classFilter);
+    const qs = params.toString();
+    return this.request(qs ? `${url}?${qs}` : url);
   },
 
   async getTeacherById(id) {
     return this.request(`/teachers/${id}`);
   },
 
-  async getTeacherLogs(id) {
-    return this.request(`/teachers/${id}/logs`);
+  async getTeacherLogs(id, year, classFilter) {
+    let url = `/teachers/${id}/logs`;
+    const params = new URLSearchParams();
+    if (year && year !== 'all') params.append('year', year);
+    if (classFilter && classFilter !== 'all') params.append('class', classFilter);
+    const qs = params.toString();
+    return this.request(qs ? `${url}?${qs}` : url);
   },
 
   async addTeacher(teacherData) {
@@ -322,6 +332,62 @@ const API = {
   async undoLog(logId) {
     return this.request(`/logs/${logId}/undo`, {
       method: 'POST'
+    });
+  },
+
+  // Edit / Delete button access toggle (Admin only)
+  async toggleEditDeleteAccess(enabled) {
+    return this.request('/admin/toggle-edit-delete-access', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled })
+    });
+  },
+
+  // Messages API (Notifications & Teacher Broadcast)
+  async getMessages() {
+    return this.request('/messages');
+  },
+
+  async sendMessage(text) {
+    return this.request('/messages', {
+      method: 'POST',
+      body: JSON.stringify({ text })
+    });
+  },
+
+  async markMessagesRead() {
+    return this.request('/messages/mark-read', {
+      method: 'POST'
+    });
+  },
+
+  // Timetable API
+  async getTimetable(className, day) {
+    let url = '/timetable';
+    const params = new URLSearchParams();
+    if (className && className !== 'all') params.append('class', className);
+    if (day && day !== 'all') params.append('day', day);
+    const qs = params.toString();
+    return this.request(qs ? `${url}?${qs}` : url);
+  },
+
+  async createTimetableSlot(slotData) {
+    return this.request('/timetable', {
+      method: 'POST',
+      body: JSON.stringify(slotData)
+    });
+  },
+
+  async updateTimetableSlot(id, slotData) {
+    return this.request(`/timetable/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(slotData)
+    });
+  },
+
+  async deleteTimetableSlot(id) {
+    return this.request(`/timetable/${id}`, {
+      method: 'DELETE'
     });
   }
 };

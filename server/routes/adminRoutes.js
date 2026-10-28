@@ -1,24 +1,26 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const AppSettings = require('../models/AppSettings');
 const User = require('../models/User');
+const Attendance = require('../models/Attendance');
+const Student = require('../models/Student');
+const Subject = require('../models/Subject');
+const Class = require('../models/Class');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 const adminMiddleware = require('../middleware/admin');
 
-// All admin routes require auth and admin role
-router.use(authMiddleware);
-router.use(adminMiddleware);
-
 // @route   GET /api/admin/settings
-// @desc    Get App Name & School Name
-router.get('/settings', async (req, res) => {
+// @desc    Get App Name, School Name, and Edit/Delete permissions (Accessible to all authenticated users)
+router.get('/settings', authMiddleware, async (req, res) => {
   try {
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = await AppSettings.create({
         appName: 'REGISTERLY',
-        schoolName: ''
+        schoolName: '',
+        allowNonAdminEditDelete: false
       });
     }
     res.json({ success: true, data: settings });
@@ -27,23 +29,28 @@ router.get('/settings', async (req, res) => {
   }
 });
 
+// All following admin routes require admin role
+router.use(authMiddleware);
+router.use(adminMiddleware);
+
 // @route   PUT /api/admin/settings
-// @desc    Update App Name & School Name
+// @desc    Update App Name & School Name & Permissions
 router.put('/settings', async (req, res) => {
   try {
-    const { appName, schoolName } = req.body;
+    const { appName, schoolName, allowNonAdminEditDelete } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings();
     }
     if (appName !== undefined) settings.appName = (appName || '').trim();
     if (schoolName !== undefined) settings.schoolName = (schoolName || '').trim();
+    if (allowNonAdminEditDelete !== undefined) settings.allowNonAdminEditDelete = Boolean(allowNonAdminEditDelete);
     settings.updatedAt = new Date();
     await settings.save();
 
     await ActivityLog.create({
       action: 'App & School Settings Updated',
-      details: `App Name: ${settings.appName} • School Name: ${settings.schoolName}`,
+      details: `App Name: ${settings.appName} • School Name: ${settings.schoolName} • Edit/Delete Access: ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'}`,
       performedBy: req.user.name,
       role: 'admin',
       entityType: 'settings',
@@ -51,6 +58,38 @@ router.put('/settings', async (req, res) => {
     });
 
     res.json({ success: true, data: settings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/admin/toggle-edit-delete-access
+// @desc    Toggle non-admin access for edit and delete buttons across the app
+router.put('/toggle-edit-delete-access', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    let settings = await AppSettings.findOne();
+    if (!settings) {
+      settings = new AppSettings();
+    }
+    settings.allowNonAdminEditDelete = enabled !== undefined ? Boolean(enabled) : !settings.allowNonAdminEditDelete;
+    settings.updatedAt = new Date();
+    await settings.save();
+
+    await ActivityLog.create({
+      action: `Edit/Delete Button Access ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'}`,
+      details: `Access for non-admin edit/delete buttons ${settings.allowNonAdminEditDelete ? 'granted' : 'revoked'} by Admin`,
+      performedBy: req.user.name,
+      role: 'admin',
+      entityType: 'settings',
+      canUndo: false
+    });
+
+    res.json({
+      success: true,
+      allowNonAdminEditDelete: settings.allowNonAdminEditDelete,
+      data: settings
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -81,7 +120,6 @@ router.post('/teachers', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email already exists' });
     }
 
-    const bcrypt = require('bcryptjs');
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password || 'teacher123', salt);
 
@@ -222,8 +260,6 @@ router.delete('/teachers/:id', async (req, res) => {
 // @desc    USER DIRECTIVE: Clear ONLY whole class attendance data (keeps teachers, students, class, subjects, details intact)
 router.post('/clear-data', async (req, res) => {
   try {
-    const Attendance = require('../models/Attendance');
-
     await Attendance.deleteMany({});
 
     await ActivityLog.create({
@@ -245,11 +281,6 @@ router.post('/clear-data', async (req, res) => {
 // @desc    USER DIRECTIVE: Clear all app data like new
 router.post('/reset-app', async (req, res) => {
   try {
-    const Student = require('../models/Student');
-    const Attendance = require('../models/Attendance');
-    const Subject = require('../models/Subject');
-    const Class = require('../models/Class');
-
     // Clear all app records like brand new
     await Student.deleteMany({});
     await Attendance.deleteMany({});
@@ -261,6 +292,7 @@ router.post('/reset-app', async (req, res) => {
     if (settings) {
       settings.appName = 'REGISTERLY';
       settings.schoolName = '';
+      settings.allowNonAdminEditDelete = false;
       await settings.save();
     }
 

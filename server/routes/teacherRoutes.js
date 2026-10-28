@@ -17,11 +17,26 @@ function getGravatarUrl(email) {
 
 // @route   GET /api/teachers
 // @desc    Get all teachers with assigned classes, subjects, google connection status, and session counts
+// Supports query: ?year=2026&class=Class+10
 router.get('/', async (req, res) => {
   try {
+    const { year, class: classFilter } = req.query;
     const teachers = await User.find().select('-password').sort({ createdAt: -1 }).lean();
 
-    // Compute live attendance session counts for each teacher
+    // Fetch distinct dates to extract all available academic years in attendance
+    const allDates = await Attendance.distinct('date');
+    const detectedYears = new Set();
+    const currentYear = new Date().getFullYear().toString();
+    detectedYears.add(currentYear);
+    allDates.forEach(d => {
+      if (typeof d === 'string' && d.length >= 4) {
+        const yr = d.substring(0, 4);
+        if (/^\d{4}$/.test(yr)) detectedYears.add(yr);
+      }
+    });
+    const availableYears = Array.from(detectedYears).sort().reverse();
+
+    // Compute live attendance session counts for each teacher based on year & class
     const enrichedTeachers = await Promise.all(
       teachers.map(async (t) => {
         const emailLower = (t.email || '').toLowerCase();
@@ -45,8 +60,20 @@ router.get('/', async (req, res) => {
         }
 
         let sessionCount = 0;
+        let totalAllTimeSessions = 0;
+
         if (orConditions.length > 0) {
-          sessionCount = await Attendance.countDocuments({ $or: orConditions });
+          totalAllTimeSessions = await Attendance.countDocuments({ $or: orConditions });
+
+          // Specific filtered count
+          const query = { $or: orConditions };
+          if (year && year !== 'all') {
+            query.date = { $regex: `^${year}` };
+          }
+          if (classFilter && classFilter !== 'all') {
+            query.class = classFilter;
+          }
+          sessionCount = await Attendance.countDocuments(query);
         }
 
         return {
@@ -54,14 +81,16 @@ router.get('/', async (req, res) => {
           assignedClasses,
           assignedSubjects,
           googleConnected: Boolean(t.googleId),
-          sessionCount
+          sessionCount,
+          totalAllTimeSessions
         };
       })
     );
 
     res.json({
       success: true,
-      data: enrichedTeachers
+      data: enrichedTeachers,
+      availableYears
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -92,8 +121,10 @@ router.get('/:id', async (req, res) => {
 
 // @route   GET /api/teachers/:id/logs
 // @desc    USER DIRECTIVE: Log button for how many classes attended in which days in which class, and how many sessions
+// Supports query: ?year=2026&class=Class+10
 router.get('/:id/logs', async (req, res) => {
   try {
+    const { year, class: classFilter } = req.query;
     const teacher = await User.findById(req.params.id).select('-password').lean();
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher not found' });
@@ -118,9 +149,30 @@ router.get('/:id/logs', async (req, res) => {
       });
     }
 
-    let sessions = [];
+    let allSessions = [];
     if (orConditions.length > 0) {
-      sessions = await Attendance.find({ $or: orConditions }).sort({ date: -1, createdAt: -1 }).lean();
+      allSessions = await Attendance.find({ $or: orConditions }).sort({ date: -1, createdAt: -1 }).lean();
+    }
+
+    // Extract available years for this teacher's sessions
+    const sessionYears = new Set();
+    const currentYear = new Date().getFullYear().toString();
+    sessionYears.add(currentYear);
+    allSessions.forEach(s => {
+      if (s.date && s.date.length >= 4) {
+        const yr = s.date.substring(0, 4);
+        if (/^\d{4}$/.test(yr)) sessionYears.add(yr);
+      }
+    });
+    const availableYears = Array.from(sessionYears).sort().reverse();
+
+    // Filter sessions by requested year and class
+    let filteredSessions = allSessions;
+    if (year && year !== 'all') {
+      filteredSessions = filteredSessions.filter(s => s.date && s.date.startsWith(year));
+    }
+    if (classFilter && classFilter !== 'all') {
+      filteredSessions = filteredSessions.filter(s => s.class === classFilter);
     }
 
     // Compute stats
@@ -131,7 +183,7 @@ router.get('/:id/logs', async (req, res) => {
     let totalAbsent = 0;
     let totalLate = 0;
 
-    sessions.forEach(s => {
+    filteredSessions.forEach(s => {
       if (s.date) uniqueDates.add(s.date);
       if (s.class) uniqueClasses.add(s.class);
       if (s.subject && s.subject !== 'all') uniqueSubjects.add(s.subject);
@@ -141,6 +193,9 @@ router.get('/:id/logs', async (req, res) => {
         totalLate += (s.summary.late || 0);
       }
     });
+
+    // Also get all unique classes from all sessions to populate class filter
+    const allClassesInHistory = Array.from(new Set(allSessions.map(s => s.class).filter(Boolean)));
 
     res.json({
       success: true,
@@ -155,16 +210,18 @@ router.get('/:id/logs', async (req, res) => {
         googleConnected: Boolean(teacher.googleId)
       },
       stats: {
-        totalSessions: sessions.length,
+        totalSessions: filteredSessions.length,
+        allTimeTotalSessions: allSessions.length,
         totalDays: uniqueDates.size,
         classesCount: uniqueClasses.size,
-        classesList: Array.from(uniqueClasses),
+        classesList: allClassesInHistory,
         subjectsList: Array.from(uniqueSubjects),
         totalPresent,
         totalAbsent,
         totalLate
       },
-      sessions: sessions.map(s => ({
+      availableYears,
+      sessions: filteredSessions.map(s => ({
         id: s._id,
         date: s.date,
         class: s.class,

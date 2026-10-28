@@ -337,3 +337,140 @@ body.dark-mode .status-critical {
     display: none !important;
   }
 }
+
+/* ==========================================================================
+   APP LAUNCH SPLASH LOADER
+   ========================================================================== */
+#app-splash-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: var(--bg-page);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#app-splash-loader.splash-fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@keyframes splashPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(36, 91, 112, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 16px rgba(36, 91, 112, 0);
+  }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.splash-icon-pulse {
+  animation: splashPulse 2s infinite ease-in-out;
+}
+
+.splash-spin-ring {
+  animation: spinSlow 1.5s linear infinite;
+}
+
+/* ==========================================================================
+   INTERACTIVE SUBJECT BADGE / TAG CHIPS
+   ========================================================================== */
+.subject-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(36, 91, 112, 0.1);
+  color: var(--primary-color);
+  border: 1px solid rgba(36, 91, 112, 0.22);
+  transition: all 0.18s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.dark-mode .subject-chip {
+  background: rgba(45, 120, 145, 0.18);
+  color: #5eead4;
+  border-color: rgba(94, 234, 212, 0.25);
+}
+
+.subject-chip:hover {
+  background: var(--primary-color);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(36, 91, 112, 0.25);
+}
+
+body.dark-mode .subject-chip:hover {
+  background: #14b8a6;
+  color: #0c1519;
+}
+
+.subject-chip:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   SWITCH TOGGLE (Admin Panel Permissions)
+   ========================================================================== */
+.switch-label {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch-label input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #cbd5e1;
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 24px;
+}
+
+body.dark-mode .switch-slider {
+  background-color: #334155;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+input:checked + .switch-slider {
+  background-color: #10b981;
+}
+
+input:checked + .switch-slider:before {
+  transform: translateX(20px);
+}
+

@@ -11,6 +11,10 @@ const appSettingsSchema = new mongoose.Schema({
     default: '',
     trim: true
   },
+  allowNonAdminEditDelete: {
+    type: Boolean,
+    default: false
+  },
   updatedAt: {
     type: Date,
     default: Date.now
@@ -18,3 +22,4 @@ const appSettingsSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('AppSettings', appSettingsSchema);
+

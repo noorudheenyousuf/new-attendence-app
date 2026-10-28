@@ -29,20 +29,44 @@ function escapeQuotes(str) {
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
+let appSettings = { appName: 'REGISTERLY', schoolName: '', allowNonAdminEditDelete: false };
+
+function canUserEditDelete() {
+  if (currentUser && currentUser.role === 'admin') return true;
+  return Boolean(appSettings && appSettings.allowNonAdminEditDelete);
+}
+
+function hideSplashLoader() {
+  const loader = document.getElementById('app-splash-loader');
+  if (loader) {
+    loader.classList.add('splash-fade-out');
+    setTimeout(() => {
+      loader.style.display = 'none';
+    }, 450);
+  }
+}
+
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   initServiceWorker();
   updateDateDisplay();
   selectTopTab('attendance');
-  await initGoogleAuth();
-  await loadCurrentUser();
-  await loadAppSettings();
-  await loadClasses();
-  await loadSubjects();
-  await loadTeachersData();
-  await loadAttendanceRoster();
-  await loadReport();
-  await loadActivityLogs();
+  try {
+    await initGoogleAuth();
+    await loadCurrentUser();
+    await loadAppSettings();
+    await loadClasses();
+    await loadSubjects();
+    await loadTeachersData();
+    await loadAttendanceRoster();
+    await loadReport();
+    await loadActivityLogs();
+    await checkUnreadMessages();
+  } catch (err) {
+    console.error('[App Init Error]', err);
+  } finally {
+    hideSplashLoader();
+  }
 });
 
 let deferredPrompt = null;
@@ -260,6 +284,7 @@ async function loadAppSettings() {
   try {
     const res = await API.getAdminSettings();
     if (res.success && res.data) {
+      appSettings = res.data;
       const appName = res.data.appName !== undefined ? res.data.appName : '';
       const schoolName = res.data.schoolName !== undefined ? res.data.schoolName : '';
       updateHeaderBranding(appName, schoolName);
@@ -268,9 +293,35 @@ async function loadAppSettings() {
       const adminSchoolInput = document.getElementById('admin-input-school-name');
       if (adminAppInput) adminAppInput.value = appName;
       if (adminSchoolInput) adminSchoolInput.value = schoolName;
+
+      const toggleEl = document.getElementById('admin-toggle-edit-delete');
+      if (toggleEl) {
+        toggleEl.checked = Boolean(res.data.allowNonAdminEditDelete);
+      }
     }
   } catch (error) {
     console.log('[Settings Load]', error);
+  }
+}
+
+async function handleAdminToggleEditDelete(enabled) {
+  try {
+    const res = await API.toggleEditDeleteAccess(enabled);
+    if (res.success) {
+      if (appSettings) {
+        appSettings.allowNonAdminEditDelete = Boolean(res.allowNonAdminEditDelete);
+      }
+      showToast(res.allowNonAdminEditDelete ? 'Edit & Delete buttons visible to all users' : 'Edit & Delete buttons hidden for non-admin accounts');
+      // Refresh views so buttons appear/disappear immediately
+      renderClassesList();
+      renderSubjectsList();
+      renderStudentsDirectory();
+      renderTeachersList();
+    }
+  } catch (error) {
+    showToast(error.message, true);
+    const toggleEl = document.getElementById('admin-toggle-edit-delete');
+    if (toggleEl) toggleEl.checked = !enabled;
   }
 }
 
@@ -410,13 +461,25 @@ function renderClassesList() {
         <div class="w-10 h-10 rounded-xl text-white font-black text-sm flex items-center justify-center custom-gradient-header flex-shrink-0">
           ${c.name.replace(/[^0-9]/g, '') || c.name.slice(0, 3)}
         </div>
-        <div>
+        <div class="min-w-0">
           <h3 class="font-bold text-[var(--text-main)] text-sm">${escapeHtml(c.name)}</h3>
           <p class="text-xs text-[var(--text-sub)]">Class Teacher: ${escapeHtml(c.classTeacher)}</p>
-          <div class="text-[11px] text-[#245b70] font-semibold mt-0.5">Assigned Subjects: ${(c.assignedSubjects && c.assignedSubjects.length) ? escapeHtml(c.assignedSubjects.join(', ')) : 'All / None'}</div>
+          <div class="mt-1 flex items-center gap-1 flex-wrap">
+            <span class="text-[10px] font-bold text-[var(--text-sub)] mr-0.5 uppercase tracking-wide">Subjects:</span>
+            ${(c.assignedSubjects && c.assignedSubjects.length > 0)
+              ? c.assignedSubjects.map(sub => `
+                  <span class="subject-chip" title="Assigned Subject: ${escapeHtml(sub)}">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-teal-400"></span>
+                    <span>${escapeHtml(sub)}</span>
+                  </span>
+                `).join('')
+              : `<span class="text-xs text-[var(--text-sub)] italic">None</span>`
+            }
+          </div>
         </div>
       </div>
-      <div class="flex items-center gap-1.5">
+      ${canUserEditDelete() ? `
+      <div class="flex items-center gap-1.5 flex-shrink-0">
         <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
@@ -424,6 +487,7 @@ function renderClassesList() {
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
+      ` : ''}
     </div>
   `).join('');
 }
@@ -651,7 +715,8 @@ function renderSubjectsList() {
           ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5">Teacher: ${s.teacher}</p>` : ''}
         </div>
       </div>
-      <div class="flex items-center gap-1.5">
+      ${canUserEditDelete() ? `
+      <div class="flex items-center gap-1.5 flex-shrink-0">
         <button onclick="openEditSubjectModal('${s._id}', '${s.name}', '${s.subjectCode}', '${s.teacher || ''}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
@@ -659,6 +724,7 @@ function renderSubjectsList() {
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
+      ` : ''}
     </div>
   `).join('');
 }
@@ -1235,6 +1301,7 @@ async function renderStudentsDirectory() {
             </div>
 
             <!-- Edit and Delete Buttons -->
+            ${canUserEditDelete() ? `
             <div class="flex items-center gap-1 flex-shrink-0">
               <button onclick="openEditStudentModal('${st._id}')" title="Edit Student (All fields)" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -1243,6 +1310,7 @@ async function renderStudentsDirectory() {
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
             </div>
+            ` : ''}
           </div>
         </div>
       `).join('');
@@ -2420,6 +2488,7 @@ function handleSignout() {
 // Connects teacher profile via Google auth email matching
 // =========================================================================
 let cachedTeachersList = [];
+let availableTeacherYears = [];
 let newTeacherPhotoUrl = '';
 let editTeacherPhotoUrl = '';
 let activeEditTeacherId = null;
@@ -2429,13 +2498,47 @@ let currentTeacherSessions = [];
 // Helper to load teachers list into memory
 async function loadTeachersData() {
   try {
-    const res = await API.getTeachers();
+    const yearEl = document.getElementById('teachers-filter-year');
+    const classEl = document.getElementById('teachers-filter-class');
+    const selectedYear = yearEl ? yearEl.value : 'all';
+    const selectedClass = classEl ? classEl.value : 'all';
+
+    const res = await API.getTeachers(selectedYear, selectedClass);
     if (res.success && Array.isArray(res.data)) {
       cachedTeachersList = res.data;
+      if (Array.isArray(res.availableYears)) {
+        availableTeacherYears = res.availableYears;
+      }
+      populateTeacherFilterDropdowns(selectedYear, selectedClass);
     }
   } catch (e) {
     console.log('[Teachers Load Error]', e);
   }
+}
+
+function populateTeacherFilterDropdowns(selectedYear = 'all', selectedClass = 'all') {
+  const yearEl = document.getElementById('teachers-filter-year');
+  const classEl = document.getElementById('teachers-filter-class');
+
+  if (yearEl && (!yearEl.options || yearEl.options.length <= 1)) {
+    let yearOptions = `<option value="all">All Years (Total)</option>`;
+    (availableTeacherYears || []).forEach(yr => {
+      yearOptions += `<option value="${yr}" ${selectedYear === yr ? 'selected' : ''}>${yr}</option>`;
+    });
+    yearEl.innerHTML = yearOptions;
+  }
+
+  if (classEl && (!classEl.options || classEl.options.length <= 1)) {
+    let classOptions = `<option value="all">All Classes</option>`;
+    (classesList || []).forEach(cl => {
+      classOptions += `<option value="${escapeHtml(cl.name)}" ${selectedClass === cl.name ? 'selected' : ''}>${escapeHtml(cl.name)}</option>`;
+    });
+    classEl.innerHTML = classOptions;
+  }
+}
+
+function handleTeacherFiltersChange() {
+  renderTeachersList();
 }
 
 // Helper to populate teacher dropdowns in Add/Edit Class & Subject
@@ -2597,6 +2700,11 @@ async function renderTeachersList() {
       return;
     }
 
+    const yearEl = document.getElementById('teachers-filter-year');
+    const classEl = document.getElementById('teachers-filter-class');
+    const selectedYear = yearEl ? yearEl.value : 'all';
+    const selectedClass = classEl ? classEl.value : 'all';
+
     container.innerHTML = teachers.map(t => {
       const avatar = t.avatarUrl || getEmailAvatarPreview(t.email, t.name);
       const isGoogleLinked = Boolean(t.googleConnected);
@@ -2617,15 +2725,15 @@ async function renderTeachersList() {
                 No Email
               </span>`);
 
-      const classesPills = (t.assignedClasses && t.assignedClasses.length > 0)
-        ? t.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-900/30 dark:text-cyan-300 font-bold text-xs shadow-sm">${escapeHtml(c)}</span>`).join(' ')
-        : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
-
       const subjectsPills = (t.assignedSubjects && t.assignedSubjects.length > 0)
         ? t.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold text-xs shadow-sm">${escapeHtml(s)}</span>`).join(' ')
         : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
 
-      const sessionsCount = t.sessionCount || 0;
+      const totalAllTime = t.totalAllTimeSessions !== undefined ? t.totalAllTimeSessions : (t.sessionCount || 0);
+      const currentSessions = t.sessionCount || 0;
+      const sessionButtonLabel = selectedYear === 'all'
+        ? `Log (${totalAllTime} Total)`
+        : `Log (${currentSessions} in ${selectedYear})`;
 
       return `
         <div class="bg-[var(--card-bg)] p-3.5 sm:p-4 rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition space-y-3">
@@ -2640,6 +2748,13 @@ async function renderTeachersList() {
                   ${googleStatusBadge}
                 </div>
                 <p class="text-xs text-[var(--text-sub)] font-medium truncate mt-0.5">${t.email ? escapeHtml(t.email) : '<span class="text-slate-400 italic font-normal">No email linked</span>'}</p>
+                <!-- Year & Filter Summary Badge -->
+                <div class="text-[10px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5 flex items-center gap-1">
+                  <span>${selectedYear === 'all' ? 'All Years' : selectedYear}</span>
+                  <span>•</span>
+                  <span>${selectedClass === 'all' ? 'All Classes' : selectedClass}:</span>
+                  <span class="font-bold">${currentSessions} sessions</span>
+                </div>
               </div>
             </div>
 
@@ -2647,9 +2762,10 @@ async function renderTeachersList() {
             <div class="flex items-center gap-1.5 flex-shrink-0">
               <button onclick="openTeacherLogModal('${t._id}')" class="px-2.5 py-1.5 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 hover:bg-[#245b70] hover:text-white text-xs font-bold transition flex items-center gap-1 shadow-sm" title="View attendance session logs">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                <span>Log (${sessionsCount})</span>
+                <span>${sessionButtonLabel}</span>
               </button>
 
+              ${canUserEditDelete() ? `
               <button onclick="openEditTeacherModal('${t._id}')" title="Edit Teacher" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               </button>
@@ -2657,15 +2773,12 @@ async function renderTeachersList() {
               <button onclick="handleDeleteTeacher('${t._id}', this.getAttribute('data-name'))" data-name="${escapeHtml(t.name)}" title="Delete Teacher" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
+              ` : ''}
             </div>
           </div>
 
-          <!-- Bottom: Classes to teach & Subjects to teach -->
-          <div class="bg-[var(--bg-page)] p-2.5 rounded-xl border border-[var(--border-color)] space-y-1.5 text-xs">
-            <div class="flex items-start gap-2">
-              <span class="font-bold text-[var(--text-sub)] min-w-[65px] pt-0.5">Classes:</span>
-              <div class="flex flex-wrap gap-1 flex-1">${classesPills}</div>
-            </div>
+          <!-- Bottom: Subjects to teach (Classes row removed as instructed) -->
+          <div class="bg-[var(--bg-page)] p-2.5 rounded-xl border border-[var(--border-color)] space-y-1 text-xs">
             <div class="flex items-start gap-2">
               <span class="font-bold text-[var(--text-sub)] min-w-[65px] pt-0.5">Subjects:</span>
               <div class="flex flex-wrap gap-1 flex-1">${subjectsPills}</div>
@@ -2841,7 +2954,12 @@ async function openTeacherLogModal(teacherId) {
   if (sessionsContainer) sessionsContainer.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">Fetching attendance sessions...</div>`;
 
   try {
-    const res = await API.getTeacherLogs(teacherId);
+    const yearEl = document.getElementById('teachers-filter-year');
+    const classEl = document.getElementById('teachers-filter-class');
+    const selectedYear = yearEl ? yearEl.value : 'all';
+    const selectedClass = classEl ? classEl.value : 'all';
+
+    const res = await API.getTeacherLogs(teacherId, selectedYear, selectedClass);
     if (res.success) {
       currentTeacherLogData = res;
       currentTeacherSessions = res.sessions || [];
@@ -2958,3 +3076,337 @@ function closeTeacherLogModal() {
   currentTeacherSessions = [];
 }
 
+
+// ================= MESSAGES MODULE =================
+let cachedMessages = [];
+
+function _timeAgo(dateStr) {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' hr ago';
+  if (diff < 604800) return Math.floor(diff / 86400) + ' day ago';
+  return new Date(dateStr).toLocaleDateString();
+}
+
+async function checkUnreadMessages() {
+  try {
+    const data = await API.getMessages();
+    const messages = data.messages || data || [];
+    cachedMessages = messages;
+    const myId = currentUser && (currentUser._id || currentUser.id);
+    const unreadCount = messages.filter(m => {
+      const readBy = m.readBy || [];
+      return !readBy.includes(String(myId));
+    }).length;
+    const badge = document.getElementById('unread-msg-badge');
+    if (badge) {
+      badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+      if (unreadCount > 0) {
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  } catch (err) {
+    // silently fail — not critical
+  }
+}
+
+async function openMessagesModal() {
+  const modal = document.getElementById('modal-messages');
+  if (modal) modal.classList.remove('hidden');
+  await loadMessages();
+  try { await API.markMessagesRead(); } catch(_) {}
+  const badge = document.getElementById('unread-msg-badge');
+  if (badge) badge.classList.add('hidden');
+}
+
+function closeMessagesModal() {
+  const modal = document.getElementById('modal-messages');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function loadMessages() {
+  const container = document.getElementById('messages-list-container');
+  if (!container) return;
+  container.innerHTML = `<div class="flex items-center justify-center py-8"><div class="w-6 h-6 rounded-full border-2 border-[#245b70] border-t-transparent animate-spin"></div></div>`;
+  try {
+    const data = await API.getMessages();
+    const messages = data.messages || data || [];
+    cachedMessages = messages;
+    if (messages.length === 0) {
+      container.innerHTML = `<div class="text-center text-xs text-[var(--text-sub)] py-8 italic">No messages yet. Be the first to post!</div>`;
+      return;
+    }
+    const myId = currentUser && (currentUser._id || currentUser.id);
+    container.innerHTML = messages.slice().reverse().map(m => {
+      const isMine = String(m.senderId) === String(myId);
+      const avatar = m.senderAvatar || DEFAULT_AVATAR;
+      const rolePill = m.senderRole === 'admin'
+        ? `<span class="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[10px] border border-amber-500/20">Admin</span>`
+        : `<span class="px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)] font-bold text-[10px]">Teacher</span>`;
+      return `
+        <div class="flex items-start gap-2.5 ${isMine ? 'flex-row-reverse' : ''}">
+          <img src="${avatar}" alt="${escapeHtml(m.senderName)}" class="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-[var(--border-color)]">
+          <div class="max-w-[78%] space-y-1 ${isMine ? 'items-end flex flex-col' : ''}">
+            <div class="flex items-center gap-1.5 ${isMine ? 'flex-row-reverse' : ''}">
+              <span class="font-extrabold text-xs text-[var(--text-main)]">${escapeHtml(m.senderName)}</span>
+              ${rolePill}
+              <span class="text-[10px] text-[var(--text-sub)]">${_timeAgo(m.createdAt)}</span>
+            </div>
+            <div class="${isMine ? 'bg-[#245b70] text-white' : 'bg-[var(--bg-page)] text-[var(--text-main)]'} px-3 py-2 rounded-2xl ${isMine ? 'rounded-tr-md' : 'rounded-tl-md'} text-xs font-medium border ${isMine ? 'border-[#245b70]' : 'border-[var(--border-color)]'} shadow-sm">
+              ${escapeHtml(m.text)}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    // scroll to bottom
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    container.innerHTML = `<div class="text-center text-xs text-rose-500 py-6">Failed to load messages: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function handleSendMessage(e) {
+  e.preventDefault();
+  const input = document.getElementById('message-input-text');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    await API.sendMessage(text);
+    input.value = '';
+    await loadMessages();
+  } catch (err) {
+    showToast('Failed to send message: ' + err.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+}
+
+// ================= TIMETABLE MODULE =================
+let currentTimetableDay = 'Monday';
+let timetableEditingSlotId = null;
+
+async function openTimetableModal() {
+  const modal = document.getElementById('modal-timetable');
+  if (modal) modal.classList.remove('hidden');
+
+  // Populate class filter
+  const classFilter = document.getElementById('timetable-filter-class');
+  if (classFilter) {
+    classFilter.innerHTML = `<option value="all">All Classes</option>` +
+      classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
+  }
+
+  // Reset to Monday
+  currentTimetableDay = 'Monday';
+  _updateTimetableDayTabs();
+  await renderTimetableSlots();
+}
+
+function closeTimetableModal() {
+  const modal = document.getElementById('modal-timetable');
+  if (modal) modal.classList.add('hidden');
+}
+
+function _updateTimetableDayTabs() {
+  document.querySelectorAll('.tt-day-btn').forEach(btn => {
+    const day = btn.getAttribute('data-day');
+    if (day === currentTimetableDay) {
+      btn.className = 'tt-day-btn px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm transition font-bold text-xs';
+    } else {
+      btn.className = 'tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition font-bold text-xs border border-[var(--border-color)]';
+    }
+  });
+}
+
+async function selectTimetableDay(day) {
+  currentTimetableDay = day;
+  _updateTimetableDayTabs();
+  await renderTimetableSlots();
+}
+
+async function renderTimetableSlots() {
+  const container = document.getElementById('timetable-slots-container');
+  if (!container) return;
+  container.innerHTML = `<div class="flex items-center justify-center py-8"><div class="w-6 h-6 rounded-full border-2 border-[#245b70] border-t-transparent animate-spin"></div></div>`;
+
+  const classFilter = document.getElementById('timetable-filter-class');
+  const selectedClass = classFilter ? classFilter.value : 'all';
+
+  try {
+    const data = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, currentTimetableDay);
+    const slots = data.slots || data || [];
+
+    if (slots.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-8 text-xs text-[var(--text-sub)]">
+          <svg class="w-10 h-10 mx-auto mb-2 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' · ' + escapeHtml(selectedClass) : ''}. Add one!
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = slots.map(slot => {
+      const editDelBtns = canUserEditDelete() ? `
+        <div class="flex gap-1 flex-shrink-0">
+          <button onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-7 h-7 rounded-lg bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+          <button onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-7 h-7 rounded-lg btn-delete flex items-center justify-center transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>` : '';
+
+      return `
+        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-3 hover:border-[#245b70] transition shadow-sm">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-[#245b70]/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="min-w-0 space-y-0.5">
+              <p class="font-extrabold text-xs text-[var(--text-main)]">${escapeHtml(slot.timeSlot || slot.time || '')}</p>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
+                <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[10px]">${escapeHtml(slot.class || '')}</span>
+                ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">· ${escapeHtml(slot.teacher)}</span>` : ''}
+                ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">· ${escapeHtml(slot.room)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          ${editDelBtns}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = `<div class="text-center text-xs text-rose-500 py-6">Failed to load timetable: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function openAddTimetableSlotModal(slotId = null) {
+  timetableEditingSlotId = slotId;
+  const modal = document.getElementById('modal-add-timetable-slot');
+  if (!modal) return;
+
+  // Reset form
+  const form = modal.querySelector('form');
+  if (form) form.reset();
+  const editIdInput = document.getElementById('slot-edit-id');
+  if (editIdInput) editIdInput.value = slotId || '';
+
+  // Populate day dropdown
+  const daySelect = document.getElementById('slot-input-day');
+  if (daySelect) {
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    daySelect.innerHTML = days.map(d => `<option value="${d}" ${d === currentTimetableDay ? 'selected' : ''}>${d}</option>`).join('');
+  }
+
+  // Populate class dropdown
+  const classSelect = document.getElementById('slot-input-class');
+  if (classSelect) {
+    classSelect.innerHTML = `<option value="">Select class…</option>` +
+      classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
+  }
+
+  // Populate subject dropdown
+  const subjectSelect = document.getElementById('slot-input-subject');
+  if (subjectSelect) {
+    subjectSelect.innerHTML = `<option value="">Select subject…</option>` +
+      subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
+  }
+
+  // Populate teacher dropdown
+  const teacherSelect = document.getElementById('slot-input-teacher');
+  if (teacherSelect) {
+    teacherSelect.innerHTML = `<option value="">Select teacher (optional)…</option>` +
+      (cachedTeachersList || []).map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
+  }
+
+  // If editing, pre-fill values
+  if (slotId) {
+    try {
+      const data = await API.getTimetable('', '');
+      const slots = data.slots || data || [];
+      const slot = slots.find(s => String(s._id) === String(slotId));
+      if (slot) {
+        if (daySelect) daySelect.value = slot.day || currentTimetableDay;
+        const timeInput = document.getElementById('slot-input-time');
+        if (timeInput) timeInput.value = slot.timeSlot || slot.time || '';
+        if (classSelect) classSelect.value = slot.class || '';
+        if (subjectSelect) subjectSelect.value = slot.subject || '';
+        if (teacherSelect) teacherSelect.value = slot.teacher || '';
+        const roomInput = document.getElementById('slot-input-room');
+        if (roomInput) roomInput.value = slot.room || '';
+      }
+    } catch(_) {}
+  }
+
+  // Update modal title
+  const titleEl = document.getElementById('timetable-slot-modal-title');
+  if (titleEl) titleEl.textContent = slotId ? 'Edit Timetable Slot' : 'Add Timetable Slot';
+
+  modal.classList.remove('hidden');
+}
+
+function closeAddTimetableSlotModal() {
+  const modal = document.getElementById('modal-add-timetable-slot');
+  if (modal) modal.classList.add('hidden');
+  timetableEditingSlotId = null;
+}
+
+async function handleSaveTimetableSlot(e) {
+  e.preventDefault();
+  const slotId = (document.getElementById('slot-edit-id') || {}).value || timetableEditingSlotId;
+
+  const slotData = {
+    day: (document.getElementById('slot-input-day') || {}).value || '',
+    timeSlot: (document.getElementById('slot-input-time') || {}).value || '',
+    class: (document.getElementById('slot-input-class') || {}).value || '',
+    subject: (document.getElementById('slot-input-subject') || {}).value || '',
+    teacher: (document.getElementById('slot-input-teacher') || {}).value || '',
+    room: (document.getElementById('slot-input-room') || {}).value || '',
+  };
+
+  if (!slotData.day || !slotData.timeSlot || !slotData.class || !slotData.subject) {
+    showToast('Day, Time, Class and Subject are required.', true);
+    return;
+  }
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    if (slotId) {
+      await API.updateTimetableSlot(slotId, slotData);
+      showToast('Timetable slot updated!');
+    } else {
+      await API.createTimetableSlot(slotData);
+      showToast('Timetable slot added!');
+    }
+    closeAddTimetableSlotModal();
+    // update day to match what was saved
+    currentTimetableDay = slotData.day;
+    _updateTimetableDayTabs();
+    await renderTimetableSlots();
+  } catch (err) {
+    showToast('Failed to save slot: ' + err.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = slotId ? 'Save Changes' : 'Add Slot'; }
+  }
+}
+
+async function deleteTimetableSlot(id) {
+  if (!confirm('Delete this timetable slot?')) return;
+  try {
+    await API.deleteTimetableSlot(id);
+    showToast('Slot deleted.');
+    await renderTimetableSlots();
+  } catch (err) {
+    showToast('Failed to delete slot: ' + err.message, true);
+  }
+}
