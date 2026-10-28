@@ -3283,7 +3283,9 @@ async function openTimetableModal() {
   }
   // Show/hide Add button — admin only
   const addSlotBtn = document.getElementById('btn-add-timetable-slot');
-  if (addSlotBtn) addSlotBtn.classList.toggle('hidden', !isAdminTT || timetableReadOnly);
+  // Show Add Slot for admin always, and for non-admin when viewing own timetable (not read-only from teacher card)
+  const canAddSlot = isAdminTT || (!timetableReadOnly && !isAdminTT);
+  if (addSlotBtn) addSlotBtn.classList.toggle('hidden', !canAddSlot);
   // Update title
   const ttTitleEl = document.querySelector('#modal-timetable h3');
   if (ttTitleEl) {
@@ -3348,7 +3350,12 @@ async function renderTimetableSlots() {
 
     container.innerHTML = slots.map(slot => {
       const isAdminUser = currentUser && currentUser.role === 'admin';
-    const editDelBtns = (isAdminUser && !timetableReadOnly) ? `
+    // Show edit/delete: admin can edit all; non-admin teacher can edit their own slots (not read-only from teacher card view)
+    const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
+    const slotTeacher = (slot.teacher || '').trim().toLowerCase();
+    const isOwnSlot = myName && slotTeacher === myName;
+    const canEditThisSlot = !timetableReadOnly && (isAdminUser || isOwnSlot);
+    const editDelBtns = canEditThisSlot ? `
         <div class="flex gap-1 flex-shrink-0">
           <button onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-7 h-7 rounded-lg bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -3415,11 +3422,21 @@ async function openAddTimetableSlotModal(slotId = null) {
       subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
   }
 
-  // Populate teacher dropdown
+  // Populate teacher dropdown — admin can choose any teacher; non-admin is locked to self
   const teacherSelect = document.getElementById('slot-input-teacher');
+  const teacherSelectWrapper = document.getElementById('slot-teacher-field-wrapper');
+  const isSlotAdmin = currentUser && currentUser.role === 'admin';
   if (teacherSelect) {
-    teacherSelect.innerHTML = `<option value="">Select teacher (optional)â€¦</option>` +
-      (cachedTeachersList || []).map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
+    if (isSlotAdmin) {
+      teacherSelect.innerHTML = `<option value="">Select teacher (optional)…</option>` +
+        (cachedTeachersList || []).map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
+      if (teacherSelectWrapper) teacherSelectWrapper.classList.remove('hidden');
+    } else {
+      // Non-admin: auto-fill their own name, hide the field
+      teacherSelect.innerHTML = `<option value="${escapeHtml(currentUser.name)}" selected>${escapeHtml(currentUser.name)}</option>`;
+      teacherSelect.value = currentUser.name || '';
+      if (teacherSelectWrapper) teacherSelectWrapper.classList.add('hidden');
+    }
   }
 
   // If editing, pre-fill values
@@ -3463,7 +3480,7 @@ async function handleSaveTimetableSlot(e) {
     timeSlot: (document.getElementById('slot-input-time') || {}).value || '',
     class: (document.getElementById('slot-input-class') || {}).value || '',
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
-    teacher: timetableViewTeacher || ((document.getElementById('slot-input-teacher') || {}).value) || '',
+    teacher: timetableViewTeacher || ((document.getElementById('slot-input-teacher') || {}).value) || (currentUser && currentUser.name) || '',
     room: (document.getElementById('slot-input-room') || {}).value || '',
   };
 

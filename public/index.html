@@ -1626,7 +1626,13 @@
           </div>
         </div>
 
-                <input type="hidden" id="slot-input-teacher" value="">
+                <!-- Teacher field: visible for admin, hidden + auto-set for non-admin -->
+        <div id="slot-teacher-field-wrapper">
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Teacher</label>
+          <select id="slot-input-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
 
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Room / Lab / Note (Optional)</label>
