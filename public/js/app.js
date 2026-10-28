@@ -1,4 +1,4 @@
-// Main Application Controller for REGISTERLY
+﻿// Main Application Controller for REGISTERLY
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E";
 let currentUser = null;
 let currentRole = 'admin'; // 'admin' or 'teacher'
@@ -81,7 +81,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 async function triggerPwaInstall() {
   if (!deferredPrompt) {
-    showToast('To install in Chrome, open menu (⋮) > "Install app" or "Add to Home screen"');
+    showToast('To install in Chrome, open menu (â‹®) > "Install app" or "Add to Home screen"');
     return;
   }
   deferredPrompt.prompt();
@@ -441,55 +441,45 @@ function renderClassesList() {
     return;
   }
 
-  container.innerHTML = classesList.map((c, index) => `
-    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between"
+  container.innerHTML = classesList.map((c, index) => {
+    const subjectPills = (c.assignedSubjects && c.assignedSubjects.length > 0)
+      ? c.assignedSubjects.map(sub => `<span class="subject-chip" title="${escapeHtml(sub)}"><span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-teal-400 flex-shrink-0"></span><span>${escapeHtml(sub)}</span></span>`).join('')
+      : `<span class="text-xs text-[var(--text-sub)] italic">No subjects assigned</span>`;
+
+    const actionBtns = canUserEditDelete() ? `
+      <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto pl-2">
+        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-white/20 hover:bg-white hover:text-[#245b70] text-white flex items-center justify-center transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </button>
+        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/70 hover:bg-rose-600 text-white flex items-center justify-center transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>` : '';
+
+    return `
+    <div class="drag-item rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden hover:shadow-md transition-shadow"
          draggable="true"
          ondragstart="handleClassDragStart(event, ${index})"
          ondragover="handleClassDragOver(event, ${index})"
          ondragleave="handleClassDragLeave(event)"
          ondragend="handleClassDragEnd(event)"
          ondrop="handleClassDrop(event, ${index})">
-      <div class="flex items-center gap-3">
-        <!-- Drag Handle Icon -->
-        <div class="text-[var(--text-sub)] hover:text-[#245b70] cursor-grab active:cursor-grabbing p-1" title="Drag to reorder class">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-          </svg>
+      <div class="custom-gradient-header px-3.5 py-3 flex items-center gap-2.5">
+        <div class="text-white/50 hover:text-white cursor-grab active:cursor-grabbing flex-shrink-0" title="Drag to reorder">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
         </div>
-        <div class="w-10 h-10 rounded-xl text-white font-black text-sm flex items-center justify-center custom-gradient-header flex-shrink-0">
-          ${c.name.replace(/[^0-9]/g, '') || c.name.slice(0, 3)}
+        <div class="min-w-0 flex-1">
+          <h3 class="font-black text-white text-sm leading-tight truncate">${escapeHtml(c.name)}</h3>
+          <p class="text-white/70 text-[11px] font-semibold truncate mt-0.5">Class Teacher: <span class="text-white/90">${escapeHtml(c.classTeacher || 'Not assigned')}</span></p>
         </div>
-        <div class="min-w-0">
-          <h3 class="font-bold text-[var(--text-main)] text-sm">${escapeHtml(c.name)}</h3>
-          <p class="text-xs text-[var(--text-sub)]">Class Teacher: ${escapeHtml(c.classTeacher)}</p>
-          <div class="mt-1 flex items-center gap-1 flex-wrap">
-            <span class="text-[10px] font-bold text-[var(--text-sub)] mr-0.5 uppercase tracking-wide">Subjects:</span>
-            ${(c.assignedSubjects && c.assignedSubjects.length > 0)
-              ? c.assignedSubjects.map(sub => `
-                  <span class="subject-chip" title="Assigned Subject: ${escapeHtml(sub)}">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-teal-400"></span>
-                    <span>${escapeHtml(sub)}</span>
-                  </span>
-                `).join('')
-              : `<span class="text-xs text-[var(--text-sub)] italic">None</span>`
-            }
-          </div>
-        </div>
+        ${actionBtns}
       </div>
-      ${canUserEditDelete() ? `
-      <div class="flex items-center gap-1.5 flex-shrink-0">
-        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        </button>
-        <button onclick="deleteClass('${c._id}', '${c.name.replace(/'/g, "\\'")}')" title="Delete Class" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+      <div class="bg-[var(--card-bg)] px-3.5 py-2.5">
+        <p class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Assigned Subjects</p>
+        <div class="flex flex-wrap gap-1.5">${subjectPills}</div>
       </div>
-      ` : ''}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 let activeEditClassId = null;
@@ -1159,7 +1149,7 @@ function renderReportTable(data, summary) {
 // USER DIRECTIVE: "in report of students, in the log button click add in the window also their attendance like....present in green,,,absent in red ....late in yellew present at the top of log window"
 async function openStudentLogModal(studentId, name, roll) {
   document.getElementById('log-modal-title').innerText = `Attendance Logs - ${name}`;
-  document.getElementById('log-modal-subtitle').innerText = `Roll #${roll} • ID: ${studentId}`;
+  document.getElementById('log-modal-subtitle').innerText = `Roll #${roll} â€¢ ID: ${studentId}`;
 
   // Reset top badges
   const statP = document.getElementById('log-stat-present');
@@ -1296,7 +1286,7 @@ async function renderStudentsDirectory() {
                   <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
                   <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
                 </div>
-                <p class="text-xs text-[var(--text-sub)] truncate">${st.class} • Roll: ${st.roll}</p>
+                <p class="text-xs text-[var(--text-sub)] truncate">${st.class} â€¢ Roll: ${st.roll}</p>
               </div>
             </div>
 
@@ -1703,20 +1693,20 @@ async function openStudentDetailsModal(studentId) {
   document.getElementById('details-student-class').innerText = `Class: ${student.class}`;
   document.getElementById('details-student-roll').innerText = `Roll #${student.roll}`;
 
-  document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || '—';
-  document.getElementById('details-student-place').innerText = (student.address && student.address.place) || '—';
-  document.getElementById('details-student-district').innerText = (student.address && student.address.district) || '—';
-  document.getElementById('details-student-state').innerText = (student.address && student.address.state) || '—';
+  document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || 'â€”';
+  document.getElementById('details-student-place').innerText = (student.address && student.address.place) || 'â€”';
+  document.getElementById('details-student-district').innerText = (student.address && student.address.district) || 'â€”';
+  document.getElementById('details-student-state').innerText = (student.address && student.address.state) || 'â€”';
 
-  document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || '—';
-  document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || '—';
-  document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || '—';
-  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '—';
+  document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || 'â€”';
+  document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || 'â€”';
+  document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || 'â€”';
+  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || 'â€”';
 
-  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '—';
+  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || 'â€”';
   document.getElementById('details-student-year').innerText = yr;
-  document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || '—';
-  document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || '—';
+  document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || 'â€”';
+  document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || 'â€”';
 
   document.getElementById('modal-student-details').classList.remove('hidden');
 }
@@ -1987,7 +1977,7 @@ async function importBackupData(event) {
 // "clear data for only clear data of attendence of whole class, not teachers, students, class ,subjects,details"
 async function handleClearDataPrompt() {
   const confirmed = confirm(
-    "⚠️ CLEAR ATTENDANCE DATA:\n\n" +
+    "âš ï¸ CLEAR ATTENDANCE DATA:\n\n" +
     "Are you sure you want to clear attendance records? Teachers, students, classes, subjects, and student details will NOT be deleted."
   );
   if (!confirmed) return;
@@ -2009,7 +1999,7 @@ async function handleClearDataPrompt() {
 // "reset button for clear all app data...like new"
 async function handleResetAppPrompt() {
   const confirmed = confirm(
-    "⚠️ FULL APP RESET (LIKE NEW):\n\n" +
+    "âš ï¸ FULL APP RESET (LIKE NEW):\n\n" +
     "Are you sure you want to wipe all app data like new? All students, classes, subjects, attendance, logs, and settings will be completely reset."
   );
   if (!confirmed) return;
@@ -2177,7 +2167,7 @@ function showAuthAlert(message, isError = true) {
   if (!alertEl || !textEl) return;
 
   textEl.innerText = message;
-  if (iconEl) iconEl.innerText = isError ? '⚠️' : '✅';
+  if (iconEl) iconEl.innerText = isError ? 'âš ï¸' : 'âœ…';
   alertEl.className = `p-3 rounded-2xl text-xs font-semibold flex items-center gap-2 transition-all ${
     isError ? 'alert-error' : 'alert-success'
   }`;
@@ -2214,7 +2204,7 @@ function renderGoogleButton() {
     if (directBtn) directBtn.classList.add('hidden');
     container.innerHTML = `
       <div class="w-full py-2.5 px-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-800 text-center">
-        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">🔑 Google OAuth awaiting Client ID in .env</span>
+        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">ðŸ”‘ Google OAuth awaiting Client ID in .env</span>
       </div>
     `;
     return;
@@ -2751,7 +2741,7 @@ async function renderTeachersList() {
                 <!-- Year & Filter Summary Badge -->
                 <div class="text-[10px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5 flex items-center gap-1">
                   <span>${selectedYear === 'all' ? 'All Years' : selectedYear}</span>
-                  <span>•</span>
+                  <span>â€¢</span>
                   <span>${selectedClass === 'all' ? 'All Classes' : selectedClass}:</span>
                   <span class="font-bold">${currentSessions} sessions</span>
                 </div>
@@ -2954,12 +2944,8 @@ async function openTeacherLogModal(teacherId) {
   if (sessionsContainer) sessionsContainer.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">Fetching attendance sessions...</div>`;
 
   try {
-    const yearEl = document.getElementById('teachers-filter-year');
-    const classEl = document.getElementById('teachers-filter-class');
-    const selectedYear = yearEl ? yearEl.value : 'all';
-    const selectedClass = classEl ? classEl.value : 'all';
-
-    const res = await API.getTeacherLogs(teacherId, selectedYear, selectedClass);
+    // Always fetch all sessions — filters applied inside log modal
+    const res = await API.getTeacherLogs(teacherId, 'all', 'all');
     if (res.success) {
       currentTeacherLogData = res;
       currentTeacherSessions = res.sessions || [];
@@ -3003,6 +2989,17 @@ async function openTeacherLogModal(teacherId) {
           : `<span class="text-xs text-[var(--text-sub)] italic">None</span>`;
       }
 
+      // Populate Year Filter inside Log Modal
+      const yearFilterInLog = document.getElementById('tlog-filter-year');
+      if (yearFilterInLog) {
+        const years = res.availableYears || [];
+        let yearOpts = `<option value="all">All Years (${stats.totalSessions})</option>`;
+        years.forEach(yr => {
+          yearOpts += `<option value="${escapeHtml(yr)}">${escapeHtml(yr)}</option>`;
+        });
+        yearFilterInLog.innerHTML = yearOpts;
+      }
+
       // Populate Class Filter inside Log Modal
       if (filterSelect) {
         let optionsHtml = `<option value="all">All Classes (${stats.totalSessions} sessions)</option>`;
@@ -3029,12 +3026,19 @@ function filterTeacherLogSessions() {
 
 function renderTeacherLogSessionsList() {
   const sessionsContainer = document.getElementById('tlog-sessions-container');
-  const filterSelect = document.getElementById('tlog-filter-class');
-  const selectedClass = filterSelect ? filterSelect.value : 'all';
+  const classFilter = document.getElementById('tlog-filter-class');
+  const yearFilter = document.getElementById('tlog-filter-year');
+  const selectedClass = classFilter ? classFilter.value : 'all';
+  const selectedYear = yearFilter ? yearFilter.value : 'all';
 
   if (!sessionsContainer) return;
 
   let filtered = currentTeacherSessions || [];
+
+  // Filter by year (date string starts with year e.g. "2025-03-15")
+  if (selectedYear !== 'all') {
+    filtered = filtered.filter(s => s.date && String(s.date).startsWith(selectedYear));
+  }
   if (selectedClass !== 'all') {
     filtered = filtered.filter(s => s.class === selectedClass);
   }
@@ -3091,14 +3095,17 @@ function _timeAgo(dateStr) {
 
 async function checkUnreadMessages() {
   try {
-    const data = await API.getMessages();
-    const messages = data.messages || data || [];
+    const res = await API.getMessages();
+    // Backend returns { success, data: [...], unreadCount }
+    const messages = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
     cachedMessages = messages;
     const myId = currentUser && (currentUser._id || currentUser.id);
-    const unreadCount = messages.filter(m => {
-      const readBy = m.readBy || [];
-      return !readBy.includes(String(myId));
-    }).length;
+    // Use backend's unreadCount if available, else compute locally
+    const unreadCount = (res && res.unreadCount !== undefined) ? res.unreadCount :
+      messages.filter(m => {
+        const readBy = (m.readBy || []).map(id => String(id));
+        return !readBy.includes(String(myId));
+      }).length;
     const badge = document.getElementById('unread-msg-badge');
     if (badge) {
       badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
@@ -3109,7 +3116,7 @@ async function checkUnreadMessages() {
       }
     }
   } catch (err) {
-    // silently fail — not critical
+    // silently fail â€” not critical
   }
 }
 
@@ -3132,15 +3139,16 @@ async function loadMessages() {
   if (!container) return;
   container.innerHTML = `<div class="flex items-center justify-center py-8"><div class="w-6 h-6 rounded-full border-2 border-[#245b70] border-t-transparent animate-spin"></div></div>`;
   try {
-    const data = await API.getMessages();
-    const messages = data.messages || data || [];
+    const res = await API.getMessages();
+    // Backend returns { success: true, data: [...], unreadCount }
+    const messages = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
     cachedMessages = messages;
     if (messages.length === 0) {
       container.innerHTML = `<div class="text-center text-xs text-[var(--text-sub)] py-8 italic">No messages yet. Be the first to post!</div>`;
       return;
     }
     const myId = currentUser && (currentUser._id || currentUser.id);
-    container.innerHTML = messages.slice().reverse().map(m => {
+    container.innerHTML = messages.map(m => {
       const isMine = String(m.senderId) === String(myId);
       const avatar = m.senderAvatar || DEFAULT_AVATAR;
       const rolePill = m.senderRole === 'admin'
@@ -3155,14 +3163,14 @@ async function loadMessages() {
               ${rolePill}
               <span class="text-[10px] text-[var(--text-sub)]">${_timeAgo(m.createdAt)}</span>
             </div>
-            <div class="${isMine ? 'bg-[#245b70] text-white' : 'bg-[var(--bg-page)] text-[var(--text-main)]'} px-3 py-2 rounded-2xl ${isMine ? 'rounded-tr-md' : 'rounded-tl-md'} text-xs font-medium border ${isMine ? 'border-[#245b70]' : 'border-[var(--border-color)]'} shadow-sm">
+            <div class="${isMine ? 'bg-[#245b70] text-white' : 'bg-[var(--bg-page)] text-[var(--text-main)]'} px-3 py-2 rounded-2xl ${isMine ? 'rounded-tr-md' : 'rounded-tl-md'} text-xs font-medium border ${isMine ? 'border-[#245b70]' : 'border-[var(--border-color)]'} shadow-sm" style="white-space:pre-wrap;word-break:break-word;">
               ${escapeHtml(m.text)}
             </div>
           </div>
         </div>
       `;
     }).join('');
-    // scroll to bottom
+    // scroll to bottom (messages are chronological from backend)
     container.scrollTop = container.scrollHeight;
   } catch (err) {
     container.innerHTML = `<div class="text-center text-xs text-rose-500 py-6">Failed to load messages: ${escapeHtml(err.message)}</div>`;
@@ -3176,7 +3184,7 @@ async function handleSendMessage(e) {
   const text = input.value.trim();
   if (!text) return;
   const btn = e.target.querySelector('button[type="submit"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sendingâ€¦'; }
   try {
     await API.sendMessage(text);
     input.value = '';
@@ -3240,14 +3248,15 @@ async function renderTimetableSlots() {
   const selectedClass = classFilter ? classFilter.value : 'all';
 
   try {
-    const data = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, currentTimetableDay);
-    const slots = data.slots || data || [];
+    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, currentTimetableDay);
+    // Backend returns { success: true, data: [...] }
+    const slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
     if (slots.length === 0) {
       container.innerHTML = `
         <div class="text-center py-8 text-xs text-[var(--text-sub)]">
           <svg class="w-10 h-10 mx-auto mb-2 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' · ' + escapeHtml(selectedClass) : ''}. Add one!
+          No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' Â· ' + escapeHtml(selectedClass) : ''}. Add one!
         </div>`;
       return;
     }
@@ -3274,8 +3283,8 @@ async function renderTimetableSlots() {
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
                 <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[10px]">${escapeHtml(slot.class || '')}</span>
-                ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">· ${escapeHtml(slot.teacher)}</span>` : ''}
-                ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">· ${escapeHtml(slot.room)}</span>` : ''}
+                ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">Â· ${escapeHtml(slot.teacher)}</span>` : ''}
+                ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">Â· ${escapeHtml(slot.room)}</span>` : ''}
               </div>
             </div>
           </div>
@@ -3309,29 +3318,29 @@ async function openAddTimetableSlotModal(slotId = null) {
   // Populate class dropdown
   const classSelect = document.getElementById('slot-input-class');
   if (classSelect) {
-    classSelect.innerHTML = `<option value="">Select class…</option>` +
+    classSelect.innerHTML = `<option value="">Select classâ€¦</option>` +
       classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
   }
 
   // Populate subject dropdown
   const subjectSelect = document.getElementById('slot-input-subject');
   if (subjectSelect) {
-    subjectSelect.innerHTML = `<option value="">Select subject…</option>` +
+    subjectSelect.innerHTML = `<option value="">Select subjectâ€¦</option>` +
       subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
   }
 
   // Populate teacher dropdown
   const teacherSelect = document.getElementById('slot-input-teacher');
   if (teacherSelect) {
-    teacherSelect.innerHTML = `<option value="">Select teacher (optional)…</option>` +
+    teacherSelect.innerHTML = `<option value="">Select teacher (optional)â€¦</option>` +
       (cachedTeachersList || []).map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
   }
 
   // If editing, pre-fill values
   if (slotId) {
     try {
-      const data = await API.getTimetable('', '');
-      const slots = data.slots || data || [];
+      const res = await API.getTimetable('', '');
+      const slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
       const slot = slots.find(s => String(s._id) === String(slotId));
       if (slot) {
         if (daySelect) daySelect.value = slot.day || currentTimetableDay;
@@ -3378,7 +3387,7 @@ async function handleSaveTimetableSlot(e) {
   }
 
   const btn = e.target.querySelector('button[type="submit"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Savingâ€¦'; }
 
   try {
     if (slotId) {

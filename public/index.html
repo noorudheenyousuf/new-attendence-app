@@ -488,21 +488,9 @@
           <input type="text" id="teacher-search-input" oninput="renderTeachersList()" placeholder="Search teachers by name, email, class or subject..." class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl pl-9 pr-3 text-xs sm:text-sm font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-sm">
         </div>
 
-        <!-- Teachers Filters: Academic Year & Class Filter -->
-        <div class="bg-[var(--card-bg)] p-3 rounded-2xl border border-[var(--border-color)] shadow-sm grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-1 uppercase tracking-wider">Academic Year</label>
-            <select id="teachers-filter-year" onchange="handleTeacherFiltersChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
-              <option value="all">All Years (Total)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-1 uppercase tracking-wider">Class Filter</label>
-            <select id="teachers-filter-class" onchange="handleTeacherFiltersChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
-              <option value="all">All Classes</option>
-            </select>
-          </div>
-        </div>
+        <!-- Hidden year/class selects kept for JS compatibility -->
+        <select id="teachers-filter-year" class="hidden"><option value="all">All Years (Total)</option></select>
+        <select id="teachers-filter-class" class="hidden"><option value="all">All Classes</option></select>
 
         <!-- Teachers Cards Container -->
         <div class="space-y-3" id="teachers-cards-container">
@@ -841,12 +829,17 @@
         </div>
       </div>
 
-      <!-- Filters inside Log: Class filter -->
-      <div class="flex items-center justify-between gap-2">
+      <!-- Filters inside Log: Year + Class filter -->
+      <div class="flex items-center justify-between gap-2 flex-wrap">
         <h4 class="text-xs font-extrabold text-[var(--text-main)] uppercase tracking-wider">Attendance Sessions History</h4>
-        <select id="tlog-filter-class" onchange="filterTeacherLogSessions()" class="touch-input text-xs font-bold bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-[var(--text-main)]">
-          <option value="all">All Classes</option>
-        </select>
+        <div class="flex items-center gap-2">
+          <select id="tlog-filter-year" onchange="filterTeacherLogSessions()" class="touch-input text-xs font-bold bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-[var(--text-main)]">
+            <option value="all">All Years</option>
+          </select>
+          <select id="tlog-filter-class" onchange="filterTeacherLogSessions()" class="touch-input text-xs font-bold bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-[var(--text-main)]">
+            <option value="all">All Classes</option>
+          </select>
+        </div>
       </div>
 
       <!-- Sessions List -->
