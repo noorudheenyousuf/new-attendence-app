@@ -1447,11 +1447,11 @@ async function renderStudentsDirectory() {
       container.innerHTML = students.map(st => `
         <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2.5 min-w-0 cursor-pointer group" onclick="openStudentDetailsModal(${st.studentId})" title="Click to view student details">
-              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm group-hover:scale-105 transition">
+            <div class="flex items-center gap-2.5 min-w-0 select-none">
+              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
               <div class="truncate">
                 <div class="flex items-center gap-1.5">
-                  <span class="font-extrabold text-[var(--text-main)] text-sm truncate group-hover:text-[#245b70] transition">${st.name}</span>
+                  <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
                   <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
                 </div>
                 <p class="text-xs text-[var(--text-sub)] truncate">${st.class} · Roll: ${st.roll}</p>
@@ -2123,29 +2123,40 @@ async function saveAdminStudentFieldsConfig() {
 
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
-  isStudentFormEditMode = false;
-
   const titleEl = document.getElementById('modal-add-student-title');
   if (titleEl) titleEl.innerText = 'Add Student';
 
   const statsEl = document.getElementById('modal-add-student-stats');
   if (statsEl) statsEl.classList.remove('hidden');
 
-  const bannerEl = document.getElementById('student-layout-editor-banner');
-  if (bannerEl) bannerEl.classList.add('hidden');
-
-  const enrollBtn = document.getElementById('btn-enroll-student');
-  if (enrollBtn) enrollBtn.classList.remove('hidden');
-
-  const saveLayoutBtn = document.getElementById('btn-save-layout-exit');
-  if (saveLayoutBtn) saveLayoutBtn.classList.add('hidden');
-
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
   const preview = document.getElementById('new-preview-photo');
   if (preview) preview.src = DEFAULT_AVATAR;
 
-  renderDynamicStudentInputs('new');
+  // Clear all inputs
+  const clearIds = [
+    'new-student-name', 'new-student-roll', 'new-student-address',
+    'new-student-place', 'new-student-district', 'new-student-state',
+    'new-student-fatherName', 'new-student-motherName', 'new-student-fatherMobile',
+    'new-student-fatherWhatsapp', 'new-student-rank', 'new-student-previousCollege'
+  ];
+  clearIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const yearEl = document.getElementById('new-student-yearJoined');
+  if (yearEl) yearEl.value = '2024';
+
+  // Populate classes dropdown
+  const classSelect = document.getElementById('new-student-class');
+  if (classSelect) {
+    classSelect.innerHTML = (classesList || []).map(c => {
+      const cName = c.name || c;
+      return `<option value="${escapeHtml(cName)}">${escapeHtml(cName)}</option>`;
+    }).join('');
+  }
+
   await updateModalStudentCounts();
 
   try {
@@ -2163,7 +2174,6 @@ function closeStudentModal() {
   document.getElementById('modal-add-student').classList.add('hidden');
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
-  isStudentFormEditMode = false;
 }
 
 async function handleSaveNewStudent(e) {
@@ -2226,7 +2236,34 @@ async function openEditStudentModal(id) {
     document.getElementById('edit-student-id').value = student.studentId;
     document.getElementById('edit-preview-photo').src = student.photoUrl || DEFAULT_AVATAR;
 
-    renderDynamicStudentInputs('edit', student);
+    // Populate class options in select
+    const classSelect = document.getElementById('edit-student-class');
+    if (classSelect) {
+      classSelect.innerHTML = (classesList || []).map(c => {
+        const cName = c.name || c;
+        return `<option value="${escapeHtml(cName)}" ${cName === student.class ? 'selected' : ''}>${escapeHtml(cName)}</option>`;
+      }).join('');
+    }
+
+    const setVal = (inputKey, val) => {
+      const el = document.getElementById(inputKey);
+      if (el) el.value = val !== undefined && val !== null ? val : '';
+    };
+
+    setVal('edit-student-name', student.name);
+    setVal('edit-student-class', student.class);
+    setVal('edit-student-roll', student.roll);
+    setVal('edit-student-address', student.address?.fullAddress);
+    setVal('edit-student-place', student.address?.place);
+    setVal('edit-student-district', student.address?.district);
+    setVal('edit-student-state', student.address?.state);
+    setVal('edit-student-fatherName', student.familyDetails?.fatherName);
+    setVal('edit-student-motherName', student.familyDetails?.motherName);
+    setVal('edit-student-fatherMobile', student.familyDetails?.fatherMobile);
+    setVal('edit-student-fatherWhatsapp', student.familyDetails?.fatherWhatsapp);
+    setVal('edit-student-yearJoined', student.academicStatus?.yearJoined || student.academicStatus?.admissionStatus || '2024');
+    setVal('edit-student-rank', student.academicStatus?.rank);
+    setVal('edit-student-previousCollege', student.academicStatus?.previousCollege);
 
     document.getElementById('modal-edit-student').classList.remove('hidden');
   } catch (error) {
@@ -4416,8 +4453,8 @@ async function executeStudentPrintA4() {
     const printableContainer = document.getElementById('printable-student-cards');
     if (!printableContainer) return;
 
-    // Chunk students into pages of 20 cards each (4 columns x 5 rows grid)
-    const pageSize = 20;
+    // Chunk students into pages of 18 cards each (3 columns x 6 rows grid)
+    const pageSize = 18;
     const pages = [];
     for (let i = 0; i < students.length; i += pageSize) {
       pages.push(students.slice(i, i + pageSize));
@@ -4442,35 +4479,35 @@ async function executeStudentPrintA4() {
         html += `
           <div class="a4-student-card">
             <!-- Header: Photo + ID & Name -->
-            <div style="display:flex;align-items:center;gap:5px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:2.5px;">
+            <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3.5px;margin-bottom:2.5px;">
               ${fields.photo ? `
-                <img src="${photo}" alt="" style="width:32px;height:32px;border-radius:5px;object-fit:cover;border:1px solid #94a3b8;flex-shrink:0;">
+                <img src="${photo}" alt="" style="width:34px;height:34px;border-radius:6px;object-fit:cover;border:1px solid #cbd5e1;flex-shrink:0;">
               ` : `
-                <div style="width:30px;height:30px;border-radius:5px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:10pt;color:#334155;flex-shrink:0;">
+                <div style="width:34px;height:34px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11pt;color:#334155;flex-shrink:0;">
                   ${escapeHtml((st.name || 'S')[0].toUpperCase())}
                 </div>
               `}
               <div style="min-width:0;flex:1;overflow:hidden;">
-                ${fields.name ? `<div style="font-weight:800;font-size:7.5pt;color:#0f172a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(st.name)}</div>` : ''}
-                <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:1px;">
-                  ${fields.id ? `<span style="font-weight:700;font-size:6pt;color:#475569;">#${st.studentId}</span>` : ''}
-                  ${fields.class ? `<span style="font-weight:700;font-size:6pt;background:#e0f2fe;color:#0369a1;padding:0.5px 3px;border-radius:2.5px;">${escapeHtml(st.class)}</span>` : ''}
-                  ${fields.roll ? `<span style="font-weight:700;font-size:6pt;background:#f1f5f9;color:#334155;padding:0.5px 3px;border-radius:2.5px;">R:${roll}</span>` : ''}
+                ${fields.name ? `<div style="font-weight:800;font-size:8pt;color:#0f172a;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(st.name)}</div>` : ''}
+                <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:1.5px;">
+                  ${fields.id ? `<span style="font-weight:700;font-size:6.5pt;color:#475569;">ID: #${st.studentId}</span>` : ''}
+                  ${fields.class ? `<span style="font-weight:700;font-size:6.5pt;color:#0284c7;background:#e0f2fe;padding:0.5px 4px;border-radius:3px;">${escapeHtml(st.class)}</span>` : ''}
+                  ${fields.roll ? `<span style="font-weight:700;font-size:6.5pt;color:#334155;background:#f1f5f9;padding:0.5px 4px;border-radius:3px;">Roll: ${roll}</span>` : ''}
                 </div>
               </div>
             </div>
 
-            <!-- Details Body -->
-            <div style="display:flex;flex-direction:column;gap:1.5px;font-size:6.5pt;color:#334155;line-height:1.15;min-width:0;">
-              ${fields.father ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">F:</strong> ${escapeHtml(fatherName)}</div>` : ''}
-              ${fields.mobile ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">Mob:</strong> ${escapeHtml(fatherMobile)}</div>` : ''}
-              ${fields.place ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">Plc:</strong> ${escapeHtml(place)}</div>` : ''}
-              ${fields.state ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">St:</strong> ${escapeHtml(state)}</div>` : ''}
-              ${fields.mother ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">M:</strong> ${escapeHtml(motherName)}</div>` : ''}
+            <!-- Details Body (Starts directly under header without gap) -->
+            <div style="display:flex;flex-direction:column;gap:1.5px;font-size:6.8pt;color:#334155;line-height:1.25;min-width:0;">
+              ${fields.father ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Father:</strong> ${escapeHtml(fatherName)}</div>` : ''}
+              ${fields.mobile ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Contact:</strong> ${escapeHtml(fatherMobile)}</div>` : ''}
+              ${fields.place ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Place:</strong> ${escapeHtml(place)}</div>` : ''}
+              ${fields.state ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">State:</strong> ${escapeHtml(state)}</div>` : ''}
+              ${fields.mother ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Mother:</strong> ${escapeHtml(motherName)}</div>` : ''}
             </div>
 
             <!-- Footer Badge -->
-            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #cbd5e1;padding-top:1.5px;margin-top:2px;font-size:5.8pt;color:#64748b;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #cbd5e1;padding-top:2px;margin-top:auto;font-size:6pt;color:#64748b;">
               <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80%;">${escapeHtml(schoolTitle)}</span>
               <span>P.${pageIdx + 1}</span>
             </div>
@@ -4485,7 +4522,7 @@ async function executeStudentPrintA4() {
 
     const subtitleEl = document.getElementById('a4-preview-subtitle');
     if (subtitleEl) {
-      subtitleEl.textContent = `${students.length} Student${students.length > 1 ? 's' : ''} (${classFilter === 'all' ? 'All Classes' : classFilter}) • 20 Cards per Page (4x5 Grid)`;
+      subtitleEl.textContent = `${students.length} Student${students.length > 1 ? 's' : ''} (${classFilter === 'all' ? 'All Classes' : classFilter}) • 18 Cards per Page (3x6 Grid)`;
     }
 
     const previewModal = document.getElementById('modal-student-a4-preview');
