@@ -12,12 +12,6 @@ const authMiddleware = async (req, res, next) => {
     }
 
     if (!token) {
-      // If no auth token, find or attach the primary user (first user or admin) for smooth experience
-      const firstUser = await User.findOne().sort({ createdAt: 1 });
-      if (firstUser) {
-        req.user = firstUser;
-        return next();
-      }
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 

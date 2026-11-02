@@ -110,7 +110,8 @@ const seedInitialData = async () => {
     // 6. Initial Attendance Session
     const attendanceCount = await Attendance.countDocuments();
     if (attendanceCount === 0) {
-      const today = new Date().toISOString().slice(0, 10);
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       await Attendance.create({
         date: today,
         class: 'Class 10',

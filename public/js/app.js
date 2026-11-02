@@ -1,4 +1,4 @@
-﻿// Main Application Controller for REGISTERLY
+// Main Application Controller for REGISTERLY
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E";
 let currentUser = null;
 let currentRole = 'admin'; // 'admin' or 'teacher'
@@ -9,7 +9,15 @@ let classesList = [];
 let subjectsList = [];
 let studentsList = [];
 let attendanceRecords = []; // [{ studentId, status, note }]
-let currentDateStr = new Date().toISOString().slice(0, 10);
+function formatLocalDate(d = new Date()) {
+  const dateObj = (d instanceof Date && !isNaN(d)) ? d : new Date();
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+let currentDateStr = formatLocalDate(new Date());
 let currentClass = 'Class 10';
 let currentSubject = '';
 
@@ -499,7 +507,7 @@ function renderClassesList() {
         <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-white/20 hover:bg-white hover:text-[#245b70] text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/70 hover:bg-rose-600 text-white flex items-center justify-center transition">
+        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/70 hover:bg-rose-600 text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>` : '';
@@ -796,6 +804,7 @@ function getSelectedSubjectCheckboxesForClass(containerId) {
 async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
   document.getElementById('input-sub-code').value = '';
+  await populateTeacherDropdowns('input-sub-teacher', '');
   document.getElementById('modal-add-subject').classList.remove('hidden');
 }
 
@@ -827,6 +836,7 @@ async function openEditSubjectModal(id, name, code, teacher) {
   activeEditSubjectId = id;
   document.getElementById('edit-sub-name').value = name;
   document.getElementById('edit-sub-code').value = code || '';
+  await populateTeacherDropdowns('edit-sub-teacher', teacher || '');
   document.getElementById('modal-edit-subject').classList.remove('hidden');
 }
 
@@ -1055,10 +1065,10 @@ function updateDateDisplay() {
     displayEl.innerText = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
   if (dayEl) {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatLocalDate(new Date());
     const yest = new Date();
     yest.setDate(yest.getDate() - 1);
-    const yestStr = yest.toISOString().slice(0, 10);
+    const yestStr = formatLocalDate(yest);
 
     if (currentDateStr === todayStr) {
       dayEl.innerText = 'Today';
@@ -1327,11 +1337,11 @@ async function renderStudentsDirectory() {
       container.innerHTML = students.map(st => `
         <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
+            <div class="flex items-center gap-2.5 min-w-0 cursor-pointer group" onclick="openStudentDetailsModal(${st.studentId})" title="Click to view student details">
+              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm group-hover:scale-105 transition">
               <div class="truncate">
                 <div class="flex items-center gap-1.5">
-                  <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
+                  <span class="font-extrabold text-[var(--text-main)] text-sm truncate group-hover:text-[#245b70] transition">${st.name}</span>
                   <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
                 </div>
                 <p class="text-xs text-[var(--text-sub)] truncate">${st.class} · Roll: ${st.roll}</p>
@@ -1741,20 +1751,20 @@ async function openStudentDetailsModal(studentId) {
   document.getElementById('details-student-class').innerText = `Class: ${student.class}`;
   document.getElementById('details-student-roll').innerText = `Roll #${student.roll}`;
 
-  document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || 'â€”';
-  document.getElementById('details-student-place').innerText = (student.address && student.address.place) || 'â€”';
-  document.getElementById('details-student-district').innerText = (student.address && student.address.district) || 'â€”';
-  document.getElementById('details-student-state').innerText = (student.address && student.address.state) || 'â€”';
+  document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || '—';
+  document.getElementById('details-student-place').innerText = (student.address && student.address.place) || '—';
+  document.getElementById('details-student-district').innerText = (student.address && student.address.district) || '—';
+  document.getElementById('details-student-state').innerText = (student.address && student.address.state) || '—';
 
-  document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || 'â€”';
-  document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || 'â€”';
-  document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || 'â€”';
-  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || 'â€”';
+  document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || '—';
+  document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || '—';
+  document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || '—';
+  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '—';
 
-  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || 'â€”';
+  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '—';
   document.getElementById('details-student-year').innerText = yr;
-  document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || 'â€”';
-  document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || 'â€”';
+  document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || '—';
+  document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || '—';
 
   document.getElementById('modal-student-details').classList.remove('hidden');
 }
@@ -2001,7 +2011,7 @@ async function exportBackupData() {
 }
 
 async function importBackupData(event) {
-  const file = event.target.files[0];
+  const file = event.target.files && event.target.files[0];
   if (!file) return;
 
   try {
@@ -2010,13 +2020,19 @@ async function importBackupData(event) {
     const res = await API.importBackup(data);
     if (res.success) {
       showToast('Admin: Database successfully restored from backup!');
+      await loadAppSettings();
       await loadClasses();
       await loadSubjects();
+      await loadTeachersData();
       await loadAttendanceRoster();
       await loadReport();
+      await loadActivityLogs();
+      await renderStudentsDirectory();
     }
   } catch (error) {
     showToast('Invalid backup file or restore failed', true);
+  } finally {
+    if (event.target) event.target.value = '';
   }
 }
 
@@ -2252,7 +2268,7 @@ function renderGoogleButton() {
     if (directBtn) directBtn.classList.add('hidden');
     container.innerHTML = `
       <div class="w-full py-2.5 px-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-800 text-center">
-        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">ðŸ”‘ Google OAuth awaiting Client ID in .env</span>
+        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">🔑 Google OAuth awaiting Client ID in .env</span>
       </div>
     `;
     return;
@@ -3179,7 +3195,7 @@ async function checkUnreadMessages() {
       }
     }
   } catch (err) {
-    // silently fail â€” not critical
+    // silently fail — not critical
   }
 }
 
@@ -3247,7 +3263,7 @@ async function handleSendMessage(e) {
   const text = input.value.trim();
   if (!text) return;
   const btn = e.target.querySelector('button[type="submit"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Sendingâ€¦'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
   try {
     await API.sendMessage(text);
     input.value = '';
@@ -3302,6 +3318,8 @@ async function openTimetableModal() {
 function closeTimetableModal() {
   const modal = document.getElementById('modal-timetable');
   if (modal) modal.classList.add('hidden');
+  timetableViewTeacher = null;
+  timetableReadOnly = false;
 }
 
 function _updateTimetableDayTabs() {
@@ -3411,14 +3429,14 @@ async function openAddTimetableSlotModal(slotId = null) {
   // Populate class dropdown
   const classSelect = document.getElementById('slot-input-class');
   if (classSelect) {
-    classSelect.innerHTML = `<option value="">Select classâ€¦</option>` +
+    classSelect.innerHTML = `<option value="">Select class...</option>` +
       classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
   }
 
   // Populate subject dropdown
   const subjectSelect = document.getElementById('slot-input-subject');
   if (subjectSelect) {
-    subjectSelect.innerHTML = `<option value="">Select subjectâ€¦</option>` +
+    subjectSelect.innerHTML = `<option value="">Select subject...</option>` +
       subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
   }
 
@@ -3474,13 +3492,18 @@ function closeAddTimetableSlotModal() {
 async function handleSaveTimetableSlot(e) {
   e.preventDefault();
   const slotId = (document.getElementById('slot-edit-id') || {}).value || timetableEditingSlotId;
+  const selectedTeacherInput = ((document.getElementById('slot-input-teacher') || {}).value || '').trim();
+  const isSlotAdmin = currentUser && currentUser.role === 'admin';
+  const assignedTeacher = isSlotAdmin
+    ? (selectedTeacherInput || timetableViewTeacher || '')
+    : (timetableViewTeacher || selectedTeacherInput || (currentUser && currentUser.name) || '');
 
   const slotData = {
     day: (document.getElementById('slot-input-day') || {}).value || '',
     timeSlot: (document.getElementById('slot-input-time') || {}).value || '',
     class: (document.getElementById('slot-input-class') || {}).value || '',
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
-    teacher: timetableViewTeacher || ((document.getElementById('slot-input-teacher') || {}).value) || (currentUser && currentUser.name) || '',
+    teacher: assignedTeacher,
     room: (document.getElementById('slot-input-room') || {}).value || '',
   };
 
@@ -3490,7 +3513,7 @@ async function handleSaveTimetableSlot(e) {
   }
 
   const btn = e.target.querySelector('button[type="submit"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Savingâ€¦'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
   try {
     if (slotId) {

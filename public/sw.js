@@ -1,4 +1,4 @@
-const CACHE_NAME = 'registerly-cache-v2';
+const CACHE_NAME = 'registerly-cache-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -35,16 +35,21 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network first for API, cache fallback for assets
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
+  // Only handle GET requests
+  if (event.request.method !== 'GET') return;
+
+  // Network-first for both API and static assets, fallback to cache when offline
+  event.respondWith(
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
+        return networkResponse;
       })
-    );
-  }
+      .catch(() => caches.match(event.request))
+  );
 });

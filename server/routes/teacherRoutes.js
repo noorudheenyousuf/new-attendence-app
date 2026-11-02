@@ -5,7 +5,14 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const ActivityLog = require('../models/ActivityLog');
+const AppSettings = require('../models/AppSettings');
 const authMiddleware = require('../middleware/auth');
+
+const canUserManage = async (user) => {
+  if (user && user.role === 'admin') return true;
+  const settings = await AppSettings.findOne();
+  return Boolean(settings && settings.allowNonAdminEditDelete);
+};
 
 // Helper to get Gravatar URL based on email
 function getGravatarUrl(email) {
@@ -241,6 +248,11 @@ router.get('/:id/logs', async (req, res) => {
 // @desc    USER DIRECTIVE: Add teacher with name, optional email, photo, assigned classes & subjects
 router.post('/', authMiddleware, async (req, res) => {
   try {
+    const allowed = await canUserManage(req.user);
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'Permission denied: Admin privileges required to add teachers' });
+    }
+
     const { name, email, password, avatarUrl, assignedClasses, assignedSubjects, phone } = req.body;
 
     if (!name || !name.trim()) {
@@ -323,6 +335,12 @@ router.post('/', authMiddleware, async (req, res) => {
 // @desc    USER DIRECTIVE: Edit teacher details (photo, name, email, classes, subjects)
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
+    const isSelf = req.user && req.user._id && req.user._id.toString() === req.params.id;
+    const allowed = isSelf || (await canUserManage(req.user));
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'Permission denied: Cannot edit other teacher profiles' });
+    }
+
     const { name, email, avatarUrl, assignedClasses, assignedSubjects, phone, role } = req.body;
     const teacher = await User.findById(req.params.id);
     if (!teacher) {
@@ -367,8 +385,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
       teacher.phone = String(phone).trim();
     }
 
+    // Role changes are strictly Admin only
     if (role && (role === 'admin' || role === 'teacher')) {
-      teacher.role = role;
+      if (req.user && req.user.role === 'admin') {
+        teacher.role = role;
+      }
     }
 
     await teacher.save();
@@ -405,6 +426,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // @desc    USER DIRECTIVE: Delete teacher account
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
+    const allowed = await canUserManage(req.user);
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'Permission denied: Admin privileges required to delete teachers' });
+    }
+
     const teacher = await User.findById(req.params.id);
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher account not found' });

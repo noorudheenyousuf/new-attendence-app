@@ -174,14 +174,10 @@ router.post('/google', async (req, res) => {
           });
         }
       } else {
-        // Fallback JWT parse if client ID not configured
-        const base64Url = credential.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
-        email = payload.email;
-        name = payload.name;
-        picture = payload.picture;
-        sub = payload.sub;
+        return res.status(400).json({
+          success: false,
+          message: 'GOOGLE_CLIENT_ID is not configured on the server. Please configure it in .env.'
+        });
       }
     } else if (access_token) {
       // Cryptographically verify access token directly with Google OAuth2 UserInfo API

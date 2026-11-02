@@ -32,28 +32,35 @@ router.post('/:id/undo', authMiddleware, adminMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'This action has already been undone' });
     }
 
+    // Helper to clean previous state (remove _id and __v so Mongoose doesn't error on immutable _id)
+    const cleanState = (state) => {
+      if (!state || typeof state !== 'object') return state;
+      const { _id, __v, ...rest } = state;
+      return rest;
+    };
+
     // Revert logic based on entityType
     if (log.entityType === 'attendance') {
       if (log.previousState) {
-        await Attendance.findByIdAndUpdate(log.entityId, log.previousState);
+        await Attendance.findByIdAndUpdate(log.entityId, { $set: cleanState(log.previousState) }, { upsert: true });
       } else {
         await Attendance.findByIdAndDelete(log.entityId);
       }
     } else if (log.entityType === 'student') {
       if (log.previousState) {
-        await Student.findByIdAndUpdate(log.entityId, log.previousState, { upsert: true });
+        await Student.findByIdAndUpdate(log.entityId, { $set: cleanState(log.previousState) }, { upsert: true });
       } else {
         await Student.findByIdAndDelete(log.entityId);
       }
     } else if (log.entityType === 'subject') {
       if (log.previousState) {
-        await Subject.findByIdAndUpdate(log.entityId, log.previousState, { upsert: true });
+        await Subject.findByIdAndUpdate(log.entityId, { $set: cleanState(log.previousState) }, { upsert: true });
       } else {
         await Subject.findByIdAndDelete(log.entityId);
       }
     } else if (log.entityType === 'class') {
       if (log.previousState) {
-        await Class.findByIdAndUpdate(log.entityId, log.previousState, { upsert: true });
+        await Class.findByIdAndUpdate(log.entityId, { $set: cleanState(log.previousState) }, { upsert: true });
       } else {
         await Class.findByIdAndDelete(log.entityId);
       }

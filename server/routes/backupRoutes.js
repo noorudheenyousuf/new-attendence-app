@@ -115,10 +115,13 @@ router.post('/import', async (req, res) => {
     // 4. Restore teachers (Full teacher details: name, email, avatarUrl, assignedClasses, assignedSubjects, role, phone, etc.)
     if (Array.isArray(teachers) && teachers.length > 0) {
       for (const t of teachers) {
-        if (!t.email) continue;
+        if (!t.name) continue;
         const { _id, __v, ...tData } = t;
+        const filter = (t.email && t.email.trim())
+          ? { email: t.email.toLowerCase().trim() }
+          : (_id ? { _id } : { name: t.name });
         await User.findOneAndUpdate(
-          { email: t.email.toLowerCase().trim() },
+          filter,
           { $set: tData },
           { upsert: true, new: true, setDefaultsOnInsert: true }
         );
