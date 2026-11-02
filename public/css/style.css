@@ -598,10 +598,11 @@ input:checked + .switch-slider:before {
   }
 }
 
-/* Nav Tab Active Click Bounce for physical feel */
+/* Nav Tab & Action Active Click Bounce for physical tactile feel */
 #top-tab-attendance:active, #top-tab-report:active, #top-tab-settings:active,
-#bottom-tab-classes:active, #bottom-tab-subjects:active, #bottom-tab-students:active, #bottom-tab-teachers:active {
-  transform: scale(0.92);
+#bottom-tab-classes:active, #bottom-tab-subjects:active, #bottom-tab-students:active, #bottom-tab-teachers:active,
+.btn-delete:active, .touch-btn:active {
+  transform: scale(0.93);
   transition: transform 0.08s ease-in-out;
 }
 

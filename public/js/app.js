@@ -51,14 +51,39 @@ function canUserEditDelete() {
 
 // Vibration & Audio Haptic Feedback for Navbars & Interactive Controls
 let hapticAudioCtx = null;
-function triggerNavHaptic(intensity = 'medium') {
-  // 1. Hardware vibration for mobile devices supporting navigator.vibrate
+
+function primeHaptics() {
   try {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      if (intensity === 'strong') {
-        navigator.vibrate([60, 40, 60]);
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass && !hapticAudioCtx) {
+      hapticAudioCtx = new AudioContextClass();
+    }
+    if (hapticAudioCtx && hapticAudioCtx.state === 'suspended') {
+      hapticAudioCtx.resume();
+    }
+  } catch (e) {}
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointerdown', primeHaptics, { once: true, passive: true });
+  window.addEventListener('touchstart', primeHaptics, { once: true, passive: true });
+}
+
+function triggerNavHaptic(intensity = 'medium') {
+  // 1. Hardware vibration for mobile devices supporting navigator.vibrate (Android Chrome, Firefox, Opera, Edge)
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      if (typeof intensity === 'number') {
+        navigator.vibrate(intensity);
+      } else if (intensity === 'delete' || intensity === 'danger') {
+        // Strong double heavy pulse for delete / destructive actions
+        navigator.vibrate([100, 50, 100]);
+      } else if (intensity === 'strong' || intensity === 'success') {
+        navigator.vibrate([60, 35, 60]);
+      } else if (intensity === 'light' || intensity === 'tap') {
+        navigator.vibrate(30);
       } else {
-        navigator.vibrate([40, 25, 40]);
+        // 'medium' default for nav tabs
+        navigator.vibrate([45, 30, 45]);
       }
     }
   } catch (e) {}
@@ -75,15 +100,38 @@ function triggerNavHaptic(intensity = 'medium') {
       }
       const osc = hapticAudioCtx.createOscillator();
       const gain = hapticAudioCtx.createGain();
+
+      let freqStart = 180;
+      let freqEnd = 35;
+      let duration = 0.035;
+      let vol = 0.28;
+
+      if (intensity === 'delete' || intensity === 'danger') {
+        freqStart = 95;
+        freqEnd = 25;
+        duration = 0.055;
+        vol = 0.38;
+      } else if (intensity === 'light' || intensity === 'tap') {
+        freqStart = 230;
+        freqEnd = 50;
+        duration = 0.025;
+        vol = 0.22;
+      } else if (intensity === 'strong' || intensity === 'success') {
+        freqStart = 250;
+        freqEnd = 50;
+        duration = 0.045;
+        vol = 0.32;
+      }
+
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(160, hapticAudioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(30, hapticAudioCtx.currentTime + 0.035);
-      gain.gain.setValueAtTime(0.15, hapticAudioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, hapticAudioCtx.currentTime + 0.035);
+      osc.frequency.setValueAtTime(freqStart, hapticAudioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freqEnd, hapticAudioCtx.currentTime + duration);
+      gain.gain.setValueAtTime(vol, hapticAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, hapticAudioCtx.currentTime + duration);
       osc.connect(gain);
       gain.connect(hapticAudioCtx.destination);
       osc.start();
-      osc.stop(hapticAudioCtx.currentTime + 0.035);
+      osc.stop(hapticAudioCtx.currentTime + duration);
     }
   } catch (e) {}
 }
@@ -687,6 +735,7 @@ async function handleSaveClass(e) {
 
 async function deleteClass(id, name) {
   if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+  triggerNavHaptic('delete');
   try {
     const res = await API.deleteClass(id);
     if (res.success) {
@@ -978,6 +1027,7 @@ async function handleUpdateSubject(e) {
 
 async function deleteSubject(id, name) {
   if (!confirm(`Delete subject "${name}"?`)) return;
+  triggerNavHaptic('delete');
   try {
     const res = await API.deleteSubject(id);
     if (res.success) {
@@ -1084,6 +1134,7 @@ function renderAttendanceList() {
 }
 
 function setStudentStatus(studentId, status) {
+  triggerNavHaptic('light');
   let record = attendanceRecords.find(r => r.studentId === studentId);
   if (!record) {
     record = { studentId, status, note: '' };
@@ -1095,6 +1146,7 @@ function setStudentStatus(studentId, status) {
 }
 
 function bulkMark(status) {
+  triggerNavHaptic('medium');
   attendanceRecords = studentsList.map(st => ({
     studentId: st.studentId,
     status,
@@ -1122,6 +1174,7 @@ function updateAttendanceStats() {
 }
 
 async function saveAttendance() {
+  triggerNavHaptic('strong');
   try {
     const payload = {
       date: currentDateStr,
@@ -1147,6 +1200,7 @@ async function deleteCurrentAttendance() {
   if (!confirm(promptMsg)) {
     return;
   }
+  triggerNavHaptic('delete');
   try {
     const res = await API.deleteAttendance({
       date: currentDateStr,
@@ -2387,6 +2441,7 @@ function closeEnlargedPhoto() {
 
 async function confirmDeleteStudent(id, name, studentId) {
   if (!confirm(`Are you sure you want to delete "${name}" (ID: ${studentId})?`)) return;
+  triggerNavHaptic('delete');
   try {
     const res = await API.deleteStudent(id);
     if (res.success) {
@@ -2548,6 +2603,7 @@ async function deleteTeacherAccount(id, name, role) {
     return;
   }
   if (!confirm(`Are you sure you want to permanently remove teacher "${name}"?`)) return;
+  triggerNavHaptic('delete');
 
   try {
     const res = await API.deleteTeacher(id);
@@ -2653,6 +2709,7 @@ async function handleClearDataPrompt() {
     "Are you sure you want to clear attendance records? Teachers, students, classes, subjects, and student details will NOT be deleted."
   );
   if (!confirmed) return;
+  triggerNavHaptic('delete');
 
   try {
     const res = await API.clearData();
@@ -2675,6 +2732,7 @@ async function handleResetAppPrompt() {
     "Are you sure you want to wipe all app data like new? All students, classes, subjects, attendance, logs, and settings will be completely reset."
   );
   if (!confirmed) return;
+  triggerNavHaptic('delete');
 
   try {
     const res = await API.resetApp();
@@ -2695,7 +2753,7 @@ async function handleResetAppPrompt() {
 
 // ================= TAB NAVIGATION =================
 function selectTopTab(tab) {
-  triggerNavHaptic(20);
+  triggerNavHaptic('medium');
   ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -2725,7 +2783,7 @@ function selectTopTab(tab) {
 }
 
 function selectBottomTab(tab) {
-  triggerNavHaptic(20);
+  triggerNavHaptic('medium');
   ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -4124,6 +4182,7 @@ async function handleSaveTimetableSlot(e) {
 
 async function deleteTimetableSlot(id) {
   if (!confirm('Delete this timetable slot?')) return;
+  triggerNavHaptic('delete');
   try {
     await API.deleteTimetableSlot(id);
     showToast('Slot deleted.');
@@ -4342,6 +4401,7 @@ async function promptEditSelectedMessage() {
 async function confirmDeleteSelectedMessage() {
   if (!activeSelectedMessage) return;
   if (!confirm('Are you sure you want to delete this message?')) return;
+  triggerNavHaptic('delete');
 
   try {
     const res = await API.deleteMessage(activeSelectedMessage._id);
@@ -4357,6 +4417,7 @@ async function confirmDeleteSelectedMessage() {
 
 async function handleClearAllChat() {
   if (!confirm('Are you sure you want to delete all chat history? This cannot be undone.')) return;
+  triggerNavHaptic('delete');
   try {
     const res = await API.clearAllMessages();
     if (res.success) {
