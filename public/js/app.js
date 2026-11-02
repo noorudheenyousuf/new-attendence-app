@@ -4416,8 +4416,8 @@ async function executeStudentPrintA4() {
     const printableContainer = document.getElementById('printable-student-cards');
     if (!printableContainer) return;
 
-    // Chunk students into pages of 12 cards each
-    const pageSize = 12;
+    // Chunk students into pages of 20 cards each (4 columns x 5 rows grid)
+    const pageSize = 20;
     const pages = [];
     for (let i = 0; i < students.length; i += pageSize) {
       pages.push(students.slice(i, i + pageSize));
@@ -4442,36 +4442,36 @@ async function executeStudentPrintA4() {
         html += `
           <div class="a4-student-card">
             <!-- Header: Photo + ID & Name -->
-            <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #cbd5e1;padding-bottom:4px;margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:5px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:2.5px;">
               ${fields.photo ? `
-                <img src="${photo}" alt="" style="width:38px;height:38px;border-radius:6px;object-fit:cover;border:1px solid #94a3b8;flex-shrink:0;">
+                <img src="${photo}" alt="" style="width:32px;height:32px;border-radius:5px;object-fit:cover;border:1px solid #94a3b8;flex-shrink:0;">
               ` : `
-                <div style="width:34px;height:34px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12pt;color:#334155;flex-shrink:0;">
+                <div style="width:30px;height:30px;border-radius:5px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:10pt;color:#334155;flex-shrink:0;">
                   ${escapeHtml((st.name || 'S')[0].toUpperCase())}
                 </div>
               `}
               <div style="min-width:0;flex:1;overflow:hidden;">
-                ${fields.name ? `<div style="font-weight:800;font-size:8.5pt;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(st.name)}</div>` : ''}
-                <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:1px;">
-                  ${fields.id ? `<span style="font-weight:700;font-size:7pt;color:#475569;">ID: #${st.studentId}</span>` : ''}
-                  ${fields.class ? `<span style="font-weight:700;font-size:6.5pt;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px;">${escapeHtml(st.class)}</span>` : ''}
-                  ${fields.roll ? `<span style="font-weight:700;font-size:6.5pt;background:#f1f5f9;color:#334155;padding:1px 4px;border-radius:3px;">Roll: ${roll}</span>` : ''}
+                ${fields.name ? `<div style="font-weight:800;font-size:7.5pt;color:#0f172a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(st.name)}</div>` : ''}
+                <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:1px;">
+                  ${fields.id ? `<span style="font-weight:700;font-size:6pt;color:#475569;">#${st.studentId}</span>` : ''}
+                  ${fields.class ? `<span style="font-weight:700;font-size:6pt;background:#e0f2fe;color:#0369a1;padding:0.5px 3px;border-radius:2.5px;">${escapeHtml(st.class)}</span>` : ''}
+                  ${fields.roll ? `<span style="font-weight:700;font-size:6pt;background:#f1f5f9;color:#334155;padding:0.5px 3px;border-radius:2.5px;">R:${roll}</span>` : ''}
                 </div>
               </div>
             </div>
 
             <!-- Details Body -->
-            <div style="display:flex;flex-direction:column;gap:2.5px;font-size:7.2pt;color:#334155;line-height:1.2;">
-              ${fields.father ? `<div><strong style="color:#0f172a;">Father:</strong> ${escapeHtml(fatherName)}</div>` : ''}
-              ${fields.mobile ? `<div><strong style="color:#0f172a;">Contact:</strong> ${escapeHtml(fatherMobile)}</div>` : ''}
-              ${fields.place ? `<div><strong style="color:#0f172a;">Place:</strong> ${escapeHtml(place)}</div>` : ''}
-              ${fields.state ? `<div><strong style="color:#0f172a;">State:</strong> ${escapeHtml(state)}</div>` : ''}
-              ${fields.mother ? `<div><strong style="color:#0f172a;">Mother:</strong> ${escapeHtml(motherName)}</div>` : ''}
+            <div style="display:flex;flex-direction:column;gap:1.5px;font-size:6.5pt;color:#334155;line-height:1.15;min-width:0;">
+              ${fields.father ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">F:</strong> ${escapeHtml(fatherName)}</div>` : ''}
+              ${fields.mobile ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">Mob:</strong> ${escapeHtml(fatherMobile)}</div>` : ''}
+              ${fields.place ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">Plc:</strong> ${escapeHtml(place)}</div>` : ''}
+              ${fields.state ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">St:</strong> ${escapeHtml(state)}</div>` : ''}
+              ${fields.mother ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;">M:</strong> ${escapeHtml(motherName)}</div>` : ''}
             </div>
 
             <!-- Footer Badge -->
-            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #cbd5e1;padding-top:2px;margin-top:3px;font-size:6.5pt;color:#64748b;">
-              <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(schoolTitle)}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #cbd5e1;padding-top:1.5px;margin-top:2px;font-size:5.8pt;color:#64748b;">
+              <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80%;">${escapeHtml(schoolTitle)}</span>
               <span>P.${pageIdx + 1}</span>
             </div>
           </div>
@@ -4485,7 +4485,7 @@ async function executeStudentPrintA4() {
 
     const subtitleEl = document.getElementById('a4-preview-subtitle');
     if (subtitleEl) {
-      subtitleEl.textContent = `${students.length} Student${students.length > 1 ? 's' : ''} (${classFilter === 'all' ? 'All Classes' : classFilter}) • 12 Cards per Page (3x4 Grid)`;
+      subtitleEl.textContent = `${students.length} Student${students.length > 1 ? 's' : ''} (${classFilter === 'all' ? 'All Classes' : classFilter}) • 20 Cards per Page (4x5 Grid)`;
     }
 
     const previewModal = document.getElementById('modal-student-a4-preview');

@@ -369,9 +369,9 @@
           </button>
         </div>
 
-        <!-- 3. PRINT DETAILS & ACTIVITY LOG (Below Messages & Timetable, styled with colorful icons & subtitles) -->
-        <div class="grid grid-cols-2 gap-2.5">
-          <!-- Print Students Details Button -->
+        <!-- 3. PRINT DETAILS & ACTIVITY LOG (Two separate lines: one for print, below that activity log) -->
+        <div class="space-y-2.5">
+          <!-- Line 1: Print Students Details Button -->
           <div id="student-export-section" class="w-full">
             <button type="button" onclick="openStudentExportModal()" class="touch-btn w-full bg-[var(--card-bg)] hover:bg-emerald-500/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group" title="Print student cards & export CSV">
               <div class="flex items-center gap-2.5 min-w-0">
@@ -380,14 +380,14 @@
                 </div>
                 <div class="text-left min-w-0">
                   <div class="text-xs font-black text-[var(--text-main)] truncate">Print Details</div>
-                  <div class="text-[10px] text-[var(--text-sub)] truncate">A4 Cards & CSV</div>
+                  <div class="text-[10px] text-[var(--text-sub)] truncate">A4 Cards & CSV Export</div>
                 </div>
               </div>
               <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </div>
 
-          <!-- Activity Log Button -->
+          <!-- Line 2: Activity Log Button (Below Print) -->
           <div class="w-full">
             <button type="button" onclick="openActivityLogsModal()" class="touch-btn w-full bg-[var(--card-bg)] hover:bg-amber-500/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group" title="View activity audit log & history">
               <div class="flex items-center gap-2.5 min-w-0">
@@ -396,7 +396,7 @@
                 </div>
                 <div class="text-left min-w-0">
                   <div class="text-xs font-black text-[var(--text-main)] truncate">Activity Log</div>
-                  <div class="text-[10px] text-[var(--text-sub)] truncate">Audit & History</div>
+                  <div class="text-[10px] text-[var(--text-sub)] truncate">Live Audit & History</div>
                 </div>
               </div>
               <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
