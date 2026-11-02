@@ -23,6 +23,10 @@ const appSettingsSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  studentFormFields: {
+    type: Array,
+    default: []
+  },
   updatedAt: {
     type: Date,
     default: Date.now

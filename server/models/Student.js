@@ -42,6 +42,11 @@ const studentSchema = new mongoose.Schema({
     rank: { type: String, default: '' },
     previousCollege: { type: String, default: '' }
   },
+  customFields: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
   createdAt: {
     type: Date,
     default: Date.now

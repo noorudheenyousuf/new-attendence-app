@@ -49,6 +49,37 @@ function canUserEditDelete() {
   return Boolean(appSettings && appSettings.allowNonAdminEditDelete);
 }
 
+// Vibration Haptic Feedback for Navbars
+function triggerNavHaptic(ms = 20) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(ms);
+    }
+  } catch (e) {
+    // Silent fail if vibration not supported or allowed
+  }
+}
+
+// Student Form Fields Configuration (Configurable in Admin Panel)
+const DEFAULT_STUDENT_FORM_FIELDS = [
+  { key: 'name', label: 'Name', type: 'text', size: 'half', required: true, enabled: true, isCustom: false },
+  { key: 'class', label: 'Class', type: 'select', size: 'half', required: true, enabled: true, isCustom: false },
+  { key: 'roll', label: 'Roll No', type: 'number', size: 'half', required: true, enabled: true, isCustom: false },
+  { key: 'address', label: 'Address', type: 'text', size: 'full', required: false, enabled: true, isCustom: false },
+  { key: 'place', label: 'Place', type: 'text', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'district', label: 'District', type: 'text', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'state', label: 'State', type: 'text', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'fatherName', label: "Father's Name", type: 'text', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'motherName', label: "Mother's Name", type: 'text', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'fatherMobile', label: "Father Mobile (Normal)", type: 'tel', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'fatherWhatsapp', label: "WhatsApp Number", type: 'tel', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'yearJoined', label: "Year Joined College", type: 'number', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'rank', label: "Rank", type: 'text', size: 'half', required: false, enabled: true, isCustom: false },
+  { key: 'previousCollege', label: "Previous College", type: 'text', size: 'half', required: false, enabled: true, isCustom: false }
+];
+
+let appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
+
 function hideSplashLoader() {
   const loader = document.getElementById('app-splash-loader');
   if (loader) {
@@ -337,6 +368,12 @@ async function loadAppSettings() {
         printToggle.checked = res.data.allowStudentDetailsPrint !== false;
       }
       _applyStudentPrintButtonVisibility();
+
+      if (Array.isArray(res.data.studentFormFields) && res.data.studentFormFields.length > 0) {
+        appStudentFormFields = res.data.studentFormFields;
+      } else {
+        appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
+      }
     }
   } catch (error) {
     console.log('[Settings Load]', error);
@@ -1614,6 +1651,95 @@ async function updateModalStudentCounts() {
   }
 }
 
+// Helper to safely get value of form fields
+function getStudentInputValue(prefix, key) {
+  const el = document.getElementById(`${prefix}-student-${key}`);
+  return el ? el.value.trim() : '';
+}
+
+// Helper to collect all custom fields
+function collectStudentCustomFields(prefix) {
+  const customs = {};
+  (appStudentFormFields || []).forEach(f => {
+    if (f.isCustom) {
+      customs[f.key] = getStudentInputValue(prefix, f.key);
+    }
+  });
+  return customs;
+}
+
+// Dynamic Student Inputs Renderer for Add & Edit Modals
+function renderDynamicStudentInputs(prefix = 'new', student = null) {
+  const container = document.getElementById(prefix === 'new' ? 'dynamic-new-student-fields' : 'dynamic-edit-student-fields');
+  if (!container) return;
+
+  const fields = (Array.isArray(appStudentFormFields) && appStudentFormFields.length > 0)
+    ? appStudentFormFields
+    : DEFAULT_STUDENT_FORM_FIELDS;
+
+  let html = '';
+  fields.forEach(field => {
+    if (field.enabled === false) return;
+
+    const spanClass = field.size === 'full' ? 'col-span-1 sm:col-span-2' : 'col-span-1';
+    const inputId = `${prefix}-student-${field.key}`;
+
+    let val = '';
+    if (student) {
+      if (field.isCustom) {
+        val = (student.customFields && (student.customFields[field.key] !== undefined ? student.customFields[field.key] : '')) || '';
+      } else {
+        switch (field.key) {
+          case 'name': val = student.name || ''; break;
+          case 'class': val = student.class || ''; break;
+          case 'roll': val = student.roll !== undefined ? student.roll : ''; break;
+          case 'address': val = (student.address && student.address.fullAddress) || ''; break;
+          case 'place': val = (student.address && student.address.place) || ''; break;
+          case 'district': val = (student.address && student.address.district) || ''; break;
+          case 'state': val = (student.address && student.address.state) || ''; break;
+          case 'fatherName': val = (student.familyDetails && student.familyDetails.fatherName) || ''; break;
+          case 'motherName': val = (student.familyDetails && student.familyDetails.motherName) || ''; break;
+          case 'fatherMobile': val = (student.familyDetails && student.familyDetails.fatherMobile) || ''; break;
+          case 'fatherWhatsapp': val = (student.familyDetails && student.familyDetails.fatherWhatsapp) || ''; break;
+          case 'yearJoined': val = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '2024'; break;
+          case 'rank': val = (student.academicStatus && student.academicStatus.rank) || ''; break;
+          case 'previousCollege': val = (student.academicStatus && student.academicStatus.previousCollege) || ''; break;
+          default: val = '';
+        }
+      }
+    } else {
+      if (field.key === 'yearJoined') val = '2024';
+    }
+
+    if (field.key === 'class') {
+      const classOpts = (classesList || []).map(c => {
+        const cName = c.name || c;
+        const sel = (val === cName) ? 'selected' : '';
+        return `<option value="${escapeHtml(cName)}" ${sel}>${escapeHtml(cName)}</option>`;
+      }).join('');
+
+      html += `
+        <div class="${spanClass}">
+          <label class="block text-[10px] font-bold text-[var(--text-main)] mb-1">${escapeHtml(field.label)}${field.required ? ' *' : ''}</label>
+          <select id="${inputId}" ${field.required ? 'required' : ''} ${prefix === 'new' ? 'onchange="updateModalStudentCounts()"' : ''} class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+            ${classOpts}
+          </select>
+        </div>
+      `;
+    } else {
+      const inputType = field.type || 'text';
+      html += `
+        <div class="${spanClass}">
+          <label class="block text-[10px] font-bold text-[var(--text-main)] mb-1">${escapeHtml(field.label)}${field.required ? ' *' : ''}</label>
+          <input type="${inputType}" id="${inputId}" value="${escapeHtml(String(val))}" placeholder="${escapeHtml(field.label)}" ${field.required ? 'required' : ''} class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+        </div>
+      `;
+    }
+  });
+
+  container.innerHTML = html;
+}
+
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
   newStudentPhotoUrl = '';
@@ -1621,6 +1747,7 @@ async function openStudentModal() {
   const preview = document.getElementById('new-preview-photo');
   if (preview) preview.src = DEFAULT_AVATAR;
 
+  renderDynamicStudentInputs('new');
   await updateModalStudentCounts();
 
   try {
@@ -1642,20 +1769,21 @@ function closeStudentModal() {
 
 async function handleSaveNewStudent(e) {
   e.preventDefault();
-  const name = document.getElementById('new-student-name').value.trim();
-  const studentClass = document.getElementById('new-student-class').value;
-  const roll = document.getElementById('new-student-roll').value;
-  const fullAddress = document.getElementById('new-student-address').value.trim();
-  const place = document.getElementById('new-student-place').value.trim();
-  const district = document.getElementById('new-student-district').value.trim();
-  const state = document.getElementById('new-student-state').value.trim();
-  const fatherName = document.getElementById('new-student-father').value.trim();
-  const motherName = document.getElementById('new-student-mother').value.trim();
-  const fatherMobile = document.getElementById('new-student-mobile-normal').value.trim();
-  const fatherWhatsapp = document.getElementById('new-student-mobile-wa').value.trim();
-  const yearJoined = document.getElementById('new-student-year-joined').value.trim() || '2024';
-  const rank = document.getElementById('new-student-rank').value.trim();
-  const previousCollege = document.getElementById('new-student-college').value.trim();
+  const name = getStudentInputValue('new', 'name');
+  const studentClass = getStudentInputValue('new', 'class') || (classesList[0]?.name || '');
+  const roll = getStudentInputValue('new', 'roll');
+  const fullAddress = getStudentInputValue('new', 'address');
+  const place = getStudentInputValue('new', 'place');
+  const district = getStudentInputValue('new', 'district');
+  const state = getStudentInputValue('new', 'state');
+  const fatherName = getStudentInputValue('new', 'fatherName');
+  const motherName = getStudentInputValue('new', 'motherName');
+  const fatherMobile = getStudentInputValue('new', 'fatherMobile');
+  const fatherWhatsapp = getStudentInputValue('new', 'fatherWhatsapp');
+  const yearJoined = getStudentInputValue('new', 'yearJoined') || '2024';
+  const rank = getStudentInputValue('new', 'rank');
+  const previousCollege = getStudentInputValue('new', 'previousCollege');
+  const customFields = collectStudentCustomFields('new');
 
   const photoUrl = newStudentPhotoUrl || newStudentBase64Photo || DEFAULT_AVATAR;
 
@@ -1666,7 +1794,8 @@ async function handleSaveNewStudent(e) {
     photoUrl,
     address: { fullAddress, place, district, state },
     familyDetails: { fatherName, motherName, fatherMobile, fatherWhatsapp },
-    academicStatus: { yearJoined, rank, previousCollege }
+    academicStatus: { yearJoined, rank, previousCollege },
+    customFields
   };
 
   try {
@@ -1697,23 +1826,8 @@ async function openEditStudentModal(id) {
     document.getElementById('edit-student-modal-title').innerText = `Edit Student: ${student.name}`;
     document.getElementById('edit-student-id').value = student.studentId;
     document.getElementById('edit-preview-photo').src = student.photoUrl || DEFAULT_AVATAR;
-    document.getElementById('edit-student-name').value = student.name || '';
-    document.getElementById('edit-student-class').value = student.class || '';
-    document.getElementById('edit-student-roll').value = student.roll || '';
-    document.getElementById('edit-student-address').value = (student.address && student.address.fullAddress) || '';
-    document.getElementById('edit-student-place').value = (student.address && student.address.place) || '';
-    document.getElementById('edit-student-district').value = (student.address && student.address.district) || '';
-    document.getElementById('edit-student-state').value = (student.address && student.address.state) || '';
-    document.getElementById('edit-student-father').value = (student.familyDetails && student.familyDetails.fatherName) || '';
-    document.getElementById('edit-student-mother').value = (student.familyDetails && student.familyDetails.motherName) || '';
-    document.getElementById('edit-student-mobile-normal').value = (student.familyDetails && student.familyDetails.fatherMobile) || '';
-    document.getElementById('edit-student-mobile-wa').value = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '';
-    
-    // Academic Status: Year Joined in the College
-    const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '2024';
-    document.getElementById('edit-student-year-joined').value = yr;
-    document.getElementById('edit-student-rank').value = (student.academicStatus && student.academicStatus.rank) || '';
-    document.getElementById('edit-student-college').value = (student.academicStatus && student.academicStatus.previousCollege) || '';
+
+    renderDynamicStudentInputs('edit', student);
 
     document.getElementById('modal-edit-student').classList.remove('hidden');
   } catch (error) {
@@ -1732,20 +1846,21 @@ async function handleSaveEditedStudent(e) {
   e.preventDefault();
   if (!activeEditStudentObjId) return;
 
-  const name = document.getElementById('edit-student-name').value.trim();
-  const studentClass = document.getElementById('edit-student-class').value;
-  const roll = document.getElementById('edit-student-roll').value;
-  const fullAddress = document.getElementById('edit-student-address').value.trim();
-  const place = document.getElementById('edit-student-place').value.trim();
-  const district = document.getElementById('edit-student-district').value.trim();
-  const state = document.getElementById('edit-student-state').value.trim();
-  const fatherName = document.getElementById('edit-student-father').value.trim();
-  const motherName = document.getElementById('edit-student-mother').value.trim();
-  const fatherMobile = document.getElementById('edit-student-mobile-normal').value.trim();
-  const fatherWhatsapp = document.getElementById('edit-student-mobile-wa').value.trim();
-  const yearJoined = document.getElementById('edit-student-year-joined').value.trim();
-  const rank = document.getElementById('edit-student-rank').value.trim();
-  const previousCollege = document.getElementById('edit-student-college').value.trim();
+  const name = getStudentInputValue('edit', 'name');
+  const studentClass = getStudentInputValue('edit', 'class');
+  const roll = getStudentInputValue('edit', 'roll');
+  const fullAddress = getStudentInputValue('edit', 'address');
+  const place = getStudentInputValue('edit', 'place');
+  const district = getStudentInputValue('edit', 'district');
+  const state = getStudentInputValue('edit', 'state');
+  const fatherName = getStudentInputValue('edit', 'fatherName');
+  const motherName = getStudentInputValue('edit', 'motherName');
+  const fatherMobile = getStudentInputValue('edit', 'fatherMobile');
+  const fatherWhatsapp = getStudentInputValue('edit', 'fatherWhatsapp');
+  const yearJoined = getStudentInputValue('edit', 'yearJoined');
+  const rank = getStudentInputValue('edit', 'rank');
+  const previousCollege = getStudentInputValue('edit', 'previousCollege');
+  const customFields = collectStudentCustomFields('edit');
 
   const payload = {
     name,
@@ -1754,7 +1869,8 @@ async function handleSaveEditedStudent(e) {
     photoUrl: editStudentPhotoUrl || editStudentBase64Photo,
     address: { fullAddress, place, district, state },
     familyDetails: { fatherName, motherName, fatherMobile, fatherWhatsapp },
-    academicStatus: { yearJoined, rank, previousCollege }
+    academicStatus: { yearJoined, rank, previousCollege },
+    customFields
   };
 
   try {
@@ -1768,6 +1884,126 @@ async function handleSaveEditedStudent(e) {
     }
   } catch (error) {
     showToast(error.message, true);
+  }
+}
+
+// ================= ADMIN STUDENT FORM CONFIGURATION =================
+function renderAdminStudentFieldsConfig() {
+  const container = document.getElementById('admin-student-fields-list');
+  if (!container) return;
+
+  if (!Array.isArray(appStudentFormFields) || appStudentFormFields.length === 0) {
+    appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
+  }
+
+  container.innerHTML = appStudentFormFields.map((f, idx) => `
+    <div class="bg-[var(--card-bg)] p-2.5 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-2 shadow-xs">
+      <div class="flex items-center gap-1.5 flex-1 min-w-0">
+        <!-- Up / Down Order Buttons -->
+        <div class="flex flex-col gap-0.5 flex-shrink-0">
+          <button type="button" onclick="moveAdminStudentField(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:text-[#245b70]"'} title="Move Up">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          </button>
+          <button type="button" onclick="moveAdminStudentField(${idx}, 1)" ${idx === appStudentFormFields.length - 1 ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:text-[#245b70]"'} title="Move Down">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+        </div>
+
+        <!-- Field Label Input -->
+        <div class="flex-1 min-w-0">
+          <input type="text" value="${escapeHtml(f.label)}" onchange="updateAdminStudentFieldLabel(${idx}, this.value)" class="w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text-main)]" title="Click to rename field label">
+          <div class="text-[9px] text-[var(--text-sub)] truncate mt-0.5">${f.isCustom ? 'Custom Field' : 'Standard Field'} • ${f.key}</div>
+        </div>
+      </div>
+
+      <!-- Size Toggle (Half vs Full) -->
+      <button type="button" onclick="toggleAdminStudentFieldSize(${idx})" class="px-2 py-1 rounded-lg text-[10px] font-black border transition flex-shrink-0 ${f.size === 'full' ? 'bg-[#245b70] text-white border-[#245b70]' : 'bg-[var(--bg-page)] text-[var(--text-main)] border-[var(--border-color)]'}" title="Toggle between Half (50%) and Full (100%) width">
+        ${f.size === 'full' ? 'Full Width' : 'Half Width'}
+      </button>
+
+      <!-- Visibility Toggle -->
+      <label class="flex items-center gap-1 text-[11px] font-bold text-[var(--text-main)] flex-shrink-0 cursor-pointer" title="Show or hide in student form">
+        <input type="checkbox" ${f.enabled !== false ? 'checked' : ''} onchange="toggleAdminStudentFieldEnabled(${idx}, this.checked)" class="rounded">
+        <span>Show</span>
+      </label>
+
+      <!-- Delete Custom Field Button -->
+      ${f.isCustom ? `
+        <button type="button" onclick="deleteAdminStudentCustomField(${idx})" class="w-6 h-6 rounded-lg text-rose-500 hover:bg-rose-500/10 flex items-center justify-center flex-shrink-0" title="Delete custom field">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+function moveAdminStudentField(index, dir) {
+  const targetIndex = index + dir;
+  if (targetIndex < 0 || targetIndex >= appStudentFormFields.length) return;
+  const item = appStudentFormFields.splice(index, 1)[0];
+  appStudentFormFields.splice(targetIndex, 0, item);
+  renderAdminStudentFieldsConfig();
+}
+
+function toggleAdminStudentFieldSize(index) {
+  if (!appStudentFormFields[index]) return;
+  appStudentFormFields[index].size = appStudentFormFields[index].size === 'full' ? 'half' : 'full';
+  renderAdminStudentFieldsConfig();
+}
+
+function toggleAdminStudentFieldEnabled(index, checked) {
+  if (!appStudentFormFields[index]) return;
+  appStudentFormFields[index].enabled = Boolean(checked);
+}
+
+function updateAdminStudentFieldLabel(index, newLabel) {
+  if (!appStudentFormFields[index]) return;
+  const trimmed = (newLabel || '').trim();
+  if (trimmed) appStudentFormFields[index].label = trimmed;
+}
+
+function promptAddCustomStudentField() {
+  const label = prompt('Enter label for new custom field (e.g. Blood Group, Bus Stop, DOB):');
+  if (!label || !label.trim()) return;
+
+  const key = 'custom_' + label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+  appStudentFormFields.push({
+    key,
+    label: label.trim(),
+    type: 'text',
+    size: 'half',
+    required: false,
+    enabled: true,
+    isCustom: true
+  });
+  renderAdminStudentFieldsConfig();
+  showToast(`Custom field "${label.trim()}" added to layout! Remember to click Save Fields Layout.`);
+}
+
+function deleteAdminStudentCustomField(index) {
+  if (!appStudentFormFields[index]) return;
+  const name = appStudentFormFields[index].label;
+  if (confirm(`Delete custom field "${name}"?`)) {
+    appStudentFormFields.splice(index, 1);
+    renderAdminStudentFieldsConfig();
+  }
+}
+
+function resetAdminStudentFieldsConfig() {
+  if (confirm('Reset student form inputs and layout to default?')) {
+    appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
+    renderAdminStudentFieldsConfig();
+  }
+}
+
+async function saveAdminStudentFieldsConfig() {
+  try {
+    const res = await API.saveStudentFormFields(appStudentFormFields);
+    if (res.success) {
+      showToast('Student form layout saved successfully!');
+    }
+  } catch (err) {
+    showToast('Failed to save layout: ' + err.message, true);
   }
 }
 
@@ -1907,10 +2143,22 @@ async function undoLog(logId, actionName) {
   }
 }
 
+function openActivityLogsModal() {
+  const modal = document.getElementById('modal-activity-logs');
+  if (modal) modal.classList.remove('hidden');
+  loadActivityLogs();
+}
+
+function closeActivityLogsModal() {
+  const modal = document.getElementById('modal-activity-logs');
+  if (modal) modal.classList.add('hidden');
+}
+
 // ================= ADMIN PANEL & TEACHERS LIST =================
 function openAdminPanel() {
   document.getElementById('modal-admin-panel').classList.remove('hidden');
   loadAdminTeachersList();
+  renderAdminStudentFieldsConfig();
 }
 
 function closeAdminPanel() {
@@ -2132,6 +2380,7 @@ async function handleResetAppPrompt() {
 
 // ================= TAB NAVIGATION =================
 function selectTopTab(tab) {
+  triggerNavHaptic(20);
   ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -2161,6 +2410,7 @@ function selectTopTab(tab) {
 }
 
 function selectBottomTab(tab) {
+  triggerNavHaptic(20);
   ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -2620,7 +2870,7 @@ function populateTeacherFilterDropdowns(selectedYear = 'all', selectedClass = 'a
   const classEl = document.getElementById('teachers-filter-class');
 
   if (yearEl && (!yearEl.options || yearEl.options.length <= 1)) {
-    let yearOptions = `<option value="all">All Years (Total)</option>`;
+    let yearOptions = `<option value="all">All Years</option>`;
     (availableTeacherYears || []).forEach(yr => {
       yearOptions += `<option value="${yr}" ${selectedYear === yr ? 'selected' : ''}>${yr}</option>`;
     });
@@ -3118,7 +3368,7 @@ async function openTeacherLogModal(teacherId) {
       const yearFilterInLog = document.getElementById('tlog-filter-year');
       if (yearFilterInLog) {
         const years = res.availableYears || [];
-        let yearOpts = `<option value="all">All Years (${stats.totalSessions})</option>`;
+        let yearOpts = `<option value="all">All Years</option>`;
         years.forEach(yr => {
           yearOpts += `<option value="${escapeHtml(yr)}">${escapeHtml(yr)}</option>`;
         });
@@ -3127,10 +3377,9 @@ async function openTeacherLogModal(teacherId) {
 
       // Populate Class Filter inside Log Modal
       if (filterSelect) {
-        let optionsHtml = `<option value="all">All Classes (${stats.totalSessions} sessions)</option>`;
+        let optionsHtml = `<option value="all">All Classes</option>`;
         (stats.classesList || []).forEach(cl => {
-          const count = currentTeacherSessions.filter(s => s.class === cl).length;
-          optionsHtml += `<option value="${escapeHtml(cl)}">${escapeHtml(cl)} (${count})</option>`;
+          optionsHtml += `<option value="${escapeHtml(cl)}">${escapeHtml(cl)}</option>`;
         });
         filterSelect.innerHTML = optionsHtml;
       }
@@ -3976,8 +4225,16 @@ function closeStudentA4Preview() {
 }
 
 function triggerStudentCardsPrint() {
+  document.body.classList.add('print-cards-active');
   window.print();
+  setTimeout(() => {
+    document.body.classList.remove('print-cards-active');
+  }, 1000);
 }
+
+window.addEventListener('afterprint', () => {
+  document.body.classList.remove('print-cards-active');
+});
 
 async function executeStudentExportCSV() {
   const classFilter = document.getElementById('export-student-class')?.value || 'all';

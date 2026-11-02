@@ -351,6 +351,14 @@ const API = {
     });
   },
 
+  // Student Form Builder / Custom Fields Configuration
+  async saveStudentFormFields(fields) {
+    return this.request('/admin/student-fields', {
+      method: 'PUT',
+      body: JSON.stringify({ fields })
+    });
+  },
+
   // Messages API (Notifications & Teacher Broadcast)
   async getMessages() {
     return this.request('/messages');

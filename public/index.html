@@ -386,24 +386,23 @@
           </button>
         </div>
 
-        <!-- Activity Logs (Only five logs show in view, other will scroll) -->
-        <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
-          <h4 class="text-xs font-bold text-[var(--text-sub)] uppercase tracking-wider flex items-center justify-between">
-            <span>Activity Logs</span>
-            <span class="text-[10px] text-[#245b70] font-semibold">Live history</span>
-          </h4>
-          
-          <div class="space-y-2 text-xs activity-logs-scroll pr-1" id="activity-logs-container">
-            <!-- Populated via loadActivityLogs() -->
+        <!-- Action Buttons Row: Print Students Detail + Activity Log in Single Line with White Background -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <!-- Print Students Details Button (White Background) -->
+          <div id="student-export-section" class="w-full">
+            <button type="button" onclick="openStudentExportModal()" class="touch-btn w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[var(--text-main)] border border-[var(--border-color)] font-extrabold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-1.5 transition shadow-sm py-3 active:scale-98">
+              <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+              <span class="truncate">Print Students</span>
+            </button>
           </div>
-        </div>
 
-        <!-- Student Details Print / Export (Controlled by Admin Toggle) -->
-        <div id="student-export-section" class="w-full">
-          <button type="button" onclick="openStudentExportModal()" class="touch-btn w-full bg-gradient-to-r from-[#1c647b] to-[#25839f] hover:from-[#175265] hover:to-[#1e6f87] text-white font-extrabold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 transition shadow-md py-3 active:scale-98">
-            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            <span>Print / Export Student Details</span>
-          </button>
+          <!-- Activity Log Button (White Background) -->
+          <div class="w-full">
+            <button type="button" onclick="openActivityLogsModal()" class="touch-btn w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[var(--text-main)] border border-[var(--border-color)] font-extrabold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-1.5 transition shadow-sm py-3 active:scale-98">
+              <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              <span class="truncate">Activity Log</span>
+            </button>
+          </div>
         </div>
 
         <!-- Sign Out Button (Light Orange in Light Mode) -->
@@ -835,8 +834,8 @@
         <button onclick="closeTeacherLogModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
       </div>
 
-      <!-- Quick Summary Badges (Sessions, Days, Classes) -->
-      <div class="grid grid-cols-3 gap-2">
+      <!-- Quick Summary Badges (Sessions, Days) -->
+      <div class="grid grid-cols-2 gap-2">
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] text-center">
           <p class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Total Sessions</p>
           <p id="tlog-total-sessions" class="text-xl font-black text-[#245b70] dark:text-cyan-400">0</p>
@@ -844,10 +843,6 @@
         <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] text-center">
           <p class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Days Attended</p>
           <p id="tlog-total-days" class="text-xl font-black text-emerald-600 dark:text-emerald-400">0</p>
-        </div>
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] text-center">
-          <p class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Classes Taught</p>
-          <p id="tlog-classes-count" class="text-xl font-black text-indigo-600 dark:text-indigo-400">0</p>
         </div>
       </div>
 
@@ -925,64 +920,9 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div class="sm:col-span-1">
-            <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Name</label>
-            <input type="text" id="new-student-name" required placeholder="Full Name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Class</label>
-            <select id="new-student-class" onchange="updateModalStudentCounts()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
-              <!-- Populated via loadClasses() -->
-            </select>
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Roll No</label>
-            <input type="number" id="new-student-roll" required placeholder="104" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
-          </div>
-        </div>
-
-        <!-- Address -->
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
-          <div class="text-[10px] font-black text-[#245b70] uppercase">Address Details</div>
-          <input type="text" id="new-student-address" placeholder="Full Address / House Name" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-          <div class="grid grid-cols-3 gap-1.5">
-            <input type="text" id="new-student-place" placeholder="Place" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="new-student-district" placeholder="District" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="new-student-state" placeholder="State" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-          </div>
-        </div>
-
-        <!-- Family Details -->
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
-          <div class="text-[10px] font-black text-[#245b70] uppercase">Family Details</div>
-          <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="new-student-father" placeholder="Father's Name" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="new-student-mother" placeholder="Mother's Name" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <input type="tel" id="new-student-mobile-normal" placeholder="Father Mobile (Normal)" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
-            <input type="tel" id="new-student-mobile-wa" placeholder="WhatsApp Number" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
-          </div>
-        </div>
-
-        <!-- Academic Status -->
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
-          <div class="text-[10px] font-black text-[#245b70] uppercase">Academic Status</div>
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Year Joined College</label>
-              <input type="number" id="new-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" value="2024" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Rank</label>
-              <input type="text" id="new-student-rank" placeholder="Rank" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Previous College</label>
-              <input type="text" id="new-student-college" placeholder="Previous College" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-          </div>
+        <!-- Dynamic Student Form Fields Container (Configured by Admin) -->
+        <div id="dynamic-new-student-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Dynamically populated via renderDynamicStudentInputs('new') -->
         </div>
 
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-extrabold text-sm rounded-xl shadow-md">
@@ -1024,70 +964,9 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div class="sm:col-span-1">
-            <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Name</label>
-            <input type="text" id="edit-student-name" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Class</label>
-            <select id="edit-student-class" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
-              <!-- Populated via loadClasses() -->
-            </select>
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Roll No</label>
-            <input type="number" id="edit-student-roll" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
-          </div>
-        </div>
-
-        <!-- Address -->
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
-          <div class="text-[10px] font-black text-[#245b70] uppercase">Address Details</div>
-          <input type="text" id="edit-student-address" placeholder="Address" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-          <div class="grid grid-cols-3 gap-1.5">
-            <input type="text" id="edit-student-place" placeholder="Place" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="edit-student-district" placeholder="District" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="edit-student-state" placeholder="State" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-          </div>
-        </div>
-
-        <!-- Family Details -->
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
-          <div class="text-[10px] font-black text-[#245b70] uppercase">Family Details</div>
-          <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="edit-student-father" placeholder="Father's Name" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-            <input type="text" id="edit-student-mother" placeholder="Mother's Name" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Father's Mobile (Normal)</label>
-              <input type="tel" id="edit-student-mobile-normal" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">WhatsApp Number</label>
-              <input type="tel" id="edit-student-mobile-wa" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-          </div>
-        </div>
-
-        <!-- Academic Status -->
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
-          <div class="text-[10px] font-black text-[#245b70] uppercase">Academic Status</div>
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Year Joined College</label>
-              <input type="number" id="edit-student-year-joined" placeholder="e.g. 2024" min="1990" max="2099" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Rank</label>
-              <input type="text" id="edit-student-rank" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-            <div>
-              <label class="block text-[9px] font-bold text-[var(--text-sub)] mb-0.5">Previous College</label>
-              <input type="text" id="edit-student-college" class="touch-input w-full  border border-[var(--border-color)] rounded-xl px-2 text-xs font-semibold text-[var(--text-main)]">
-            </div>
-          </div>
+        <!-- Dynamic Edit Student Form Fields Container (Configured by Admin) -->
+        <div id="dynamic-edit-student-fields" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Dynamically populated via renderDynamicStudentInputs('edit', student) -->
         </div>
 
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-extrabold text-sm rounded-xl shadow-md">
@@ -1331,6 +1210,38 @@
           <input type="checkbox" id="admin-toggle-student-print" onchange="handleAdminToggleStudentPrint(this.checked)" checked>
           <span class="switch-slider"></span>
         </label>
+      </div>
+
+      <!-- Student Form Inputs Configuration (Admin Can Add/Edit/Reorder/Resize Fields) -->
+      <div class="bg-[var(--bg-page)] p-3.5 rounded-2xl border border-[var(--border-color)] space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="text-xs font-black text-[#245b70] uppercase flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-[#245b70]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              <span>Student Form Inputs & Layout</span>
+            </div>
+            <div class="text-[10px] text-[var(--text-sub)] mt-0.5 leading-tight">
+              Customize input labels, width (half / full), positions, and add custom fields
+            </div>
+          </div>
+          <button type="button" onclick="promptAddCustomStudentField()" class="px-2.5 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl shadow-sm flex items-center gap-1 flex-shrink-0">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Add Field</span>
+          </button>
+        </div>
+
+        <div id="admin-student-fields-list" class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+          <!-- Populated dynamically via renderAdminStudentFieldsConfig() -->
+        </div>
+
+        <div class="flex items-center justify-between pt-1 border-t border-[var(--border-color)]">
+          <button type="button" onclick="resetAdminStudentFieldsConfig()" class="px-3 py-1.5 rounded-xl border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition">
+            Reset Default
+          </button>
+          <button type="button" onclick="saveAdminStudentFieldsConfig()" class="px-4 py-1.5 rounded-xl bg-[#245b70] text-white text-xs font-bold shadow-sm active:scale-95 transition">
+            Save Fields Layout
+          </button>
+        </div>
       </div>
 
       <!-- Teachers List -->
@@ -1812,6 +1723,28 @@
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
           <span>Delete Message</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ACTIVITY LOGS MODAL ================= -->
+  <div id="modal-activity-logs" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-lg rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[92vh] flex flex-col space-y-3.5">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5 flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 flex items-center justify-center font-bold">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base text-[var(--text-main)]">Activity Logs</h3>
+            <p class="text-[10px] text-[var(--text-sub)]">Live audit trail & attendance history</p>
+          </div>
+        </div>
+        <button onclick="closeActivityLogsModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <div class="space-y-2 text-xs overflow-y-auto flex-1 pr-1 max-h-[60vh]" id="activity-logs-container">
+        <!-- Populated via loadActivityLogs() -->
       </div>
     </div>
   </div>

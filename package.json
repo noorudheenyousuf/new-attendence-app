@@ -1,7 +1,7 @@
 {
   "name": "registerly",
   "version": "1.0.0",
-  "description": "REGISTERLY - Full Stack School Attendance & Management PWA",
+  "description": "REGISTERLY - School Attendance & Management ",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",

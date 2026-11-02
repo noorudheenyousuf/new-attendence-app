@@ -59,7 +59,8 @@ router.post('/', authMiddleware, async (req, res) => {
       photoUrl,
       address,
       familyDetails,
-      academicStatus
+      academicStatus,
+      customFields
     } = req.body;
 
     if (!name || !studentClass || !roll) {
@@ -77,7 +78,8 @@ router.post('/', authMiddleware, async (req, res) => {
       photoUrl: photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face',
       address: address || {},
       familyDetails: familyDetails || {},
-      academicStatus: academicStatus || {}
+      academicStatus: academicStatus || {},
+      customFields: customFields || {}
     });
 
     await ActivityLog.create({
@@ -113,7 +115,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
       photoUrl,
       address,
       familyDetails,
-      academicStatus
+      academicStatus,
+      customFields
     } = req.body;
 
     const updated = await Student.findByIdAndUpdate(
@@ -125,7 +128,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
         photoUrl: photoUrl || oldStudent.photoUrl,
         address: address !== undefined ? address : oldStudent.address,
         familyDetails: familyDetails !== undefined ? familyDetails : oldStudent.familyDetails,
-        academicStatus: academicStatus !== undefined ? academicStatus : oldStudent.academicStatus
+        academicStatus: academicStatus !== undefined ? academicStatus : oldStudent.academicStatus,
+        customFields: customFields !== undefined ? customFields : oldStudent.customFields
       },
       { new: true }
     );

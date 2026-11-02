@@ -39,7 +39,7 @@ router.use(adminMiddleware);
 // @desc    Update App Name & School Name & Permissions
 router.put('/settings', async (req, res) => {
   try {
-    const { appName, schoolName, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint } = req.body;
+    const { appName, schoolName, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint, studentFormFields } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings();
@@ -49,6 +49,7 @@ router.put('/settings', async (req, res) => {
     if (allowNonAdminEditDelete !== undefined) settings.allowNonAdminEditDelete = Boolean(allowNonAdminEditDelete);
     if (showTeachersTabToAll !== undefined) settings.showTeachersTabToAll = Boolean(showTeachersTabToAll);
     if (allowStudentDetailsPrint !== undefined) settings.allowStudentDetailsPrint = Boolean(allowStudentDetailsPrint);
+    if (Array.isArray(studentFormFields)) settings.studentFormFields = studentFormFields;
     settings.updatedAt = new Date();
     await settings.save();
 
@@ -62,6 +63,36 @@ router.put('/settings', async (req, res) => {
     });
 
     res.json({ success: true, data: settings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/admin/student-fields
+// @desc    Update student form input fields configuration (labels, size/width, position, enabled)
+router.put('/student-fields', async (req, res) => {
+  try {
+    const { fields } = req.body;
+    let settings = await AppSettings.findOne();
+    if (!settings) {
+      settings = new AppSettings();
+    }
+    if (Array.isArray(fields)) {
+      settings.studentFormFields = fields;
+    }
+    settings.updatedAt = new Date();
+    await settings.save();
+
+    await ActivityLog.create({
+      action: 'Student Form Fields Layout Updated',
+      details: `Customized by Admin ${req.user.name}`,
+      performedBy: req.user.name,
+      role: 'admin',
+      entityType: 'settings',
+      canUndo: false
+    });
+
+    res.json({ success: true, data: settings.studentFormFields });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
