@@ -598,3 +598,32 @@ input:checked + .switch-slider:before {
   }
 }
 
+/* Drag and Drop Field Customizer Styles */
+.field-drag-card {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.field-drag-card:active {
+  cursor: grabbing;
+}
+.field-drag-card.dragging {
+  opacity: 0.35;
+  transform: scale(0.95);
+  border-color: #245b70 !important;
+  box-shadow: 0 10px 25px -5px rgba(36, 91, 112, 0.3);
+}
+.field-drag-card.drag-over {
+  border-color: #10b981 !important;
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  transform: scale(1.02);
+}
+
+/* Nav Tab Active Click Bounce for physical feel */
+#top-tab-attendance:active, #top-tab-report:active, #top-tab-settings:active,
+#bottom-tab-classes:active, #bottom-tab-subjects:active, #bottom-tab-students:active, #bottom-tab-teachers:active {
+  transform: scale(0.92);
+  transition: transform 0.08s ease-in-out;
+}
+

@@ -49,15 +49,43 @@ function canUserEditDelete() {
   return Boolean(appSettings && appSettings.allowNonAdminEditDelete);
 }
 
-// Vibration Haptic Feedback for Navbars
-function triggerNavHaptic(ms = 20) {
+// Vibration & Audio Haptic Feedback for Navbars & Interactive Controls
+let hapticAudioCtx = null;
+function triggerNavHaptic(intensity = 'medium') {
+  // 1. Hardware vibration for mobile devices supporting navigator.vibrate
   try {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(ms);
+      if (intensity === 'strong') {
+        navigator.vibrate([60, 40, 60]);
+      } else {
+        navigator.vibrate([40, 25, 40]);
+      }
     }
-  } catch (e) {
-    // Silent fail if vibration not supported or allowed
-  }
+  } catch (e) {}
+
+  // 2. Synthesized audio haptic impulse (crisp tactile click) for iOS & desktop browsers
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      if (!hapticAudioCtx) {
+        hapticAudioCtx = new AudioContextClass();
+      }
+      if (hapticAudioCtx.state === 'suspended') {
+        hapticAudioCtx.resume();
+      }
+      const osc = hapticAudioCtx.createOscillator();
+      const gain = hapticAudioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(160, hapticAudioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, hapticAudioCtx.currentTime + 0.035);
+      gain.gain.setValueAtTime(0.15, hapticAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, hapticAudioCtx.currentTime + 0.035);
+      osc.connect(gain);
+      gain.connect(hapticAudioCtx.destination);
+      osc.start();
+      osc.stop(hapticAudioCtx.currentTime + 0.035);
+    }
+  } catch (e) {}
 }
 
 // Student Form Fields Configuration (Configurable in Admin Panel)
@@ -1668,7 +1696,15 @@ function collectStudentCustomFields(prefix) {
   return customs;
 }
 
-// Dynamic Student Inputs Renderer for Add & Edit Modals
+// State for Student Form Layout Editor Mode
+let isStudentFormEditMode = false;
+let draggedFieldIndex = null;
+let touchDraggedIdx = null;
+let touchElement = null;
+let activeEditingFieldIdx = null;
+let currentFieldEditorSize = 'half';
+
+// Dynamic Student Inputs Renderer for Add & Edit Modals (Supports Normal & Interactive Layout Editor Mode)
 function renderDynamicStudentInputs(prefix = 'new', student = null) {
   const container = document.getElementById(prefix === 'new' ? 'dynamic-new-student-fields' : 'dynamic-edit-student-fields');
   if (!container) return;
@@ -1677,6 +1713,72 @@ function renderDynamicStudentInputs(prefix = 'new', student = null) {
     ? appStudentFormFields
     : DEFAULT_STUDENT_FORM_FIELDS;
 
+  // ================= INTERACTIVE LAYOUT EDITOR MODE (ADMIN CAN DRAG BY HOLDING, EDIT WITH KEY/BUTTON) =================
+  if (isStudentFormEditMode && prefix === 'new') {
+    let html = '';
+    fields.forEach((field, idx) => {
+      const spanClass = field.size === 'full' ? 'col-span-1 sm:col-span-2' : 'col-span-1';
+      const isHidden = field.enabled === false;
+
+      html += `
+        <div class="${spanClass} field-drag-card relative p-3 rounded-2xl border-2 ${isHidden ? 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-100/60 dark:bg-slate-800/40 opacity-60' : 'border-[#245b70]/30 hover:border-[#245b70] bg-[var(--card-bg)] shadow-xs'} transition group"
+             draggable="true"
+             tabindex="0"
+             data-index="${idx}"
+             ondragstart="handleFieldDragStart(event, ${idx})"
+             ondragover="handleFieldDragOver(event, ${idx})"
+             ondragleave="handleFieldDragLeave(event, ${idx})"
+             ondrop="handleFieldDrop(event, ${idx})"
+             ondragend="handleFieldDragEnd(event)"
+             ontouchstart="handleFieldTouchStart(event, ${idx})"
+             ontouchmove="handleFieldTouchMove(event)"
+             ontouchend="handleFieldTouchEnd(event)"
+             onkeydown="handleFieldKeyDown(event, ${idx})">
+          
+          <!-- Card Header: Drag handle, Size toggle, Edit key, Delete -->
+          <div class="flex items-center justify-between gap-1.5 mb-2 pb-1.5 border-b border-[var(--border-color)]">
+            <div class="flex items-center gap-1.5 cursor-grab active:cursor-grabbing text-[#245b70] dark:text-cyan-400">
+              <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+              <span class="text-[10px] font-black uppercase tracking-wider">Drag to Move</span>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <!-- 1-Click Size Toggle -->
+              <button type="button" onclick="toggleAdminStudentFieldSize(${idx})" class="px-2 py-0.5 rounded-lg text-[10px] font-black border transition ${field.size === 'full' ? 'bg-[#245b70] text-white border-[#245b70]' : 'bg-[var(--bg-page)] text-[var(--text-main)] border-[var(--border-color)]'}" title="Click to toggle Half / Full width">
+                ${field.size === 'full' ? 'Full (100%)' : 'Half (50%)'}
+              </button>
+
+              <!-- Edit Key / Button -->
+              <button type="button" onclick="openFieldEditModal(${idx})" class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-teal-500/10 hover:bg-[#245b70] text-[#245b70] hover:text-white transition flex items-center gap-1" title="Click or press 'E' key to edit label & properties">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                <span>Edit</span>
+              </button>
+
+              ${field.isCustom ? `
+                <button type="button" onclick="deleteAdminStudentCustomField(${idx})" class="w-5 h-5 rounded text-rose-500 hover:bg-rose-500/10 flex items-center justify-center font-bold" title="Delete custom field">✕</button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Card Content / Preview -->
+          <div class="pointer-events-none">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-black text-[var(--text-main)]">${escapeHtml(field.label)}</span>
+              ${isHidden ? `<span class="text-[9px] font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded">Hidden</span>` : ''}
+            </div>
+            <div class="h-8 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] px-2.5 flex items-center text-xs font-medium text-[var(--text-sub)]">
+              ${field.key === 'class' ? 'Class Dropdown' : (field.type === 'number' ? '123...' : 'Text input...')}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    return;
+  }
+
+  // ================= NORMAL FORM INPUTS RENDERING =================
   let html = '';
   fields.forEach(field => {
     if (field.enabled === false) return;
@@ -1740,8 +1842,304 @@ function renderDynamicStudentInputs(prefix = 'new', student = null) {
   container.innerHTML = html;
 }
 
+// Opens the Add Student modal directly in Layout Customizer Mode from Admin Panel
+function openStudentFormLayoutEditor() {
+  closeAdminPanel();
+  isStudentFormEditMode = true;
+
+  const titleEl = document.getElementById('modal-add-student-title');
+  if (titleEl) titleEl.innerText = 'Customize Student Form Layout';
+  
+  const statsEl = document.getElementById('modal-add-student-stats');
+  if (statsEl) statsEl.classList.add('hidden');
+
+  const bannerEl = document.getElementById('student-layout-editor-banner');
+  if (bannerEl) bannerEl.classList.remove('hidden');
+
+  const enrollBtn = document.getElementById('btn-enroll-student');
+  if (enrollBtn) enrollBtn.classList.add('hidden');
+
+  const saveLayoutBtn = document.getElementById('btn-save-layout-exit');
+  if (saveLayoutBtn) saveLayoutBtn.classList.remove('hidden');
+
+  renderDynamicStudentInputs('new');
+  document.getElementById('modal-add-student').classList.remove('hidden');
+  triggerNavHaptic('strong');
+}
+
+function exitStudentFormLayoutEditor() {
+  isStudentFormEditMode = false;
+
+  const titleEl = document.getElementById('modal-add-student-title');
+  if (titleEl) titleEl.innerText = 'Add Student';
+
+  const statsEl = document.getElementById('modal-add-student-stats');
+  if (statsEl) statsEl.classList.remove('hidden');
+
+  const bannerEl = document.getElementById('student-layout-editor-banner');
+  if (bannerEl) bannerEl.classList.add('hidden');
+
+  const enrollBtn = document.getElementById('btn-enroll-student');
+  if (enrollBtn) enrollBtn.classList.remove('hidden');
+
+  const saveLayoutBtn = document.getElementById('btn-save-layout-exit');
+  if (saveLayoutBtn) saveLayoutBtn.classList.add('hidden');
+
+  renderDynamicStudentInputs('new');
+  closeStudentModal();
+}
+
+async function saveAndExitStudentFormLayoutEditor() {
+  await saveAdminStudentFieldsConfig();
+  exitStudentFormLayoutEditor();
+}
+
+// Drag & Drop Handlers for Reordering Form Inputs
+function handleFieldDragStart(e, idx) {
+  draggedFieldIndex = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', idx);
+  e.currentTarget.classList.add('dragging');
+  triggerNavHaptic('medium');
+}
+
+function handleFieldDragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const card = e.currentTarget;
+  if (!card.classList.contains('drag-over') && draggedFieldIndex !== idx) {
+    card.classList.add('drag-over');
+  }
+}
+
+function handleFieldDragLeave(e, idx) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function handleFieldDrop(e, targetIdx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (draggedFieldIndex === null || draggedFieldIndex === targetIdx) return;
+
+  const item = appStudentFormFields.splice(draggedFieldIndex, 1)[0];
+  appStudentFormFields.splice(targetIdx, 0, item);
+  draggedFieldIndex = null;
+
+  triggerNavHaptic('strong');
+  renderDynamicStudentInputs('new');
+}
+
+function handleFieldDragEnd(e) {
+  draggedFieldIndex = null;
+  document.querySelectorAll('.field-drag-card').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
+}
+
+// Mobile Touch Drag & Drop for reordering
+function handleFieldTouchStart(e, idx) {
+  touchDraggedIdx = idx;
+  touchElement = e.currentTarget;
+  touchElement.classList.add('dragging');
+  triggerNavHaptic('medium');
+}
+
+function handleFieldTouchMove(e) {
+  if (touchDraggedIdx === null) return;
+  const touch = e.touches[0];
+  const target = document.elementFromPoint(touch.clientX, touch.clientY);
+  const card = target ? target.closest('.field-drag-card') : null;
+
+  document.querySelectorAll('.field-drag-card').forEach(el => el.classList.remove('drag-over'));
+  if (card && card !== touchElement) {
+    card.classList.add('drag-over');
+  }
+}
+
+function handleFieldTouchEnd(e) {
+  if (touchDraggedIdx === null) return;
+  const touch = e.changedTouches[0];
+  const target = document.elementFromPoint(touch.clientX, touch.clientY);
+  const card = target ? target.closest('.field-drag-card') : null;
+
+  if (card) {
+    const targetIdx = parseInt(card.getAttribute('data-index'), 10);
+    if (!isNaN(targetIdx) && targetIdx !== touchDraggedIdx) {
+      const item = appStudentFormFields.splice(touchDraggedIdx, 1)[0];
+      appStudentFormFields.splice(targetIdx, 0, item);
+      triggerNavHaptic('strong');
+    }
+  }
+
+  touchDraggedIdx = null;
+  touchElement = null;
+  document.querySelectorAll('.field-drag-card').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
+  renderDynamicStudentInputs('new');
+}
+
+// Keyboard Shortcut: press 'E' or 'Enter' on a field card to edit it
+function handleFieldKeyDown(e, idx) {
+  if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
+    e.preventDefault();
+    openFieldEditModal(idx);
+  }
+}
+
+// Quick Field Editor Modal (Edit label, half/full width, visibility, delete)
+function openFieldEditModal(idx) {
+  const field = appStudentFormFields[idx];
+  if (!field) return;
+
+  activeEditingFieldIdx = idx;
+  currentFieldEditorSize = field.size || 'half';
+
+  document.getElementById('field-editor-idx').value = idx;
+  document.getElementById('field-editor-label').value = field.label;
+  document.getElementById('field-editor-key-subtitle').innerText = `${field.isCustom ? 'Custom' : 'Standard'} Field • ${field.key}`;
+  document.getElementById('field-editor-enabled').checked = field.enabled !== false;
+
+  setFieldEditorSize(currentFieldEditorSize);
+
+  const deleteWrap = document.getElementById('field-editor-delete-wrap');
+  if (deleteWrap) {
+    if (field.isCustom) {
+      deleteWrap.classList.remove('hidden');
+    } else {
+      deleteWrap.classList.add('hidden');
+    }
+  }
+
+  document.getElementById('modal-field-editor').classList.remove('hidden');
+  triggerNavHaptic('medium');
+}
+
+function closeFieldEditModal() {
+  document.getElementById('modal-field-editor').classList.add('hidden');
+  activeEditingFieldIdx = null;
+}
+
+function setFieldEditorSize(size) {
+  currentFieldEditorSize = size;
+  const halfBtn = document.getElementById('btn-size-half');
+  const fullBtn = document.getElementById('btn-size-full');
+
+  if (halfBtn && fullBtn) {
+    if (size === 'half') {
+      halfBtn.className = 'p-2.5 rounded-xl border border-[#245b70] bg-[#245b70] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm';
+      fullBtn.className = 'p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] text-[var(--text-main)] text-xs font-bold transition flex items-center justify-center gap-1.5';
+    } else {
+      halfBtn.className = 'p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] text-[var(--text-main)] text-xs font-bold transition flex items-center justify-center gap-1.5';
+      fullBtn.className = 'p-2.5 rounded-xl border border-[#245b70] bg-[#245b70] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm';
+    }
+  }
+}
+
+function saveFieldEditChanges() {
+  if (activeEditingFieldIdx === null || !appStudentFormFields[activeEditingFieldIdx]) return;
+  const newLabel = document.getElementById('field-editor-label').value.trim();
+  const enabled = document.getElementById('field-editor-enabled').checked;
+
+  if (newLabel) {
+    appStudentFormFields[activeEditingFieldIdx].label = newLabel;
+  }
+  appStudentFormFields[activeEditingFieldIdx].size = currentFieldEditorSize;
+  appStudentFormFields[activeEditingFieldIdx].enabled = enabled;
+
+  closeFieldEditModal();
+  renderDynamicStudentInputs('new');
+  triggerNavHaptic('strong');
+  showToast(`Updated "${newLabel || 'field'}"!`);
+}
+
+function deleteCurrentCustomField() {
+  if (activeEditingFieldIdx === null || !appStudentFormFields[activeEditingFieldIdx]) return;
+  const name = appStudentFormFields[activeEditingFieldIdx].label;
+  if (confirm(`Delete custom field "${name}"?`)) {
+    appStudentFormFields.splice(activeEditingFieldIdx, 1);
+    closeFieldEditModal();
+    renderDynamicStudentInputs('new');
+    triggerNavHaptic('strong');
+    showToast(`Deleted custom field "${name}"`);
+  }
+}
+
+function toggleAdminStudentFieldSize(index) {
+  if (!appStudentFormFields[index]) return;
+  appStudentFormFields[index].size = appStudentFormFields[index].size === 'full' ? 'half' : 'full';
+  renderDynamicStudentInputs('new');
+  triggerNavHaptic('medium');
+}
+
+function promptAddCustomStudentField() {
+  const label = prompt('Enter label for new custom field (e.g. Blood Group, Bus Stop, DOB):');
+  if (!label || !label.trim()) return;
+
+  const key = 'custom_' + label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+  appStudentFormFields.push({
+    key,
+    label: label.trim(),
+    type: 'text',
+    size: 'half',
+    required: false,
+    enabled: true,
+    isCustom: true
+  });
+  renderDynamicStudentInputs('new');
+  triggerNavHaptic('strong');
+  showToast(`Custom field "${label.trim()}" added! Drag & hold to reposition.`);
+}
+
+function deleteAdminStudentCustomField(index) {
+  if (!appStudentFormFields[index]) return;
+  const name = appStudentFormFields[index].label;
+  if (confirm(`Delete custom field "${name}"?`)) {
+    appStudentFormFields.splice(index, 1);
+    renderDynamicStudentInputs('new');
+    triggerNavHaptic('strong');
+  }
+}
+
+function resetAdminStudentFieldsConfig() {
+  if (confirm('Reset student form inputs and layout to default?')) {
+    appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
+    renderDynamicStudentInputs('new');
+    triggerNavHaptic('strong');
+  }
+}
+
+async function saveAdminStudentFieldsConfig() {
+  try {
+    const res = await API.saveStudentFormFields(appStudentFormFields);
+    if (res.success) {
+      showToast('Student form layout saved successfully!');
+      triggerNavHaptic('strong');
+    }
+  } catch (err) {
+    showToast('Failed to save layout: ' + err.message, true);
+  }
+}
+
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
+  isStudentFormEditMode = false;
+
+  const titleEl = document.getElementById('modal-add-student-title');
+  if (titleEl) titleEl.innerText = 'Add Student';
+
+  const statsEl = document.getElementById('modal-add-student-stats');
+  if (statsEl) statsEl.classList.remove('hidden');
+
+  const bannerEl = document.getElementById('student-layout-editor-banner');
+  if (bannerEl) bannerEl.classList.add('hidden');
+
+  const enrollBtn = document.getElementById('btn-enroll-student');
+  if (enrollBtn) enrollBtn.classList.remove('hidden');
+
+  const saveLayoutBtn = document.getElementById('btn-save-layout-exit');
+  if (saveLayoutBtn) saveLayoutBtn.classList.add('hidden');
+
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
   const preview = document.getElementById('new-preview-photo');
@@ -1765,6 +2163,7 @@ function closeStudentModal() {
   document.getElementById('modal-add-student').classList.add('hidden');
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
+  isStudentFormEditMode = false;
 }
 
 async function handleSaveNewStudent(e) {
@@ -1884,126 +2283,6 @@ async function handleSaveEditedStudent(e) {
     }
   } catch (error) {
     showToast(error.message, true);
-  }
-}
-
-// ================= ADMIN STUDENT FORM CONFIGURATION =================
-function renderAdminStudentFieldsConfig() {
-  const container = document.getElementById('admin-student-fields-list');
-  if (!container) return;
-
-  if (!Array.isArray(appStudentFormFields) || appStudentFormFields.length === 0) {
-    appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
-  }
-
-  container.innerHTML = appStudentFormFields.map((f, idx) => `
-    <div class="bg-[var(--card-bg)] p-2.5 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-2 shadow-xs">
-      <div class="flex items-center gap-1.5 flex-1 min-w-0">
-        <!-- Up / Down Order Buttons -->
-        <div class="flex flex-col gap-0.5 flex-shrink-0">
-          <button type="button" onclick="moveAdminStudentField(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:text-[#245b70]"'} title="Move Up">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
-          </button>
-          <button type="button" onclick="moveAdminStudentField(${idx}, 1)" ${idx === appStudentFormFields.length - 1 ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:text-[#245b70]"'} title="Move Down">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
-          </button>
-        </div>
-
-        <!-- Field Label Input -->
-        <div class="flex-1 min-w-0">
-          <input type="text" value="${escapeHtml(f.label)}" onchange="updateAdminStudentFieldLabel(${idx}, this.value)" class="w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text-main)]" title="Click to rename field label">
-          <div class="text-[9px] text-[var(--text-sub)] truncate mt-0.5">${f.isCustom ? 'Custom Field' : 'Standard Field'} • ${f.key}</div>
-        </div>
-      </div>
-
-      <!-- Size Toggle (Half vs Full) -->
-      <button type="button" onclick="toggleAdminStudentFieldSize(${idx})" class="px-2 py-1 rounded-lg text-[10px] font-black border transition flex-shrink-0 ${f.size === 'full' ? 'bg-[#245b70] text-white border-[#245b70]' : 'bg-[var(--bg-page)] text-[var(--text-main)] border-[var(--border-color)]'}" title="Toggle between Half (50%) and Full (100%) width">
-        ${f.size === 'full' ? 'Full Width' : 'Half Width'}
-      </button>
-
-      <!-- Visibility Toggle -->
-      <label class="flex items-center gap-1 text-[11px] font-bold text-[var(--text-main)] flex-shrink-0 cursor-pointer" title="Show or hide in student form">
-        <input type="checkbox" ${f.enabled !== false ? 'checked' : ''} onchange="toggleAdminStudentFieldEnabled(${idx}, this.checked)" class="rounded">
-        <span>Show</span>
-      </label>
-
-      <!-- Delete Custom Field Button -->
-      ${f.isCustom ? `
-        <button type="button" onclick="deleteAdminStudentCustomField(${idx})" class="w-6 h-6 rounded-lg text-rose-500 hover:bg-rose-500/10 flex items-center justify-center flex-shrink-0" title="Delete custom field">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      ` : ''}
-    </div>
-  `).join('');
-}
-
-function moveAdminStudentField(index, dir) {
-  const targetIndex = index + dir;
-  if (targetIndex < 0 || targetIndex >= appStudentFormFields.length) return;
-  const item = appStudentFormFields.splice(index, 1)[0];
-  appStudentFormFields.splice(targetIndex, 0, item);
-  renderAdminStudentFieldsConfig();
-}
-
-function toggleAdminStudentFieldSize(index) {
-  if (!appStudentFormFields[index]) return;
-  appStudentFormFields[index].size = appStudentFormFields[index].size === 'full' ? 'half' : 'full';
-  renderAdminStudentFieldsConfig();
-}
-
-function toggleAdminStudentFieldEnabled(index, checked) {
-  if (!appStudentFormFields[index]) return;
-  appStudentFormFields[index].enabled = Boolean(checked);
-}
-
-function updateAdminStudentFieldLabel(index, newLabel) {
-  if (!appStudentFormFields[index]) return;
-  const trimmed = (newLabel || '').trim();
-  if (trimmed) appStudentFormFields[index].label = trimmed;
-}
-
-function promptAddCustomStudentField() {
-  const label = prompt('Enter label for new custom field (e.g. Blood Group, Bus Stop, DOB):');
-  if (!label || !label.trim()) return;
-
-  const key = 'custom_' + label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
-  appStudentFormFields.push({
-    key,
-    label: label.trim(),
-    type: 'text',
-    size: 'half',
-    required: false,
-    enabled: true,
-    isCustom: true
-  });
-  renderAdminStudentFieldsConfig();
-  showToast(`Custom field "${label.trim()}" added to layout! Remember to click Save Fields Layout.`);
-}
-
-function deleteAdminStudentCustomField(index) {
-  if (!appStudentFormFields[index]) return;
-  const name = appStudentFormFields[index].label;
-  if (confirm(`Delete custom field "${name}"?`)) {
-    appStudentFormFields.splice(index, 1);
-    renderAdminStudentFieldsConfig();
-  }
-}
-
-function resetAdminStudentFieldsConfig() {
-  if (confirm('Reset student form inputs and layout to default?')) {
-    appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
-    renderAdminStudentFieldsConfig();
-  }
-}
-
-async function saveAdminStudentFieldsConfig() {
-  try {
-    const res = await API.saveStudentFormFields(appStudentFormFields);
-    if (res.success) {
-      showToast('Student form layout saved successfully!');
-    }
-  } catch (err) {
-    showToast('Failed to save layout: ' + err.message, true);
   }
 }
 
@@ -2158,7 +2437,6 @@ function closeActivityLogsModal() {
 function openAdminPanel() {
   document.getElementById('modal-admin-panel').classList.remove('hidden');
   loadAdminTeachersList();
-  renderAdminStudentFieldsConfig();
 }
 
 function closeAdminPanel() {

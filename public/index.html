@@ -328,7 +328,15 @@
           </div>
         </div>
 
-        <!-- Profile Quick Actions: Message / Notification & Timetable -->
+        <!-- 1. ADMIN PANEL BUTTON (Just below the profile name and photo div) -->
+        <div id="admin-settings-section" class="space-y-3">
+          <button onclick="openAdminPanel()" class="touch-btn w-full custom-gradient-btn font-extrabold text-xs sm:text-sm rounded-2xl shadow-md flex items-center justify-center gap-2 active:scale-98 transition py-3">
+            <svg class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            <span>Open Admin Panel</span>
+          </button>
+        </div>
+
+        <!-- 2. MESSAGES & TIMETABLE (Below Admin Panel) -->
         <div class="grid grid-cols-2 gap-2.5">
           <!-- Notification / Messages Button with Number Badge -->
           <button type="button" onclick="openMessagesModal()" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group" title="Open teacher notifications & chat">
@@ -361,6 +369,41 @@
           </button>
         </div>
 
+        <!-- 3. PRINT DETAILS & ACTIVITY LOG (Below Messages & Timetable, styled with colorful icons & subtitles) -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <!-- Print Students Details Button -->
+          <div id="student-export-section" class="w-full">
+            <button type="button" onclick="openStudentExportModal()" class="touch-btn w-full bg-[var(--card-bg)] hover:bg-emerald-500/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group" title="Print student cards & export CSV">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                </div>
+                <div class="text-left min-w-0">
+                  <div class="text-xs font-black text-[var(--text-main)] truncate">Print Details</div>
+                  <div class="text-[10px] text-[var(--text-sub)] truncate">A4 Cards & CSV</div>
+                </div>
+              </div>
+              <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+
+          <!-- Activity Log Button -->
+          <div class="w-full">
+            <button type="button" onclick="openActivityLogsModal()" class="touch-btn w-full bg-[var(--card-bg)] hover:bg-amber-500/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group" title="View activity audit log & history">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                </div>
+                <div class="text-left min-w-0">
+                  <div class="text-xs font-black text-[var(--text-main)] truncate">Activity Log</div>
+                  <div class="text-[10px] text-[var(--text-sub)] truncate">Audit & History</div>
+                </div>
+              </div>
+              <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+        </div>
+
         <!-- Install App Card (Shows if installable in Chrome) -->
         <div id="settings-install-card" class="hidden bg-gradient-to-r from-amber-500/10 to-teal-500/10 p-3.5 rounded-2xl border border-amber-300 dark:border-amber-900/60 shadow-sm flex items-center justify-between gap-3">
           <div class="flex items-center gap-2.5">
@@ -375,34 +418,6 @@
           <button onclick="triggerPwaInstall()" class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-black text-xs shadow-sm transition active:scale-95 flex-shrink-0">
             Install
           </button>
-        </div>
-
-        <!-- ADMIN ONLY SECTION (Hidden for regular teachers) -->
-        <div id="admin-settings-section" class="space-y-3">
-          <!-- Button to Admin Panel (EXACT NAME: Open Admin Panel) -->
-          <button onclick="openAdminPanel()" class="touch-btn w-full custom-gradient-btn font-extrabold text-xs sm:text-sm rounded-2xl shadow-md flex items-center justify-center gap-2 active:scale-98 transition">
-            <svg class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
-            <span>Open Admin Panel</span>
-          </button>
-        </div>
-
-        <!-- Action Buttons Row: Print Students Detail + Activity Log in Single Line with White Background -->
-        <div class="grid grid-cols-2 gap-2.5">
-          <!-- Print Students Details Button (White Background) -->
-          <div id="student-export-section" class="w-full">
-            <button type="button" onclick="openStudentExportModal()" class="touch-btn w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[var(--text-main)] border border-[var(--border-color)] font-extrabold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-1.5 transition shadow-sm py-3 active:scale-98">
-              <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-              <span class="truncate">Print Students</span>
-            </button>
-          </div>
-
-          <!-- Activity Log Button (White Background) -->
-          <div class="w-full">
-            <button type="button" onclick="openActivityLogsModal()" class="touch-btn w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-[var(--text-main)] border border-[var(--border-color)] font-extrabold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-1.5 transition shadow-sm py-3 active:scale-98">
-              <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-              <span class="truncate">Activity Log</span>
-            </button>
-          </div>
         </div>
 
         <!-- Sign Out Button (Light Orange in Light Mode) -->
@@ -883,8 +898,8 @@
     <div class="bg-[var(--card-bg)] w-full max-w-lg rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[92vh] overflow-y-auto space-y-3.5">
       <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
         <div>
-          <h3 class="font-extrabold text-base text-[var(--text-main)]">Add Student</h3>
-          <div class="flex items-center gap-1.5 mt-0.5 text-[11px] font-bold">
+          <h3 id="modal-add-student-title" class="font-extrabold text-base text-[var(--text-main)]">Add Student</h3>
+          <div id="modal-add-student-stats" class="flex items-center gap-1.5 mt-0.5 text-[11px] font-bold">
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-sm">
               <span>Total:</span>
               <span id="modal-add-total-count" class="font-black">0</span>
@@ -898,9 +913,38 @@
         <button onclick="closeStudentModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
       </div>
 
+      <!-- Layout Editor Controls Top Banner (Visible when admin is customizing inputs) -->
+      <div id="student-layout-editor-banner" class="hidden p-3 rounded-2xl bg-gradient-to-r from-[#245b70]/15 via-teal-500/10 to-indigo-500/15 border-2 border-[#245b70] space-y-2">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+            <span class="text-xs font-black text-[#245b70] dark:text-cyan-300 uppercase tracking-wide">Layout Customizer Mode</span>
+          </div>
+          <div class="text-[10px] text-[var(--text-sub)] font-semibold">
+            Drag & hold to reposition • Click "Edit" or press E on a field
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap pt-0.5">
+          <button type="button" onclick="promptAddCustomStudentField()" class="px-3 py-1.5 rounded-xl bg-[#245b70] text-white text-xs font-black shadow-sm flex items-center gap-1 active:scale-95 transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ Add Field</span>
+          </button>
+          <button type="button" onclick="resetAdminStudentFieldsConfig()" class="px-2.5 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-[var(--text-main)] text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition">
+            Reset Default
+          </button>
+          <button type="button" onclick="saveAdminStudentFieldsConfig()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm flex items-center gap-1 active:scale-95 transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>Save Layout</span>
+          </button>
+          <button type="button" onclick="exitStudentFormLayoutEditor()" class="px-3 py-1.5 rounded-xl border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] ml-auto">
+            Done / Exit
+          </button>
+        </div>
+      </div>
+
       <form onsubmit="handleSaveNewStudent(event)" class="space-y-3.5">
         <!-- Top: Photo + Student ID (Auto-added starting with 2000, read-only) -->
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center gap-3">
+        <div id="new-student-photo-id-card" class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center gap-3">
           <div class="relative w-16 h-16 rounded-2xl overflow-hidden border border-[#245b70] flex-shrink-0 cursor-pointer group shadow-sm" onclick="document.getElementById('new-student-photo-file').click()" title="Click to upload student photo">
             <img id="new-preview-photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E" class="w-full h-full object-cover">
             <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-80 group-hover:opacity-100 transition text-white">
@@ -925,10 +969,76 @@
           <!-- Dynamically populated via renderDynamicStudentInputs('new') -->
         </div>
 
-        <button type="submit" class="touch-btn w-full custom-gradient-btn font-extrabold text-sm rounded-xl shadow-md">
+        <button id="btn-enroll-student" type="submit" class="touch-btn w-full custom-gradient-btn font-extrabold text-sm rounded-xl shadow-md">
           Enroll Student
         </button>
+
+        <button id="btn-save-layout-exit" type="button" onclick="saveAndExitStudentFormLayoutEditor()" class="hidden touch-btn w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 py-3 active:scale-98 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Save Layout & Done</span>
+        </button>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= QUICK FIELD EDITOR MODAL (EDIT LABEL, SIZE, VISIBILITY) ================= -->
+  <div id="modal-field-editor" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto space-y-3.5">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div>
+          <h3 class="font-extrabold text-sm text-[var(--text-main)]">Edit Field Input</h3>
+          <p id="field-editor-key-subtitle" class="text-[10px] text-[var(--text-sub)]"></p>
+        </div>
+        <button type="button" onclick="closeFieldEditModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <input type="hidden" id="field-editor-idx" value="">
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-bold text-[var(--text-main)] mb-1">Field Label / Name</label>
+          <input type="text" id="field-editor-label" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-[var(--text-main)] mb-1">Field Width (Size)</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btn-size-half" onclick="setFieldEditorSize('half')" class="p-2.5 rounded-xl border border-[var(--border-color)] text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <span>Half Width (50%)</span>
+            </button>
+            <button type="button" id="btn-size-full" onclick="setFieldEditorSize('full')" class="p-2.5 rounded-xl border border-[var(--border-color)] text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <span>Full Width (100%)</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+          <div>
+            <div class="text-xs font-bold text-[var(--text-main)]">Show in Student Form</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Display this input to users</div>
+          </div>
+          <label class="switch-label flex-shrink-0">
+            <input type="checkbox" id="field-editor-enabled">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div id="field-editor-delete-wrap" class="hidden pt-1">
+          <button type="button" onclick="deleteCurrentCustomField()" class="w-full py-2 rounded-xl text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 text-xs font-bold transition flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <span>Delete Custom Field</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-color)]">
+        <button type="button" onclick="closeFieldEditModal()" class="px-3.5 py-1.5 rounded-xl border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)]">
+          Cancel
+        </button>
+        <button type="button" onclick="saveFieldEditChanges()" class="px-4 py-1.5 rounded-xl bg-[#245b70] text-white text-xs font-bold shadow-sm active:scale-95 transition">
+          Apply Changes
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1212,36 +1322,21 @@
         </label>
       </div>
 
-      <!-- Student Form Inputs Configuration (Admin Can Add/Edit/Reorder/Resize Fields) -->
-      <div class="bg-[var(--bg-page)] p-3.5 rounded-2xl border border-[var(--border-color)] space-y-3">
-        <div class="flex items-center justify-between gap-2">
-          <div>
-            <div class="text-xs font-black text-[#245b70] uppercase flex items-center gap-1.5">
-              <svg class="w-4 h-4 text-[#245b70]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              <span>Student Form Inputs & Layout</span>
-            </div>
-            <div class="text-[10px] text-[var(--text-sub)] mt-0.5 leading-tight">
-              Customize input labels, width (half / full), positions, and add custom fields
-            </div>
+      <!-- Button to Customize Student Form Inputs (Opens Add Student Modal in Drag & Drop Layout Editor Mode) -->
+      <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-black text-[var(--text-main)] flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-[#245b70]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <span>Student Form Inputs & Layout</span>
           </div>
-          <button type="button" onclick="promptAddCustomStudentField()" class="px-2.5 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl shadow-sm flex items-center gap-1 flex-shrink-0">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            <span>Add Field</span>
-          </button>
+          <div class="text-[10px] text-[var(--text-sub)] mt-0.5 leading-tight">
+            Click to open Add Student window and drag to reorder, resize & edit inputs
+          </div>
         </div>
-
-        <div id="admin-student-fields-list" class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-          <!-- Populated dynamically via renderAdminStudentFieldsConfig() -->
-        </div>
-
-        <div class="flex items-center justify-between pt-1 border-t border-[var(--border-color)]">
-          <button type="button" onclick="resetAdminStudentFieldsConfig()" class="px-3 py-1.5 rounded-xl border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition">
-            Reset Default
-          </button>
-          <button type="button" onclick="saveAdminStudentFieldsConfig()" class="px-4 py-1.5 rounded-xl bg-[#245b70] text-white text-xs font-bold shadow-sm active:scale-95 transition">
-            Save Fields Layout
-          </button>
-        </div>
+        <button type="button" onclick="openStudentFormLayoutEditor()" class="touch-btn px-3 py-2 custom-gradient-btn text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          <span>Customize Inputs</span>
+        </button>
       </div>
 
       <!-- Teachers List -->
