@@ -13,10 +13,10 @@ router.get('/', authMiddleware, async (req, res) => {
       filter.class = className;
     }
     if (day && day !== 'all') {
-      filter.day = day;
+      filter.day = { $in: [day, 'All Days'] };
     }
 
-    const slots = await Timetable.find(filter).sort({ day: 1, timeSlot: 1 }).lean();
+    const slots = await Timetable.find(filter).sort({ order: 1, createdAt: 1 }).lean();
     res.json({
       success: true,
       data: slots
@@ -35,17 +35,41 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Day, time slot, class, and subject are required' });
     }
 
+    const lastSlot = await Timetable.findOne().sort({ order: -1 }).select('order').lean();
+    const nextOrder = lastSlot && typeof lastSlot.order === 'number' ? lastSlot.order + 1 : 0;
+
     const slot = new Timetable({
       day,
       timeSlot: timeSlot.trim(),
       class: className.trim(),
       subject: subject.trim(),
       teacher: (teacher || '').trim(),
-      room: (room || '').trim()
+      room: (room || '').trim(),
+      order: nextOrder
     });
 
     await slot.save();
     res.status(201).json({ success: true, data: slot });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/timetable/reorder
+// @desc    Reorder timetable slots based on array of IDs
+router.put('/reorder', authMiddleware, async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (Array.isArray(orderedIds) && orderedIds.length > 0) {
+      const ops = orderedIds.map((id, index) => ({
+        updateOne: {
+          filter: { _id: id },
+          update: { $set: { order: index } }
+        }
+      }));
+      await Timetable.bulkWrite(ops);
+    }
+    res.json({ success: true, message: 'Timetable order updated' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

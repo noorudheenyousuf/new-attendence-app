@@ -343,6 +343,14 @@ const API = {
     });
   },
 
+  // Student Details Print/Export access toggle (Admin only)
+  async toggleStudentPrintAccess(enabled) {
+    return this.request('/admin/toggle-student-print-access', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled })
+    });
+  },
+
   // Messages API (Notifications & Teacher Broadcast)
   async getMessages() {
     return this.request('/messages');
@@ -352,6 +360,25 @@ const API = {
     return this.request('/messages', {
       method: 'POST',
       body: JSON.stringify({ text })
+    });
+  },
+
+  async editMessage(id, text) {
+    return this.request(`/messages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ text })
+    });
+  },
+
+  async deleteMessage(id) {
+    return this.request(`/messages/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async clearAllMessages() {
+    return this.request('/messages', {
+      method: 'DELETE'
     });
   },
 
@@ -382,6 +409,13 @@ const API = {
     return this.request(`/timetable/${id}`, {
       method: 'PUT',
       body: JSON.stringify(slotData)
+    });
+  },
+
+  async reorderTimetable(orderedIds) {
+    return this.request('/timetable/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ orderedIds })
     });
   },
 

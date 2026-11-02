@@ -6,6 +6,9 @@ const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const ActivityLog = require('../models/ActivityLog');
 const AppSettings = require('../models/AppSettings');
+const Timetable = require('../models/Timetable');
+const Subject = require('../models/Subject');
+const Class = require('../models/Class');
 const authMiddleware = require('../middleware/auth');
 
 const canUserManage = async (user) => {
@@ -347,6 +350,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Teacher not found' });
     }
 
+    const oldName = teacher.name;
+    const nameChanged = Boolean(name && name.trim() && name.trim() !== oldName);
     if (name && name.trim()) teacher.name = name.trim();
 
     if (email !== undefined) {
@@ -393,6 +398,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
 
     await teacher.save();
+
+    if (nameChanged) {
+      await Timetable.updateMany({ teacher: oldName }, { teacher: teacher.name });
+      await Attendance.updateMany({ markedBy: oldName }, { markedBy: teacher.name });
+      await Subject.updateMany({ teacher: oldName }, { teacher: teacher.name });
+      await Class.updateMany({ classTeacher: oldName }, { classTeacher: teacher.name });
+    }
 
     await ActivityLog.create({
       action: `Teacher Profile Updated: ${teacher.name}`,
@@ -448,6 +460,11 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
 
     await User.findByIdAndDelete(req.params.id);
+
+    // Clean up timetable, subject, and class references to this teacher
+    await Timetable.updateMany({ teacher: teacher.name }, { teacher: '' });
+    await Subject.updateMany({ teacher: teacher.name }, { teacher: '' });
+    await Class.updateMany({ classTeacher: teacher.name }, { classTeacher: '' });
 
     await ActivityLog.create({
       action: `Teacher Account Deleted: ${teacher.name}`,

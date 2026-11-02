@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const timetableSchema = new mongoose.Schema({
   day: {
     type: String,
-    enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'All Days'],
     required: true
   },
   timeSlot: {
@@ -30,6 +30,10 @@ const timetableSchema = new mongoose.Schema({
     type: String,
     default: '',
     trim: true
+  },
+  order: {
+    type: Number,
+    default: 0
   },
   createdAt: {
     type: Date,

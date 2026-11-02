@@ -474,3 +474,62 @@ input:checked + .switch-slider:before {
   transform: translateX(20px);
 }
 
+/* ================= PRINT STYLES & A4 STUDENT DETAILS GRID ================= */
+#printable-student-cards {
+  display: none;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  body > *:not(#printable-student-cards) {
+    display: none !important;
+  }
+  #printable-student-cards {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 6mm 6mm;
+  }
+  .a4-page {
+    page-break-after: always;
+    break-after: page;
+    width: 100%;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 4mm;
+    min-height: 280mm;
+    max-height: 284mm;
+  }
+  .a4-student-card {
+    border: 1.5px solid #0f172a;
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: #ffffff;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 8pt;
+    line-height: 1.25;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+}
+

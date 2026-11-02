@@ -253,6 +253,18 @@ function updateHeaderBranding(appName, schoolName) {
   const rawApp = (appName !== undefined && appName !== null ? String(appName) : '').trim();
   const rawSchool = (schoolName !== undefined && schoolName !== null ? String(schoolName) : '').trim();
 
+  // Keep localStorage and splash branding in sync with admin update
+  try {
+    localStorage.setItem('registerly_app_name', rawApp || 'REGISTERLY');
+    const splashName = document.getElementById('splash-app-name');
+    const splashLetter = document.getElementById('splash-icon-letter');
+    const brandIcon = document.getElementById('header-brand-icon');
+    const firstLetter = (rawApp ? rawApp.trim()[0] : 'R').toUpperCase();
+    if (splashName) splashName.textContent = rawApp || 'REGISTERLY';
+    if (splashLetter) splashLetter.textContent = firstLetter;
+    if (brandIcon) brandIcon.textContent = firstLetter;
+  } catch (e) {}
+
   if (!rawApp && !rawSchool) {
     if (appEl) {
       appEl.innerText = '';
@@ -319,6 +331,12 @@ async function loadAppSettings() {
         ttToggle.checked = res.data.showTeachersTabToAll !== false;
       }
       _applyTeachersTabVisibility();
+
+      const printToggle = document.getElementById('admin-toggle-student-print');
+      if (printToggle) {
+        printToggle.checked = res.data.allowStudentDetailsPrint !== false;
+      }
+      _applyStudentPrintButtonVisibility();
     }
   } catch (error) {
     console.log('[Settings Load]', error);
@@ -341,7 +359,7 @@ function _applyTeachersTabVisibility() {
 
 async function handleAdminToggleTeachersTab(enabled) {
   try {
-    // Use a generic settings update — we need a backend field
+    // Use a generic settings update - we need a backend field
     // For now store in appSettings locally and via API
     const res = await API.updateAdminSettings(
       appSettings.appName,
@@ -667,16 +685,43 @@ async function handleClassChange() {
   await loadAttendanceRoster();
 }
 
+function updateReportSubjectsDropdown(selectedClassName) {
+  const repSubject = document.getElementById('report-subject');
+  if (!repSubject) return;
+
+  const prevVal = repSubject.value;
+  let relevantSubjects = subjectsList;
+  if (selectedClassName && selectedClassName !== 'all') {
+    relevantSubjects = subjectsList.filter(s => {
+      const assigned = Array.isArray(s.assignedClasses) ? s.assignedClasses : [];
+      return assigned.length === 0 || assigned.includes(selectedClassName);
+    });
+  }
+
+  const optionsHtml = relevantSubjects.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
+  repSubject.innerHTML = `<option value="whole">All Subjects</option>` + optionsHtml;
+
+  if (prevVal && Array.from(repSubject.options).some(o => o.value === prevVal)) {
+    repSubject.value = prevVal;
+  } else {
+    repSubject.value = 'whole';
+  }
+}
+
+async function handleReportClassChange() {
+  const repClassEl = document.getElementById('report-class');
+  const selectedClass = repClassEl ? repClassEl.value : '';
+  updateReportSubjectsDropdown(selectedClass);
+  await loadReport();
+}
+
 function populateSubjectDropdowns() {
   const selClassEl = document.getElementById('sel-class');
   const targetClass = selClassEl ? selClassEl.value : currentClass;
   updateAttendanceSubjectsDropdown(targetClass);
 
-  const repSubject = document.getElementById('report-subject');
-  if (repSubject) {
-    const allOptionsHtml = subjectsList.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-    repSubject.innerHTML = `<option value="whole">All Subjects</option>` + allOptionsHtml;
-  }
+  const repClassEl = document.getElementById('report-class');
+  updateReportSubjectsDropdown(repClassEl ? repClassEl.value : '');
 }
 
 // Drag & Drop Sorting for Subjects
@@ -1751,20 +1796,20 @@ async function openStudentDetailsModal(studentId) {
   document.getElementById('details-student-class').innerText = `Class: ${student.class}`;
   document.getElementById('details-student-roll').innerText = `Roll #${student.roll}`;
 
-  document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || '—';
-  document.getElementById('details-student-place').innerText = (student.address && student.address.place) || '—';
-  document.getElementById('details-student-district').innerText = (student.address && student.address.district) || '—';
-  document.getElementById('details-student-state').innerText = (student.address && student.address.state) || '—';
+  document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || '-';
+  document.getElementById('details-student-place').innerText = (student.address && student.address.place) || '-';
+  document.getElementById('details-student-district').innerText = (student.address && student.address.district) || '-';
+  document.getElementById('details-student-state').innerText = (student.address && student.address.state) || '-';
 
-  document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || '—';
-  document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || '—';
-  document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || '—';
-  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '—';
+  document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || '-';
+  document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || '-';
+  document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || '-';
+  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '-';
 
-  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '—';
+  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '-';
   document.getElementById('details-student-year').innerText = yr;
-  document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || '—';
-  document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || '—';
+  document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || '-';
+  document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || '-';
 
   document.getElementById('modal-student-details').classList.remove('hidden');
 }
@@ -2903,6 +2948,7 @@ async function handleSaveTeacher(e) {
     if (res.success) {
       showToast(res.message || `Teacher "${name}" added!`);
       closeAddTeacherModal();
+      await loadTeachersData();
       await renderTeachersList();
     }
   } catch (err) {
@@ -2975,6 +3021,7 @@ async function handleUpdateTeacher(e) {
     if (res.success) {
       showToast(res.message || `Teacher "${name}" updated!`);
       closeEditTeacherModal();
+      await loadTeachersData();
       await renderTeachersList();
     }
   } catch (err) {
@@ -2990,6 +3037,7 @@ async function handleDeleteTeacher(id, name) {
     const res = await API.deleteTeacher(id);
     if (res.success) {
       showToast(res.message || `Teacher "${name}" removed.`);
+      await loadTeachersData();
       await renderTeachersList();
     }
   } catch (err) {
@@ -3021,7 +3069,7 @@ async function openTeacherLogModal(teacherId) {
   if (sessionsContainer) sessionsContainer.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">Fetching attendance sessions...</div>`;
 
   try {
-    // Always fetch all sessions — filters applied inside log modal
+    // Always fetch all sessions - filters applied inside log modal
     const res = await API.getTeacherLogs(teacherId, 'all', 'all');
     if (res.success) {
       currentTeacherLogData = res;
@@ -3195,7 +3243,7 @@ async function checkUnreadMessages() {
       }
     }
   } catch (err) {
-    // silently fail — not critical
+    // silently fail - not critical
   }
 }
 
@@ -3242,8 +3290,18 @@ async function loadMessages() {
               ${rolePill}
               <span class="text-[10px] text-[var(--text-sub)]">${_timeAgo(m.createdAt)}</span>
             </div>
-            <div class="${isMine ? 'bg-[#245b70] text-white' : 'bg-[var(--bg-page)] text-[var(--text-main)]'} px-3 py-2 rounded-2xl ${isMine ? 'rounded-tr-md' : 'rounded-tl-md'} text-xs font-medium border ${isMine ? 'border-[#245b70]' : 'border-[var(--border-color)]'} shadow-sm" style="white-space:pre-wrap;word-break:break-word;">
+            <div class="${isMine ? 'bg-[#245b70] text-white' : 'bg-[var(--bg-page)] text-[var(--text-main)]'} px-3 py-2 rounded-2xl ${isMine ? 'rounded-tr-md' : 'rounded-tl-md'} text-xs font-medium border ${isMine ? 'border-[#245b70]' : 'border-[var(--border-color)]'} shadow-sm cursor-pointer select-none active:scale-98 transition relative"
+              onmousedown="handleMsgStartHold(event, '${m._id}')"
+              onmouseup="handleMsgEndHold(event)"
+              onmouseleave="handleMsgEndHold(event)"
+              ontouchstart="handleMsgStartHold(event, '${m._id}')"
+              ontouchend="handleMsgEndHold(event)"
+              ontouchcancel="handleMsgEndHold(event)"
+              oncontextmenu="handleMsgContextMenu(event, '${m._id}')"
+              title="Click & hold to edit or delete"
+              style="white-space:pre-wrap;word-break:break-word;">
               ${escapeHtml(m.text)}
+              ${m.isEdited ? '<span class="text-[9px] opacity-75 ml-1 italic">(edited)</span>' : ''}
             </div>
           </div>
         </div>
@@ -3297,7 +3355,7 @@ async function openTimetableModal() {
   if (!timetableViewTeacher && !isAdminTT) {
     timetableViewTeacher = (currentUser && currentUser.name) || null;
   }
-  // Show/hide Add button — admin only
+  // Show/hide Add button - admin only
   const addSlotBtn = document.getElementById('btn-add-timetable-slot');
   // Show Add Slot for admin always, and for non-admin when viewing own timetable (not read-only from teacher card)
   const canAddSlot = isAdminTT || (!timetableReadOnly && !isAdminTT);
@@ -3366,43 +3424,8 @@ async function renderTimetableSlots() {
       return;
     }
 
-    container.innerHTML = slots.map(slot => {
-      const isAdminUser = currentUser && currentUser.role === 'admin';
-    // Show edit/delete: admin can edit all; non-admin teacher can edit their own slots (not read-only from teacher card view)
-    const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
-    const slotTeacher = (slot.teacher || '').trim().toLowerCase();
-    const isOwnSlot = myName && slotTeacher === myName;
-    const canEditThisSlot = !timetableReadOnly && (isAdminUser || isOwnSlot);
-    const editDelBtns = canEditThisSlot ? `
-        <div class="flex gap-1 flex-shrink-0">
-          <button onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-7 h-7 rounded-lg bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-          </button>
-          <button onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-7 h-7 rounded-lg btn-delete flex items-center justify-center transition">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          </button>
-        </div>` : '';
-
-      return `
-        <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-3 hover:border-[#245b70] transition shadow-sm">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-[#245b70]/10 flex items-center justify-center">
-              <svg class="w-5 h-5 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            </div>
-            <div class="min-w-0 space-y-0.5">
-              <p class="font-extrabold text-xs text-[var(--text-main)]">${escapeHtml(slot.timeSlot || slot.time || '')}</p>
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
-                <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[10px]">${escapeHtml(slot.class || '')}</span>
-                ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">· ${escapeHtml(slot.teacher)}</span>` : ''}
-                ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">· ${escapeHtml(slot.room)}</span>` : ''}
-              </div>
-            </div>
-          </div>
-          ${editDelBtns}
-        </div>
-      `;
-    }).join('');
+    cachedCurrentTimetableSlots = slots;
+    container.innerHTML = _generateTimetableSlotsHtml(slots);
   } catch (err) {
     container.innerHTML = `<div class="text-center text-xs text-rose-500 py-6">Failed to load timetable: ${escapeHtml(err.message)}</div>`;
   }
@@ -3419,10 +3442,10 @@ async function openAddTimetableSlotModal(slotId = null) {
   const editIdInput = document.getElementById('slot-edit-id');
   if (editIdInput) editIdInput.value = slotId || '';
 
-  // Populate day dropdown
+  // Populate day dropdown with 'All Days' option
   const daySelect = document.getElementById('slot-input-day');
   if (daySelect) {
-    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const days = ['All Days', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     daySelect.innerHTML = days.map(d => `<option value="${d}" ${d === currentTimetableDay ? 'selected' : ''}>${d}</option>`).join('');
   }
 
@@ -3440,13 +3463,13 @@ async function openAddTimetableSlotModal(slotId = null) {
       subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
   }
 
-  // Populate teacher dropdown — admin can choose any teacher; non-admin is locked to self
+  // Populate teacher dropdown - admin can choose any teacher; non-admin is locked to self
   const teacherSelect = document.getElementById('slot-input-teacher');
   const teacherSelectWrapper = document.getElementById('slot-teacher-field-wrapper');
   const isSlotAdmin = currentUser && currentUser.role === 'admin';
   if (teacherSelect) {
     if (isSlotAdmin) {
-      teacherSelect.innerHTML = `<option value="">Select teacher (optional)…</option>` +
+      teacherSelect.innerHTML = `<option value="">Select teacher (optional)...</option>` +
         (cachedTeachersList || []).map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
       if (teacherSelectWrapper) teacherSelectWrapper.classList.remove('hidden');
     } else {
@@ -3524,8 +3547,8 @@ async function handleSaveTimetableSlot(e) {
       showToast('Timetable slot added!');
     }
     closeAddTimetableSlotModal();
-    // update day to match what was saved
-    currentTimetableDay = slotData.day;
+    // update day to match what was saved (show 'all' if 'All Days')
+    currentTimetableDay = slotData.day === 'All Days' ? 'all' : slotData.day;
     _updateTimetableDayTabs();
     await renderTimetableSlots();
   } catch (err) {
@@ -3559,7 +3582,7 @@ function filterTimetableSubjectsByClass() {
     ? cls.assignedSubjects
     : subjectsList.map(s => s.name || s);
   const currentVal = subjectSelect.value;
-  subjectSelect.innerHTML = '<option value="">Select subject…</option>' +
+  subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
     subjects.map(s => '<option value="' + escapeHtml(s) + '" ' + (s === currentVal ? 'selected' : '') + '>' + escapeHtml(s) + '</option>').join('');
 }
 
@@ -3569,4 +3592,434 @@ async function openTeacherTimetable(teacherName) {
   timetableViewTeacher = teacherName;
   timetableReadOnly = !isAdmin; // read-only for non-admin, admin can edit
   await openTimetableModal();
+}
+
+
+// ================= TIMETABLE DRAG & DROP AND GENERATOR =================
+let cachedCurrentTimetableSlots = [];
+let draggedTimetableSlotId = null;
+
+function _generateTimetableSlotsHtml(slots) {
+  if (!slots || slots.length === 0) {
+    return `
+      <div class="text-center py-8 text-xs text-[var(--text-sub)]">
+        <svg class="w-10 h-10 mx-auto mb-2 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        No timetable slots found. Click "+ Add Slot" to create one.
+      </div>`;
+  }
+
+  const isAdminUser = currentUser && currentUser.role === 'admin';
+  const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
+
+  return slots.map(slot => {
+    const slotTeacher = (slot.teacher || '').trim().toLowerCase();
+    const isOwnSlot = myName && slotTeacher === myName;
+    const canEditThisSlot = !timetableReadOnly && (isAdminUser || isOwnSlot);
+
+    const editDelBtns = canEditThisSlot ? `
+      <div class="flex gap-1 flex-shrink-0">
+        <button type="button" onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-7 h-7 rounded-lg bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </button>
+        <button type="button" onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-7 h-7 rounded-lg btn-delete flex items-center justify-center transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>` : '';
+
+    return `
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-3 hover:border-[#245b70] transition shadow-sm cursor-grab active:cursor-grabbing"
+        draggable="true"
+        data-slot-id="${slot._id}"
+        ondragstart="handleTimetableDragStart(event, '${slot._id}')"
+        ondragover="handleTimetableDragOver(event)"
+        ondrop="handleTimetableDrop(event, '${slot._id}')"
+        ondragend="handleTimetableDragEnd(event)">
+        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+          <div class="cursor-grab text-slate-400 hover:text-[#245b70] flex-shrink-0" title="Drag to reorder slots">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+          </div>
+          <div class="flex-shrink-0 w-9 h-9 rounded-xl bg-[#245b70]/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <div class="min-w-0 space-y-0.5 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="font-black text-xs text-[var(--text-main)]">${escapeHtml(slot.timeSlot || slot.time || '')}</span>
+              ${slot.day ? `<span class="px-1.5 py-0.5 rounded-md bg-teal-500/10 text-teal-800 dark:text-teal-300 font-bold text-[9px]">${escapeHtml(slot.day)}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
+              <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[10px]">${escapeHtml(slot.class || '')}</span>
+              ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">· ${escapeHtml(slot.teacher)}</span>` : ''}
+              ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">· ${escapeHtml(slot.room)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        ${editDelBtns}
+      </div>
+    `;
+  }).join('');
+}
+
+function handleTimetableDragStart(e, slotId) {
+  draggedTimetableSlotId = slotId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('opacity-40');
+}
+
+function handleTimetableDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+async function handleTimetableDrop(e, targetSlotId) {
+  e.preventDefault();
+  if (!draggedTimetableSlotId || String(draggedTimetableSlotId) === String(targetSlotId)) return;
+
+  const fromIndex = cachedCurrentTimetableSlots.findIndex(s => String(s._id) === String(draggedTimetableSlotId));
+  const toIndex = cachedCurrentTimetableSlots.findIndex(s => String(s._id) === String(targetSlotId));
+
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  const [movedSlot] = cachedCurrentTimetableSlots.splice(fromIndex, 1);
+  cachedCurrentTimetableSlots.splice(toIndex, 0, movedSlot);
+
+  const container = document.getElementById('timetable-slots-container');
+  if (container) {
+    container.innerHTML = _generateTimetableSlotsHtml(cachedCurrentTimetableSlots);
+  }
+
+  try {
+    const orderedIds = cachedCurrentTimetableSlots.map(s => s._id);
+    await API.reorderTimetable(orderedIds);
+  } catch (err) {
+    showToast('Failed to save order: ' + err.message, true);
+  }
+}
+
+function handleTimetableDragEnd(e) {
+  if (e && e.currentTarget) e.currentTarget.classList.remove('opacity-40');
+  draggedTimetableSlotId = null;
+}
+
+// ================= MESSAGE CLICK & HOLD (LONG PRESS) & CLEAR CHAT =================
+let msgHoldTimer = null;
+let activeSelectedMessage = null;
+
+function handleMsgStartHold(e, msgId) {
+  if (msgHoldTimer) clearTimeout(msgHoldTimer);
+  const msg = (cachedMessages || []).find(m => String(m._id) === String(msgId));
+  if (!msg) return;
+
+  msgHoldTimer = setTimeout(() => {
+    openMessageActionsModal(msg);
+  }, 450);
+}
+
+function handleMsgEndHold(e) {
+  if (msgHoldTimer) {
+    clearTimeout(msgHoldTimer);
+    msgHoldTimer = null;
+  }
+}
+
+function handleMsgContextMenu(e, msgId) {
+  e.preventDefault();
+  handleMsgEndHold();
+  const msg = (cachedMessages || []).find(m => String(m._id) === String(msgId));
+  if (msg) openMessageActionsModal(msg);
+}
+
+function openMessageActionsModal(msg) {
+  activeSelectedMessage = msg;
+  const modal = document.getElementById('modal-message-actions');
+  const preview = document.getElementById('message-actions-preview');
+  const btnEdit = document.getElementById('btn-msg-action-edit');
+  const btnDelete = document.getElementById('btn-msg-action-delete');
+
+  if (preview) preview.textContent = msg.text;
+
+  const myId = currentUser && (currentUser._id || currentUser.id);
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const isMine = String(msg.senderId) === String(myId);
+
+  if (btnEdit) btnEdit.style.display = (isMine || isAdmin) ? 'flex' : 'none';
+  if (btnDelete) btnDelete.style.display = (isMine || isAdmin) ? 'flex' : 'none';
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeMessageActionsModal() {
+  const modal = document.getElementById('modal-message-actions');
+  if (modal) modal.classList.add('hidden');
+  activeSelectedMessage = null;
+}
+
+async function promptEditSelectedMessage() {
+  if (!activeSelectedMessage) return;
+  const currentText = activeSelectedMessage.text;
+  const newText = prompt('Edit your message:', currentText);
+  if (newText === null || !newText.trim() || newText.trim() === currentText) {
+    closeMessageActionsModal();
+    return;
+  }
+
+  try {
+    const res = await API.editMessage(activeSelectedMessage._id, newText.trim());
+    if (res.success) {
+      showToast('Message updated');
+      closeMessageActionsModal();
+      await loadMessages();
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to edit message', true);
+  }
+}
+
+async function confirmDeleteSelectedMessage() {
+  if (!activeSelectedMessage) return;
+  if (!confirm('Are you sure you want to delete this message?')) return;
+
+  try {
+    const res = await API.deleteMessage(activeSelectedMessage._id);
+    if (res.success) {
+      showToast('Message deleted');
+      closeMessageActionsModal();
+      await loadMessages();
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to delete message', true);
+  }
+}
+
+async function handleClearAllChat() {
+  if (!confirm('Are you sure you want to delete all chat history? This cannot be undone.')) return;
+  try {
+    const res = await API.clearAllMessages();
+    if (res.success) {
+      showToast('All chat history cleared');
+      await loadMessages();
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to clear chat', true);
+  }
+}
+
+// ================= STUDENT DETAILS PRINT & CSV EXPORT =================
+function _applyStudentPrintButtonVisibility() {
+  const section = document.getElementById('student-export-section');
+  if (!section) return;
+  const isAllowed = !appSettings || appSettings.allowStudentDetailsPrint !== false;
+  section.classList.toggle('hidden', !isAllowed);
+}
+
+async function handleAdminToggleStudentPrint(checked) {
+  try {
+    const res = await API.toggleStudentPrintAccess(checked);
+    if (res.success) {
+      if (appSettings) appSettings.allowStudentDetailsPrint = res.allowStudentDetailsPrint;
+      _applyStudentPrintButtonVisibility();
+      showToast(res.allowStudentDetailsPrint ? 'Student Details Print enabled' : 'Student Details Print disabled');
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to toggle access', true);
+  }
+}
+
+function openStudentExportModal() {
+  const modal = document.getElementById('modal-student-export');
+  if (!modal) return;
+
+  const classSelect = document.getElementById('export-student-class');
+  if (classSelect) {
+    const currentVal = classSelect.value || 'all';
+    classSelect.innerHTML = `<option value="all">All Classes</option>` +
+      classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
+    classSelect.value = currentVal;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeStudentExportModal() {
+  const modal = document.getElementById('modal-student-export');
+  if (modal) modal.classList.add('hidden');
+}
+
+function toggleAllExportCheckboxes() {
+  const container = document.getElementById('export-fields-container');
+  if (!container) return;
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+  const allChecked = Array.from(checkboxes).every(c => c.checked);
+  checkboxes.forEach(c => c.checked = !allChecked);
+}
+
+function _getSelectedExportFields() {
+  return {
+    photo: Boolean(document.getElementById('chk-export-photo')?.checked),
+    id: Boolean(document.getElementById('chk-export-id')?.checked),
+    name: Boolean(document.getElementById('chk-export-name')?.checked),
+    class: Boolean(document.getElementById('chk-export-class')?.checked),
+    father: Boolean(document.getElementById('chk-export-father')?.checked),
+    mobile: Boolean(document.getElementById('chk-export-mobile')?.checked),
+    place: Boolean(document.getElementById('chk-export-place')?.checked),
+    state: Boolean(document.getElementById('chk-export-state')?.checked),
+    roll: Boolean(document.getElementById('chk-export-roll')?.checked),
+    mother: Boolean(document.getElementById('chk-export-mother')?.checked)
+  };
+}
+
+async function executeStudentPrintA4() {
+  const classFilter = document.getElementById('export-student-class')?.value || 'all';
+  const fields = _getSelectedExportFields();
+
+  try {
+    showToast('Preparing A4 Printable Sheet...');
+    const res = await API.getStudents(classFilter === 'all' ? '' : classFilter);
+    const students = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+
+    if (students.length === 0) {
+      showToast('No students found for selected class', true);
+      return;
+    }
+
+    const printableContainer = document.getElementById('printable-student-cards');
+    if (!printableContainer) return;
+
+    // Chunk students into pages of 12 cards each
+    const pageSize = 12;
+    const pages = [];
+    for (let i = 0; i < students.length; i += pageSize) {
+      pages.push(students.slice(i, i + pageSize));
+    }
+
+    const schoolTitle = (appSettings && appSettings.schoolName)
+      ? appSettings.schoolName
+      : (appSettings && appSettings.appName ? appSettings.appName : 'REGISTERLY');
+
+    let html = '';
+    pages.forEach((pageStudents, pageIdx) => {
+      html += `<div class="a4-page">`;
+      pageStudents.forEach(st => {
+        const photo = st.photoUrl || DEFAULT_AVATAR;
+        const fatherName = (st.familyDetails && st.familyDetails.fatherName) || '-';
+        const fatherMobile = (st.familyDetails && st.familyDetails.fatherMobile) || '-';
+        const place = (st.address && st.address.place) || '-';
+        const state = (st.address && st.address.state) || '-';
+        const roll = st.roll !== undefined ? st.roll : '-';
+        const motherName = (st.familyDetails && st.familyDetails.motherName) || '-';
+
+        html += `
+          <div class="a4-student-card">
+            <!-- Header: Photo + ID & Name -->
+            <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #cbd5e1;padding-bottom:4px;margin-bottom:4px;">
+              ${fields.photo ? `
+                <img src="${photo}" alt="" style="width:38px;height:38px;border-radius:6px;object-fit:cover;border:1px solid #94a3b8;flex-shrink:0;">
+              ` : `
+                <div style="width:34px;height:34px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12pt;color:#334155;flex-shrink:0;">
+                  ${escapeHtml((st.name || 'S')[0].toUpperCase())}
+                </div>
+              `}
+              <div style="min-width:0;flex:1;overflow:hidden;">
+                ${fields.name ? `<div style="font-weight:800;font-size:8.5pt;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(st.name)}</div>` : ''}
+                <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:1px;">
+                  ${fields.id ? `<span style="font-weight:700;font-size:7pt;color:#475569;">ID: #${st.studentId}</span>` : ''}
+                  ${fields.class ? `<span style="font-weight:700;font-size:6.5pt;background:#e0f2fe;color:#0369a1;padding:1px 4px;border-radius:3px;">${escapeHtml(st.class)}</span>` : ''}
+                  ${fields.roll ? `<span style="font-weight:700;font-size:6.5pt;background:#f1f5f9;color:#334155;padding:1px 4px;border-radius:3px;">Roll: ${roll}</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Details Body -->
+            <div style="display:flex;flex-direction:column;gap:2.5px;font-size:7.2pt;color:#334155;line-height:1.2;">
+              ${fields.father ? `<div><strong style="color:#0f172a;">Father:</strong> ${escapeHtml(fatherName)}</div>` : ''}
+              ${fields.mobile ? `<div><strong style="color:#0f172a;">Contact:</strong> ${escapeHtml(fatherMobile)}</div>` : ''}
+              ${fields.place ? `<div><strong style="color:#0f172a;">Place:</strong> ${escapeHtml(place)}</div>` : ''}
+              ${fields.state ? `<div><strong style="color:#0f172a;">State:</strong> ${escapeHtml(state)}</div>` : ''}
+              ${fields.mother ? `<div><strong style="color:#0f172a;">Mother:</strong> ${escapeHtml(motherName)}</div>` : ''}
+            </div>
+
+            <!-- Footer Badge -->
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #cbd5e1;padding-top:2px;margin-top:3px;font-size:6.5pt;color:#64748b;">
+              <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(schoolTitle)}</span>
+              <span>P.${pageIdx + 1}</span>
+            </div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    });
+
+    printableContainer.innerHTML = html;
+    closeStudentExportModal();
+
+    setTimeout(() => {
+      window.print();
+    }, 250);
+  } catch (err) {
+    showToast('Failed to prepare print: ' + err.message, true);
+  }
+}
+
+async function executeStudentExportCSV() {
+  const classFilter = document.getElementById('export-student-class')?.value || 'all';
+  const fields = _getSelectedExportFields();
+
+  try {
+    showToast('Generating CSV file...');
+    const res = await API.getStudents(classFilter === 'all' ? '' : classFilter);
+    const students = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+
+    if (students.length === 0) {
+      showToast('No students to export', true);
+      return;
+    }
+
+    const headers = [];
+    if (fields.id) headers.push('Student ID');
+    if (fields.name) headers.push('Name');
+    if (fields.class) headers.push('Class');
+    if (fields.roll) headers.push('Roll No');
+    if (fields.father) headers.push("Father's Name");
+    if (fields.mobile) headers.push("Father's Number");
+    if (fields.place) headers.push('Place');
+    if (fields.state) headers.push('State');
+    if (fields.mother) headers.push("Mother's Name");
+
+    const csvRows = [headers.join(',')];
+
+    students.forEach(st => {
+      const row = [];
+      const fatherName = (st.familyDetails && st.familyDetails.fatherName) || '';
+      const fatherMobile = (st.familyDetails && st.familyDetails.fatherMobile) || '';
+      const place = (st.address && st.address.place) || '';
+      const state = (st.address && st.address.state) || '';
+      const motherName = (st.familyDetails && st.familyDetails.motherName) || '';
+
+      if (fields.id) row.push(`"${st.studentId}"`);
+      if (fields.name) row.push(`"${(st.name || '').replace(/"/g, '""')}"`);
+      if (fields.class) row.push(`"${(st.class || '').replace(/"/g, '""')}"`);
+      if (fields.roll) row.push(`"${st.roll !== undefined ? st.roll : ''}"`);
+      if (fields.father) row.push(`"${fatherName.replace(/"/g, '""')}"`);
+      if (fields.mobile) row.push(`"${fatherMobile.replace(/"/g, '""')}"`);
+      if (fields.place) row.push(`"${place.replace(/"/g, '""')}"`);
+      if (fields.state) row.push(`"${state.replace(/"/g, '""')}"`);
+      if (fields.mother) row.push(`"${motherName.replace(/"/g, '""')}"`);
+
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
+    const downloadAnchor = document.createElement('a');
+    const classNameTag = classFilter === 'all' ? 'All_Classes' : classFilter.replace(/\s+/g, '_');
+    downloadAnchor.setAttribute("href", csvContent);
+    downloadAnchor.setAttribute("download", `Students_${classNameTag}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    showToast('CSV downloaded successfully!');
+    closeStudentExportModal();
+  } catch (err) {
+    showToast('CSV Export failed: ' + err.message, true);
+  }
 }

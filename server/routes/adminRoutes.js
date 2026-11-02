@@ -7,6 +7,8 @@ const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const Class = require('../models/Class');
+const Message = require('../models/Message');
+const Timetable = require('../models/Timetable');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 const adminMiddleware = require('../middleware/admin');
@@ -37,7 +39,7 @@ router.use(adminMiddleware);
 // @desc    Update App Name & School Name & Permissions
 router.put('/settings', async (req, res) => {
   try {
-    const { appName, schoolName, allowNonAdminEditDelete, showTeachersTabToAll } = req.body;
+    const { appName, schoolName, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings();
@@ -46,12 +48,13 @@ router.put('/settings', async (req, res) => {
     if (schoolName !== undefined) settings.schoolName = (schoolName || '').trim();
     if (allowNonAdminEditDelete !== undefined) settings.allowNonAdminEditDelete = Boolean(allowNonAdminEditDelete);
     if (showTeachersTabToAll !== undefined) settings.showTeachersTabToAll = Boolean(showTeachersTabToAll);
+    if (allowStudentDetailsPrint !== undefined) settings.allowStudentDetailsPrint = Boolean(allowStudentDetailsPrint);
     settings.updatedAt = new Date();
     await settings.save();
 
     await ActivityLog.create({
       action: 'App & School Settings Updated',
-      details: `App Name: ${settings.appName} • School Name: ${settings.schoolName} • Edit/Delete Access: ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'}`,
+      details: `App Name: ${settings.appName} • School Name: ${settings.schoolName} • Edit/Delete: ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'} • Student Print: ${settings.allowStudentDetailsPrint ? 'Enabled' : 'Disabled'}`,
       performedBy: req.user.name,
       role: 'admin',
       entityType: 'settings',
@@ -278,8 +281,40 @@ router.post('/clear-data', async (req, res) => {
   }
 });
 
+// @route   PUT /api/admin/toggle-student-print-access
+// @desc    Toggle student details print/export button access
+router.put('/toggle-student-print-access', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    let settings = await AppSettings.findOne();
+    if (!settings) {
+      settings = new AppSettings();
+    }
+    settings.allowStudentDetailsPrint = enabled !== undefined ? Boolean(enabled) : !settings.allowStudentDetailsPrint;
+    settings.updatedAt = new Date();
+    await settings.save();
+
+    await ActivityLog.create({
+      action: `Student Details Print/Export Access ${settings.allowStudentDetailsPrint ? 'Enabled' : 'Disabled'}`,
+      details: `Student Details Print/Export button ${settings.allowStudentDetailsPrint ? 'enabled' : 'disabled'} by Admin`,
+      performedBy: req.user.name,
+      role: 'admin',
+      entityType: 'settings',
+      canUndo: false
+    });
+
+    res.json({
+      success: true,
+      allowStudentDetailsPrint: settings.allowStudentDetailsPrint,
+      data: settings
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   POST /api/admin/reset-app
-// @desc    USER DIRECTIVE: Clear all app data like new
+// @desc    USER DIRECTIVE: Clear all app data like new (including teachers, messages, and timetable)
 router.post('/reset-app', async (req, res) => {
   try {
     // Clear all app records like brand new
@@ -287,19 +322,25 @@ router.post('/reset-app', async (req, res) => {
     await Attendance.deleteMany({});
     await Subject.deleteMany({});
     await Class.deleteMany({});
+    await Message.deleteMany({});
+    await Timetable.deleteMany({});
     await ActivityLog.deleteMany({});
+    // Remove teacher accounts (preserve admin accounts)
+    await User.deleteMany({ role: 'teacher' });
 
     let settings = await AppSettings.findOne();
     if (settings) {
       settings.appName = 'REGISTERLY';
       settings.schoolName = '';
       settings.allowNonAdminEditDelete = false;
+      settings.showTeachersTabToAll = true;
+      settings.allowStudentDetailsPrint = true;
       await settings.save();
     }
 
     await ActivityLog.create({
       action: 'Application Reset Like New',
-      details: 'All data cleared like brand new by Admin',
+      details: 'All data (students, teachers, classes, subjects, attendance, messages, timetable) cleared like brand new by Admin',
       performedBy: req.user.name,
       role: 'admin',
       entityType: 'settings',

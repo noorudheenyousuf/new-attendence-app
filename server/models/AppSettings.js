@@ -19,6 +19,10 @@ const appSettingsSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  allowStudentDetailsPrint: {
+    type: Boolean,
+    default: true
+  },
   updatedAt: {
     type: Date,
     default: Date.now
