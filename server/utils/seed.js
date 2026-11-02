@@ -121,16 +121,16 @@ const seedInitialData = async () => {
           { studentId: 2001, status: 'P', note: '' },
           { studentId: 2002, status: 'A', note: 'Fever' }
         ],
-        summary: { total: 3, present: 2, absent: 1, late: 0, percentage: 66.7 },
+        summary: { total: 3, present: 2, absent: 1, leave: 0, late: 0, percentage: 66.7 },
         markedBy: 'Admin'
       });
 
       await ActivityLog.create({
         action: 'Attendance Marked: Class 10',
-        details: '2 Present, 1 Absent, 0 Late (66.7%) • Initial Setup',
+        details: '2 Present, 1 Absent, 0 Leave (66.7%) • Initial Setup',
         performedBy: 'Admin',
         role: 'admin',
-        counts: { present: 2, absent: 1, late: 0 },
+        counts: { present: 2, absent: 1, leave: 0, late: 0 },
         entityType: 'attendance',
         canUndo: true
       });

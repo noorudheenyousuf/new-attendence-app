@@ -475,61 +475,120 @@ input:checked + .switch-slider:before {
 }
 
 /* ================= PRINT STYLES & A4 STUDENT DETAILS GRID ================= */
-#printable-student-cards {
-  display: none;
+.a4-page {
+  background: #ffffff;
+  color: #0f172a;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 8mm;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 5mm;
+  border-radius: 6px;
+}
+
+.a4-student-card {
+  border: 1.5px solid #334155;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #ffffff;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 8pt;
+  line-height: 1.25;
+  overflow: hidden;
+}
+
+@media screen and (max-width: 840px) {
+  .a4-page {
+    width: 100%;
+    min-height: auto;
+    padding: 12px;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: auto;
+    gap: 8px;
+  }
+}
+
+@media screen and (max-width: 520px) {
+  .a4-page {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 6mm;
+  }
+  html, body {
     background: #ffffff !important;
-    color: #0f172a !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: visible !important;
     height: auto !important;
   }
-  body > *:not(#printable-student-cards) {
-    display: none !important;
+  body * {
+    visibility: hidden;
   }
-  #printable-student-cards {
+  #printable-student-cards, #printable-student-cards * {
+    visibility: visible;
+  }
+  #modal-student-a4-preview {
     display: block !important;
     position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+  #printable-student-cards {
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100% !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
     padding: 0 !important;
     margin: 0 !important;
   }
   .no-print {
     display: none !important;
   }
-  @page {
-    size: A4 portrait;
-    margin: 6mm 6mm;
-  }
   .a4-page {
     page-break-after: always;
     break-after: page;
-    width: 100%;
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(4, 1fr);
-    gap: 4mm;
-    min-height: 280mm;
-    max-height: 284mm;
+    width: 100% !important;
+    min-height: 280mm !important;
+    max-height: 284mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: repeat(4, 1fr) !important;
+    gap: 4mm !important;
+    box-sizing: border-box !important;
   }
   .a4-student-card {
-    border: 1.5px solid #0f172a;
-    border-radius: 8px;
-    padding: 6px 8px;
-    background: #ffffff;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    font-size: 8pt;
-    line-height: 1.25;
-    break-inside: avoid;
-    overflow: hidden;
+    border: 1.5px solid #0f172a !important;
+    border-radius: 8px !important;
+    padding: 6px 8px !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    font-size: 8pt !important;
+    line-height: 1.25 !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
   }
 }
 

@@ -181,7 +181,7 @@
             <div class="text-lg font-black text-rose-800 dark:text-rose-200" id="stat-absent">0</div>
           </div>
           <div class="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-2 rounded-2xl shadow-sm">
-            <div class="text-[10px] font-bold text-amber-700 dark:text-amber-300">LATE</div>
+            <div class="text-[10px] font-bold text-amber-700 dark:text-amber-300">LEAVE</div>
             <div class="text-lg font-black text-amber-800 dark:text-amber-200" id="stat-late">0</div>
           </div>
         </div>
@@ -298,7 +298,7 @@
                   <th class="py-2 px-1 text-center">Sessions</th>
                   <th class="py-2 px-1 text-center text-emerald-600">Present</th>
                   <th class="py-2 px-1 text-center text-rose-600">Absent</th>
-                  <th class="py-2 px-1 text-center text-amber-600">Late</th>
+                  <th class="py-2 px-1 text-center text-amber-600">Leave</th>
                   <th class="py-2 px-1 text-center">Percent</th>
                   <th class="py-2 px-1.5 text-center">Status</th>
                   <th class="py-2 px-1.5 text-center no-print">Action</th>
@@ -1198,7 +1198,7 @@
           <div class="text-base font-black text-rose-800 dark:text-rose-200" id="log-stat-absent">0</div>
         </div>
         <div class="p-2 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-center shadow-sm">
-          <div class="text-[10px] font-bold text-amber-700 dark:text-amber-300">LATE</div>
+          <div class="text-[10px] font-bold text-amber-700 dark:text-amber-300">LEAVE</div>
           <div class="text-base font-black text-amber-800 dark:text-amber-200" id="log-stat-late">0</div>
         </div>
       </div>
@@ -1816,8 +1816,31 @@
     </div>
   </div>
 
-  <!-- ================= PRINTABLE STUDENT DETAILS CONTAINER (A4 Grid) ================= -->
-  <div id="printable-student-cards"></div>
+  <!-- ================= A4 STUDENT CARDS PREVIEW & PRINT MODAL ================= -->
+  <div id="modal-student-a4-preview" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto hidden">
+    <!-- Sticky Preview Toolbar (Hidden in Print) -->
+    <div class="sticky top-0 z-10 w-full max-w-4xl bg-[var(--card-bg)] text-[var(--text-main)] rounded-2xl p-3 shadow-2xl border border-[var(--border-color)] flex items-center justify-between gap-3 mb-4 no-print flex-shrink-0">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-teal-500/10 text-[#245b70] dark:text-teal-300 flex items-center justify-center font-bold">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        </div>
+        <div>
+          <h3 class="font-black text-sm text-[var(--text-main)]">Student Details A4 Sheet</h3>
+          <p id="a4-preview-subtitle" class="text-[11px] text-[var(--text-sub)]">12 Student Cards arranged per page</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="triggerStudentCardsPrint()" class="touch-btn px-4 py-2 bg-gradient-to-r from-[#245b70] to-[#1c647b] hover:from-[#1b4859] hover:to-[#175265] text-white text-xs font-black rounded-xl shadow-md flex items-center gap-1.5 active:scale-95 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span>Print Sheet</span>
+        </button>
+        <button type="button" onclick="closeStudentA4Preview()" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold text-sm hover:text-slate-800 dark:hover:text-white transition">✕</button>
+      </div>
+    </div>
+
+    <!-- Scrollable Screen A4 Container -->
+    <div id="printable-student-cards" class="w-full max-w-4xl flex flex-col items-center gap-6 pb-12"></div>
+  </div>
 
   <!-- TOAST NOTIFICATION -->
   <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#14323d] text-white text-xs font-bold px-4 py-2 rounded-full shadow-2xl flex items-center gap-1.5 transform -translate-y-20 opacity-0 transition-all duration-300 pointer-events-none no-print">

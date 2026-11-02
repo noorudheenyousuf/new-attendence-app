@@ -1007,7 +1007,7 @@ function renderAttendanceList() {
             isA ? 'bg-rose-600 text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-rose-50 hover:text-rose-700'
           }">A</button>
 
-          <button onclick="setStudentStatus(${st.studentId}, 'L')" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
+          <button onclick="setStudentStatus(${st.studentId}, 'L')" title="Mark Leave" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
             isL ? 'bg-amber-500 text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-amber-50 hover:text-amber-700'
           }">L</button>
         </div>
@@ -3186,11 +3186,11 @@ function renderTeacherLogSessionsList() {
           <p class="text-[11px] text-[var(--text-sub)]">Marked by: <span class="font-bold text-[var(--text-main)]">${escapeHtml(s.markedBy || 'Teacher')}</span></p>
         </div>
 
-        <!-- Present / Absent / Late Badges -->
+        <!-- Present / Absent / Leave Badges -->
         <div class="flex items-center gap-1.5 flex-shrink-0 text-[11px] font-bold">
           <span class="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">${summary.present} P</span>
           <span class="px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">${summary.absent} A</span>
-          <span class="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">${summary.late} L</span>
+          <span class="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">${summary.leave !== undefined ? summary.leave : summary.late} Leave</span>
           <span class="px-2 py-0.5 rounded-lg bg-[#245b70] text-white font-extrabold">${summary.percentage}%</span>
         </div>
       </div>
@@ -3825,9 +3825,13 @@ async function handleAdminToggleStudentPrint(checked) {
   }
 }
 
-function openStudentExportModal() {
+async function openStudentExportModal() {
   const modal = document.getElementById('modal-student-export');
   if (!modal) return;
+
+  if (!classesList || classesList.length === 0) {
+    try { await loadClasses(); } catch(_) {}
+  }
 
   const classSelect = document.getElementById('export-student-class');
   if (classSelect) {
@@ -3874,7 +3878,7 @@ async function executeStudentPrintA4() {
 
   try {
     showToast('Preparing A4 Printable Sheet...');
-    const res = await API.getStudents(classFilter === 'all' ? '' : classFilter);
+    const res = await API.getStudents(classFilter === 'all' ? 'all' : classFilter);
     const students = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
     if (students.length === 0) {
@@ -3952,12 +3956,27 @@ async function executeStudentPrintA4() {
     printableContainer.innerHTML = html;
     closeStudentExportModal();
 
-    setTimeout(() => {
-      window.print();
-    }, 250);
+    const subtitleEl = document.getElementById('a4-preview-subtitle');
+    if (subtitleEl) {
+      subtitleEl.textContent = `${students.length} Student${students.length > 1 ? 's' : ''} (${classFilter === 'all' ? 'All Classes' : classFilter}) • 12 Cards per Page (3x4 Grid)`;
+    }
+
+    const previewModal = document.getElementById('modal-student-a4-preview');
+    if (previewModal) {
+      previewModal.classList.remove('hidden');
+    }
   } catch (err) {
     showToast('Failed to prepare print: ' + err.message, true);
   }
+}
+
+function closeStudentA4Preview() {
+  const modal = document.getElementById('modal-student-a4-preview');
+  if (modal) modal.classList.add('hidden');
+}
+
+function triggerStudentCardsPrint() {
+  window.print();
 }
 
 async function executeStudentExportCSV() {
@@ -3966,7 +3985,7 @@ async function executeStudentExportCSV() {
 
   try {
     showToast('Generating CSV file...');
-    const res = await API.getStudents(classFilter === 'all' ? '' : classFilter);
+    const res = await API.getStudents(classFilter === 'all' ? 'all' : classFilter);
     const students = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
     if (students.length === 0) {

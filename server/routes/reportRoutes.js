@@ -42,7 +42,7 @@ router.get('/class', async (req, res) => {
       let sessions = 0;
       let present = 0;
       let absent = 0;
-      let late = 0;
+      let leave = 0;
 
       attendanceDocs.forEach(att => {
         const studentRec = att.records.find(r => r.studentId === st.studentId);
@@ -50,7 +50,7 @@ router.get('/class', async (req, res) => {
           sessions++;
           if (studentRec.status === 'P') present++;
           else if (studentRec.status === 'A') absent++;
-          else if (studentRec.status === 'L') late++;
+          else if (studentRec.status === 'L') leave++;
         }
       });
 
@@ -76,7 +76,8 @@ router.get('/class', async (req, res) => {
         sessions,
         present,
         absent,
-        late,
+        leave,
+        late: leave,
         percent,
         status
       };
@@ -127,7 +128,7 @@ router.get('/student-logs/:studentId', async (req, res) => {
           subject: subDisplay,
           period: subDisplay,
           status: rec.status,
-          statusText: rec.status === 'P' ? 'Present' : rec.status === 'A' ? 'Absent' : 'Late',
+          statusText: rec.status === 'P' ? 'Present' : rec.status === 'A' ? 'Absent' : 'Leave',
           note: rec.note || ''
         });
       }

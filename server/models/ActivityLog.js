@@ -21,6 +21,7 @@ const activityLogSchema = new mongoose.Schema({
   counts: {
     present: { type: Number, default: 0 },
     absent: { type: Number, default: 0 },
+    leave: { type: Number, default: 0 },
     late: { type: Number, default: 0 }
   },
   entityType: {

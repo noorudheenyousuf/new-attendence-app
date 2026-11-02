@@ -200,7 +200,7 @@ router.get('/:id/logs', async (req, res) => {
       if (s.summary) {
         totalPresent += (s.summary.present || 0);
         totalAbsent += (s.summary.absent || 0);
-        totalLate += (s.summary.late || 0);
+        totalLate += (s.summary.leave || s.summary.late || 0);
       }
     });
 
@@ -228,6 +228,7 @@ router.get('/:id/logs', async (req, res) => {
         subjectsList: Array.from(uniqueSubjects),
         totalPresent,
         totalAbsent,
+        totalLeave: totalLate,
         totalLate
       },
       availableYears,
@@ -236,7 +237,10 @@ router.get('/:id/logs', async (req, res) => {
         date: s.date,
         class: s.class,
         subject: s.subject,
-        summary: s.summary || { total: 0, present: 0, absent: 0, late: 0, percentage: 0 },
+        summary: s.summary ? {
+          ...s.summary,
+          leave: s.summary.leave !== undefined ? s.summary.leave : (s.summary.late || 0)
+        } : { total: 0, present: 0, absent: 0, leave: 0, late: 0, percentage: 0 },
         markedBy: s.markedBy || 'Teacher',
         markedByEmail: s.markedByEmail || '',
         createdAt: s.createdAt

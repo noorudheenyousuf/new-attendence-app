@@ -41,10 +41,10 @@ router.post('/', authMiddleware, async (req, res) => {
     const total = records.length;
     const present = records.filter(r => r.status === 'P').length;
     const absent = records.filter(r => r.status === 'A').length;
-    const late = records.filter(r => r.status === 'L').length;
+    const leave = records.filter(r => r.status === 'L').length;
     const percentage = total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0;
 
-    const summary = { total, present, absent, late, percentage };
+    const summary = { total, present, absent, leave, late: leave, percentage };
     const markedBy = req.user ? req.user.name : 'Teacher';
     const markedByEmail = (req.user && req.user.email) ? req.user.email.toLowerCase() : '';
 
@@ -64,13 +64,12 @@ router.post('/', authMiddleware, async (req, res) => {
       { upsert: true, new: true }
     );
 
-    // USER DIRECTIVE: add in logs of attendance .....present,absent,late
     await ActivityLog.create({
       action: `Attendance Marked: ${className}`,
-      details: `${present} Present, ${absent} Absent, ${late} Late (${percentage}%) • Date: ${date}`,
+      details: `${present} Present, ${absent} Absent, ${leave} Leave (${percentage}%) • Date: ${date}`,
       performedBy: markedBy,
       role: req.user ? req.user.role : 'teacher',
-      counts: { present, absent, late },
+      counts: { present, absent, leave, late: leave },
       entityType: 'attendance',
       entityId: updatedAttendance._id.toString(),
       canUndo: true,
