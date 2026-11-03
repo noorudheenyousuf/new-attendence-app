@@ -21,6 +21,7 @@ let currentDateStr = formatLocalDate(new Date());
 let currentClass = 'Class 10';
 let currentSubject = '';
 let attendanceReadyToLoad = false; // Deferred attendance: false on init until class/subject selected
+let reportReadyToLoad = false;     // Deferred report: false on init until class/subject selected
 
 // Universal Case-Insensitive String / Class Comparison Helper
 function isClassEqual(a, b) {
@@ -193,7 +194,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadSubjects();
     await loadTeachersData();
     renderAttendancePlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading roster
-    await loadReport();
+
+    // Set default year and month to current date for reports
+    const initDate = new Date();
+    const repYearEl = document.getElementById('report-year');
+    const repPeriodEl = document.getElementById('report-period');
+    if (repYearEl) repYearEl.value = initDate.getFullYear().toString();
+    if (repPeriodEl) repPeriodEl.value = (initDate.getMonth() + 1).toString();
+    renderReportPlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading report
+
     await loadActivityLogs();
     await checkUnreadMessages();
     _applyTeachersTabVisibility();
@@ -869,7 +878,19 @@ async function handleReportClassChange() {
   const repClassEl = document.getElementById('report-class');
   const selectedClass = repClassEl ? repClassEl.value : '';
   updateReportSubjectsDropdown(selectedClass);
+  reportReadyToLoad = true;
   await loadReport();
+}
+
+async function handleReportSubjectChange() {
+  reportReadyToLoad = true;
+  await loadReport();
+}
+
+async function handleReportFilterChange() {
+  if (reportReadyToLoad) {
+    await loadReport();
+  }
 }
 
 function populateSubjectDropdowns() {
@@ -1090,12 +1111,25 @@ function renderAttendancePlaceholder() {
 
   container.innerHTML = `
     <div class="flex flex-col items-center justify-center py-12 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
-      <div class="w-16 h-16 rounded-2xl bg-[#245b70]/10 dark:bg-cyan-500/10 flex items-center justify-center text-[#245b70] dark:text-cyan-400 mb-3 shadow-inner">
-        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-          <path d="m9 14 2 2 4-4"></path>
-        </svg>
+      <div class="relative w-20 h-20 flex items-center justify-center mb-3.5">
+        <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-emerald-500/30 via-teal-500/20 to-cyan-500/30 blur-md"></div>
+        <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 p-0.5 shadow-xl shadow-teal-500/20 flex items-center justify-center">
+          <div class="w-full h-full rounded-[22px] bg-white/10 dark:bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
+            <svg class="w-10 h-10 drop-shadow-md" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="8" y="10" width="32" height="34" rx="6" fill="#F8FAFC" stroke="#0F766E" stroke-width="2.5" class="dark:fill-slate-800 dark:stroke-teal-400"/>
+              <rect x="17" y="6" width="14" height="8" rx="3" fill="#F59E0B" stroke="#D97706" stroke-width="1.5"/>
+              <circle cx="24" cy="10" r="1.5" fill="#78350F"/>
+              <path d="M14 20L17 23L22 17" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="25" y1="20" x2="34" y2="20" stroke="#0D9488" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.8"/>
+              <path d="M14 28L17 31L22 25" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="25" y1="28" x2="34" y2="28" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.8"/>
+              <path d="M14 36L17 39L22 33" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="25" y1="36" x2="31" y2="36" stroke="#818CF8" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.8"/>
+              <circle cx="37" cy="13" r="4" fill="#F59E0B" stroke="#FEF3C7" stroke-width="1.5"/>
+              <path d="M37 11V15M35 13H39" stroke="#FFF" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
       </div>
       <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
       <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
@@ -1116,6 +1150,56 @@ function _toggleAttendanceControls(show) {
       else el.classList.add('hidden');
     }
   });
+}
+
+function renderReportPlaceholder() {
+  const container = document.getElementById('report-placeholder');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-12 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
+      <div class="relative w-20 h-20 flex items-center justify-center mb-3.5">
+        <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-indigo-500/30 via-purple-500/20 to-pink-500/30 blur-md"></div>
+        <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-0.5 shadow-xl shadow-purple-500/20 flex items-center justify-center">
+          <div class="w-full h-full rounded-[22px] bg-white/10 dark:bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
+            <svg class="w-10 h-10 drop-shadow-md" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="9" y="8" width="30" height="34" rx="5" fill="#F8FAFC" stroke="#6366F1" stroke-width="2.5" class="dark:fill-slate-800 dark:stroke-indigo-400"/>
+              <line x1="15" y1="14" x2="25" y2="14" stroke="#818CF8" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="15" y1="19" x2="21" y2="19" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" class="dark:stroke-slate-600"/>
+              <rect x="15" y="29" width="4.5" height="8" rx="1.5" fill="#10B981"/>
+              <rect x="22" y="24" width="4.5" height="13" rx="1.5" fill="#6366F1"/>
+              <rect x="29" y="20" width="4.5" height="17" rx="1.5" fill="#EC4899"/>
+              <path d="M14 27L20 22L27 25L34 16" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="34" cy="16" r="2.5" fill="#F59E0B" stroke="#FEF3C7" stroke-width="1"/>
+              <circle cx="36" cy="10" r="3.5" fill="#10B981" stroke="#D1FAE5" stroke-width="1"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
+      <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
+        Choose a class and subject above to view the attendance report and student analytics.
+      </p>
+    </div>
+  `;
+
+  _toggleReportControls(false);
+}
+
+function _toggleReportControls(show) {
+  const tableEl = document.getElementById('printable-report');
+  const printBtn = document.getElementById('btn-print-report');
+  const placeholderEl = document.getElementById('report-placeholder');
+
+  if (show) {
+    if (placeholderEl) placeholderEl.classList.add('hidden');
+    if (tableEl) tableEl.classList.remove('hidden');
+    if (printBtn) printBtn.classList.remove('hidden');
+  } else {
+    if (placeholderEl) placeholderEl.classList.remove('hidden');
+    if (tableEl) tableEl.classList.add('hidden');
+    if (printBtn) printBtn.classList.add('hidden');
+  }
 }
 
 async function loadAttendanceRoster() {
@@ -1375,6 +1459,11 @@ function openDatePicker() {
 // action .....under of it a button named log when click it shows the date period present status etc"
 // "only show main name in filters not in the bracket"
 async function loadReport() {
+  if (!reportReadyToLoad) {
+    renderReportPlaceholder();
+    return;
+  }
+
   const repClassEl = document.getElementById('report-class');
   const repYearEl = document.getElementById('report-year');
   const repPeriodEl = document.getElementById('report-period');
@@ -1388,6 +1477,7 @@ async function loadReport() {
   try {
     const res = await API.getClassReport(repClass, repYear, repPeriod, repSubject);
     if (res.success) {
+      _toggleReportControls(true);
       renderReportTable(res.data, res.summary);
     }
   } catch (error) {
@@ -2864,7 +2954,10 @@ function selectTopTab(tab) {
     if (btn) btn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition";
   });
 
-  if (tab === 'report') loadReport();
+  if (tab === 'report') {
+    if (reportReadyToLoad) loadReport();
+    else renderReportPlaceholder();
+  }
   if (tab === 'settings') loadActivityLogs();
 }
 

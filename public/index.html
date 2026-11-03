@@ -231,64 +231,73 @@
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
           <div class="flex items-center justify-between">
             <h2 class="text-sm sm:text-base font-bold text-[var(--text-main)]">Whole Class Report</h2>
-            <!-- Print Button (Dark in Light Mode as instructed) -->
-            <button onclick="printReport()" class="touch-btn px-3.5 btn-print text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+            <!-- Print Button (Hidden initially until class & subject selected) -->
+            <button id="btn-print-report" onclick="printReport()" class="touch-btn px-3.5 btn-print text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition hidden">
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
               <span>Print</span>
             </button>
           </div>
 
-          <!-- Filters: Class, Year, Month, Subject (No brackets) -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-            <div>
-              <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Class</label>
-              <select id="report-class" onchange="handleReportClassChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
-                <!-- Populated via loadClasses() -->
-              </select>
+          <!-- Filters: Row 1 (Class & Subject), Row 2 (Year & Month) -->
+          <div class="space-y-2 pt-1">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase tracking-wide">Class</label>
+                <select id="report-class" onchange="handleReportClassChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
+                  <!-- Populated via loadClasses() -->
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase tracking-wide">Subject</label>
+                <select id="report-subject" onchange="handleReportSubjectChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
+                  <!-- Populated via loadSubjects() with ONLY main names -->
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Year</label>
-              <select id="report-year" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
-                <option value="all">All Years</option>
-                <option value="2024">2024</option>
-                <option value="2025">2025</option>
-                <option value="2026" selected>2026</option>
-                <option value="2027">2027</option>
-                <option value="2028">2028</option>
-              </select>
-            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase tracking-wide">Year</label>
+                <select id="report-year" onchange="handleReportFilterChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
+                  <option value="all">All Years</option>
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                </select>
+              </div>
 
-            <div>
-              <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Month</label>
-              <select id="report-period" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
-                <option value="all-year">All Months</option>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase">Subject</label>
-              <select id="report-subject" onchange="loadReport()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 text-xs font-bold text-[var(--text-main)]">
-                <!-- Populated via loadSubjects() with ONLY main names -->
-              </select>
+              <div>
+                <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-0.5 uppercase tracking-wide">Month</label>
+                <select id="report-period" onchange="handleReportFilterChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
+                  <option value="all-year">All Months</option>
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- Report Placeholder Container (Shown before selecting class & subject) -->
+        <div id="report-placeholder">
+          <!-- Populated via renderReportPlaceholder() -->
+        </div>
+
         <!-- Printable Table -->
-        <div id="printable-report" class="bg-[var(--card-bg)] p-3 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
+        <div id="printable-report" class="bg-[var(--card-bg)] p-3 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5 hidden">
           <div class="border-b border-[var(--border-color)] pb-2 flex justify-between items-center">
             <div>
               <h3 class="font-black text-xs sm:text-sm text-[var(--text-main)]">Class Attendance Sheet</h3>
