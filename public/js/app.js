@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const repYearEl = document.getElementById('report-year');
     const repPeriodEl = document.getElementById('report-period');
     if (repYearEl) repYearEl.value = initDate.getFullYear().toString();
-    if (repPeriodEl) repPeriodEl.value = (initDate.getMonth() + 1).toString();
+    if (repPeriodEl) repPeriodEl.value = 'all-year'; // Default to "All Months"
     renderReportPlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading report
 
     await loadActivityLogs();
@@ -593,10 +593,14 @@ function populateClassDropdowns() {
   const optionsHtml = classesList.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
 
   if (selClass) {
-    selClass.innerHTML = optionsHtml;
-    if (classesList.length > 0) currentClass = classesList[0].name;
+    const placeholderOpt = `<option value="" disabled selected>Select Class</option>`;
+    selClass.innerHTML = placeholderOpt + optionsHtml;
+    // Don't auto-set currentClass on initial load; wait for user selection
   }
-  if (repClass) repClass.innerHTML = optionsHtml;
+  if (repClass) {
+    const placeholderOpt = `<option value="" disabled selected>Select Class</option>`;
+    repClass.innerHTML = placeholderOpt + optionsHtml;
+  }
   if (studentFilter) {
     studentFilter.innerHTML = `<option value="all">All Classes</option>` + optionsHtml;
   }
@@ -819,6 +823,12 @@ function updateAttendanceSubjectsDropdown(selectedClass) {
   const selSubject = document.getElementById('sel-subject');
   if (!selSubject) return;
 
+  // Show placeholder if attendance is not ready (initial load)
+  if (!attendanceReadyToLoad) {
+    selSubject.innerHTML = `<option value="" disabled selected>Select Subject</option>`;
+    return;
+  }
+
   const validSubjects = getAppropriateSubjectsForClass(selectedClass);
   if (validSubjects.length > 0) {
     selSubject.innerHTML = validSubjects.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
@@ -837,8 +847,8 @@ async function handleClassChange() {
   if (selClassEl) {
     currentClass = selClassEl.value;
   }
-  updateAttendanceSubjectsDropdown(currentClass);
   attendanceReadyToLoad = true;
+  updateAttendanceSubjectsDropdown(currentClass);
   await loadAttendanceRoster();
 }
 
@@ -854,6 +864,12 @@ async function handleSubjectChange() {
 function updateReportSubjectsDropdown(selectedClassName) {
   const repSubject = document.getElementById('report-subject');
   if (!repSubject) return;
+
+  // Show placeholder if report is not ready (initial load)
+  if (!reportReadyToLoad) {
+    repSubject.innerHTML = `<option value="" disabled selected>Select Subject</option>`;
+    return;
+  }
 
   const prevVal = repSubject.value;
   let relevantSubjects = subjectsList;
@@ -877,8 +893,8 @@ function updateReportSubjectsDropdown(selectedClassName) {
 async function handleReportClassChange() {
   const repClassEl = document.getElementById('report-class');
   const selectedClass = repClassEl ? repClassEl.value : '';
-  updateReportSubjectsDropdown(selectedClass);
   reportReadyToLoad = true;
+  updateReportSubjectsDropdown(selectedClass);
   await loadReport();
 }
 
