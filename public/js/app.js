@@ -1110,26 +1110,17 @@ function renderAttendancePlaceholder() {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="flex flex-col items-center justify-center py-12 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
-      <div class="relative w-20 h-20 flex items-center justify-center mb-3.5">
-        <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-emerald-500/30 via-teal-500/20 to-cyan-500/30 blur-md"></div>
-        <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 p-0.5 shadow-xl shadow-teal-500/20 flex items-center justify-center">
-          <div class="w-full h-full rounded-[22px] bg-white/10 dark:bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
-            <svg class="w-10 h-10 drop-shadow-md" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="8" y="10" width="32" height="34" rx="6" fill="#F8FAFC" stroke="#0F766E" stroke-width="2.5" class="dark:fill-slate-800 dark:stroke-teal-400"/>
-              <rect x="17" y="6" width="14" height="8" rx="3" fill="#F59E0B" stroke="#D97706" stroke-width="1.5"/>
-              <circle cx="24" cy="10" r="1.5" fill="#78350F"/>
-              <path d="M14 20L17 23L22 17" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <line x1="25" y1="20" x2="34" y2="20" stroke="#0D9488" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.8"/>
-              <path d="M14 28L17 31L22 25" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <line x1="25" y1="28" x2="34" y2="28" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.8"/>
-              <path d="M14 36L17 39L22 33" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <line x1="25" y1="36" x2="31" y2="36" stroke="#818CF8" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.8"/>
-              <circle cx="37" cy="13" r="4" fill="#F59E0B" stroke="#FEF3C7" stroke-width="1.5"/>
-              <path d="M37 11V15M35 13H39" stroke="#FFF" stroke-width="1.2" stroke-linecap="round"/>
-            </svg>
-          </div>
-        </div>
+    <div class="flex flex-col items-center justify-center py-10 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
+      <!-- Modern Minimalist Dual-tone Checklist in Soft Light Teal Rounded Square -->
+      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-900/50 flex items-center justify-center mb-3 shadow-sm">
+        <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="5" y="4" width="14" height="17" rx="3" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8.5 10l1.5 1.5 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="14.5" y1="10" x2="16.5" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8.5 15l1.5 1.5 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="14.5" y1="15" x2="16.5" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
       </div>
       <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
       <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
@@ -1157,24 +1148,15 @@ function renderReportPlaceholder() {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="flex flex-col items-center justify-center py-12 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
-      <div class="relative w-20 h-20 flex items-center justify-center mb-3.5">
-        <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-indigo-500/30 via-purple-500/20 to-pink-500/30 blur-md"></div>
-        <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-0.5 shadow-xl shadow-purple-500/20 flex items-center justify-center">
-          <div class="w-full h-full rounded-[22px] bg-white/10 dark:bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
-            <svg class="w-10 h-10 drop-shadow-md" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="9" y="8" width="30" height="34" rx="5" fill="#F8FAFC" stroke="#6366F1" stroke-width="2.5" class="dark:fill-slate-800 dark:stroke-indigo-400"/>
-              <line x1="15" y1="14" x2="25" y2="14" stroke="#818CF8" stroke-width="2.5" stroke-linecap="round"/>
-              <line x1="15" y1="19" x2="21" y2="19" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" class="dark:stroke-slate-600"/>
-              <rect x="15" y="29" width="4.5" height="8" rx="1.5" fill="#10B981"/>
-              <rect x="22" y="24" width="4.5" height="13" rx="1.5" fill="#6366F1"/>
-              <rect x="29" y="20" width="4.5" height="17" rx="1.5" fill="#EC4899"/>
-              <path d="M14 27L20 22L27 25L34 16" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="34" cy="16" r="2.5" fill="#F59E0B" stroke="#FEF3C7" stroke-width="1"/>
-              <circle cx="36" cy="10" r="3.5" fill="#10B981" stroke="#D1FAE5" stroke-width="1"/>
-            </svg>
-          </div>
-        </div>
+    <div class="flex flex-col items-center justify-center py-10 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
+      <!-- Modern Minimalist Dual-tone Bar Chart in Soft Light Purple Rounded Square -->
+      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/50 flex items-center justify-center mb-3 shadow-sm">
+        <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="2"/>
+          <rect x="6.5" y="12" width="2.5" height="5" rx="1" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="10.75" y="8.5" width="2.5" height="8.5" rx="1" fill="currentColor" fill-opacity="0.5" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="15" y="6" width="2.5" height="11" rx="1" fill="currentColor" fill-opacity="0.75" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
       </div>
       <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
       <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
