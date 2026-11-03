@@ -1,8 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const Class = require('../models/Class');
+const Student = require('../models/Student');
+const Attendance = require('../models/Attendance');
+const Timetable = require('../models/Timetable');
+const Subject = require('../models/Subject');
+const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const { caseInsensitiveRegex, escapeRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/classes
 // @desc    Get all classes sorted by custom order
@@ -39,11 +45,12 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, classTeacher, assignedSubjects } = req.body;
-    if (!name) {
+    if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Class name is required' });
     }
 
-    const existing = await Class.findOne({ name });
+    const cleanName = name.trim();
+    const existing = await Class.findOne({ name: caseInsensitiveRegex(cleanName) });
     if (existing) {
       return res.status(400).json({ success: false, message: 'Class with this name already exists' });
     }
@@ -53,14 +60,14 @@ router.post('/', authMiddleware, async (req, res) => {
       : [];
 
     const newClass = await Class.create({
-      name,
+      name: cleanName,
       classTeacher: classTeacher || 'Not Assigned',
       assignedSubjects: subjectsArray
     });
 
     // Log action
     await ActivityLog.create({
-      action: `Class Added: ${name}`,
+      action: `Class Added: ${cleanName}`,
       details: `Teacher: ${classTeacher || 'None'} | Subjects: ${subjectsArray.join(', ') || 'All'}`,
       performedBy: req.user ? req.user.name : 'Admin',
       role: req.user ? req.user.role : 'admin',
@@ -77,7 +84,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // @route   PUT /api/classes/:id
-// @desc    Update class
+// @desc    Update class & cascade name changes across Students, Attendance, Timetable, Subjects, and Teachers
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { name, classTeacher, assignedSubjects } = req.body;
@@ -86,8 +93,22 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
+    const cleanName = name ? name.trim() : oldClass.name;
+    const oldName = oldClass.name;
+
+    // Check if another class exists with this new name (case-insensitive)
+    if (name && cleanName.toLowerCase() !== oldName.toLowerCase()) {
+      const duplicate = await Class.findOne({
+        _id: { $ne: req.params.id },
+        name: caseInsensitiveRegex(cleanName)
+      });
+      if (duplicate) {
+        return res.status(400).json({ success: false, message: `Class with name "${cleanName}" already exists` });
+      }
+    }
+
     const updatePayload = {
-      name: name || oldClass.name,
+      name: cleanName,
       classTeacher: classTeacher !== undefined ? (classTeacher || 'Not Assigned') : oldClass.classTeacher
     };
 
@@ -103,8 +124,60 @@ router.put('/:id', authMiddleware, async (req, res) => {
       { new: true }
     );
 
+    // CASCADE CLASS NAME RENAME / CASE CHANGE
+    // If the name changed in any way (casing or spelling), migrate all references!
+    if (cleanName !== oldName) {
+      const oldClassRegex = caseInsensitiveRegex(oldName);
+
+      // 1. Cascade to Student models
+      await Student.updateMany(
+        { class: oldClassRegex },
+        { $set: { class: cleanName } }
+      );
+
+      // 2. Cascade to Attendance documents
+      await Attendance.updateMany(
+        { class: oldClassRegex },
+        { $set: { class: cleanName } }
+      );
+
+      // 3. Cascade to Timetable slots
+      await Timetable.updateMany(
+        { class: oldClassRegex },
+        { $set: { class: cleanName } }
+      );
+
+      // 4. Cascade to Subject assignedClasses
+      const subjectsWithClass = await Subject.find({ assignedClasses: oldClassRegex });
+      for (const sub of subjectsWithClass) {
+        let changed = false;
+        sub.assignedClasses = sub.assignedClasses.map(c => {
+          if (c && c.toLowerCase() === oldName.toLowerCase()) {
+            changed = true;
+            return cleanName;
+          }
+          return c;
+        });
+        if (changed) await sub.save();
+      }
+
+      // 5. Cascade to User assignedClasses
+      const teachersWithClass = await User.find({ assignedClasses: oldClassRegex });
+      for (const t of teachersWithClass) {
+        let changed = false;
+        t.assignedClasses = t.assignedClasses.map(c => {
+          if (c && c.toLowerCase() === oldName.toLowerCase()) {
+            changed = true;
+            return cleanName;
+          }
+          return c;
+        });
+        if (changed) await t.save();
+      }
+    }
+
     await ActivityLog.create({
-      action: `Class Updated: ${name || oldClass.name}`,
+      action: `Class Updated: ${cleanName}`,
       details: `Teacher: ${classTeacher || oldClass.classTeacher}`,
       performedBy: req.user ? req.user.name : 'Admin',
       role: req.user ? req.user.role : 'admin',

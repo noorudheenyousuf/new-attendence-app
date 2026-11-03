@@ -3,6 +3,7 @@ const router = express.Router();
 const Student = require('../models/Student');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/students
 // @desc    Get all students (with class filter and search)
@@ -12,7 +13,7 @@ router.get('/', async (req, res) => {
     let query = {};
 
     if (classFilter && classFilter !== 'all') {
-      query.class = classFilter;
+      query.class = caseInsensitiveRegex(classFilter);
     }
 
     if (search) {

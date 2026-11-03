@@ -3,9 +3,10 @@ const router = express.Router();
 const Attendance = require('../models/Attendance');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/attendance
-// @desc    Get attendance for date, class, and subject
+// @desc    Get attendance for date, class, and subject (case-insensitive)
 router.get('/', async (req, res) => {
   try {
     const { date, class: className, subject } = req.query;
@@ -16,8 +17,8 @@ router.get('/', async (req, res) => {
     const targetSubject = subject || 'all';
     const record = await Attendance.findOne({
       date,
-      class: className,
-      subject: targetSubject
+      class: caseInsensitiveRegex(className),
+      subject: caseInsensitiveRegex(targetSubject)
     });
 
     res.json({ success: true, data: record });
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
 });
 
 // @route   POST /api/attendance
-// @desc    Save or update attendance session
+// @desc    Save or update attendance session (case-insensitive check)
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { date, class: className, subject, records } = req.body;
@@ -35,7 +36,8 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid attendance submission payload' });
     }
 
-    const targetSubject = subject || 'all';
+    const cleanClass = className.trim();
+    const targetSubject = (subject || 'all').trim();
 
     // Calculate counts
     const total = records.length;
@@ -48,24 +50,35 @@ router.post('/', authMiddleware, async (req, res) => {
     const markedBy = req.user ? req.user.name : 'Teacher';
     const markedByEmail = (req.user && req.user.email) ? req.user.email.toLowerCase() : '';
 
-    const previousDoc = await Attendance.findOne({ date, class: className, subject: targetSubject });
+    const previousDoc = await Attendance.findOne({
+      date,
+      class: caseInsensitiveRegex(cleanClass),
+      subject: caseInsensitiveRegex(targetSubject)
+    });
 
-    const updatedAttendance = await Attendance.findOneAndUpdate(
-      { date, class: className, subject: targetSubject },
-      {
+    let updatedAttendance;
+    if (previousDoc) {
+      previousDoc.class = cleanClass;
+      previousDoc.subject = targetSubject;
+      previousDoc.records = records;
+      previousDoc.summary = summary;
+      previousDoc.markedBy = markedBy;
+      previousDoc.markedByEmail = markedByEmail;
+      updatedAttendance = await previousDoc.save();
+    } else {
+      updatedAttendance = await Attendance.create({
         date,
-        class: className,
+        class: cleanClass,
         subject: targetSubject,
         records,
         summary,
         markedBy,
         markedByEmail
-      },
-      { upsert: true, new: true }
-    );
+      });
+    }
 
     await ActivityLog.create({
-      action: `Attendance Marked: ${className}`,
+      action: `Attendance Marked: ${cleanClass}`,
       details: `${present} Present, ${absent} Absent, ${leave} Leave (${percentage}%) • Date: ${date}`,
       performedBy: markedBy,
       role: req.user ? req.user.role : 'teacher',
@@ -83,7 +96,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // @route   DELETE /api/attendance
-// @desc    Delete recorded attendance for date, class, and subject
+// @desc    Delete recorded attendance for date, class, and subject (case-insensitive)
 router.delete('/', authMiddleware, async (req, res) => {
   try {
     const { date, class: className, subject } = req.query;
@@ -94,8 +107,8 @@ router.delete('/', authMiddleware, async (req, res) => {
     const targetSubject = subject || 'all';
     const deletedRecord = await Attendance.findOneAndDelete({
       date,
-      class: className,
-      subject: targetSubject
+      class: caseInsensitiveRegex(className),
+      subject: caseInsensitiveRegex(targetSubject)
     });
 
     if (deletedRecord) {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Timetable = require('../models/Timetable');
 const authMiddleware = require('../middleware/auth');
+const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/timetable
 // @desc    Get timetable slots, optionally filtered by class or day
@@ -10,7 +11,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const { class: className, day } = req.query;
     const filter = {};
     if (className && className !== 'all') {
-      filter.class = className;
+      filter.class = caseInsensitiveRegex(className);
     }
     if (day && day !== 'all') {
       filter.day = { $in: [day, 'All Days'] };

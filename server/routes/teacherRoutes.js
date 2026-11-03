@@ -10,6 +10,7 @@ const Timetable = require('../models/Timetable');
 const Subject = require('../models/Subject');
 const Class = require('../models/Class');
 const authMiddleware = require('../middleware/auth');
+const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 const canUserManage = async (user) => {
   if (user && user.role === 'admin') return true;
@@ -81,7 +82,7 @@ router.get('/', async (req, res) => {
             query.date = { $regex: `^${year}` };
           }
           if (classFilter && classFilter !== 'all') {
-            query.class = classFilter;
+            query.class = caseInsensitiveRegex(classFilter);
           }
           sessionCount = await Attendance.countDocuments(query);
         }

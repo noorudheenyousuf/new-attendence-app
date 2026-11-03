@@ -20,6 +20,19 @@ function formatLocalDate(d = new Date()) {
 let currentDateStr = formatLocalDate(new Date());
 let currentClass = 'Class 10';
 let currentSubject = '';
+let attendanceReadyToLoad = false; // Deferred attendance: false on init until class/subject selected
+
+// Universal Case-Insensitive String / Class Comparison Helper
+function isClassEqual(a, b) {
+  if (a === b) return true;
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
+function classListIncludes(arr, className) {
+  if (!Array.isArray(arr) || !className) return false;
+  const target = String(className).trim().toLowerCase();
+  return arr.some(item => String(item || '').trim().toLowerCase() === target);
+}
 
 // Sanitization Helpers
 function escapeHtml(str) {
@@ -179,7 +192,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadClasses();
     await loadSubjects();
     await loadTeachersData();
-    await loadAttendanceRoster();
+    renderAttendancePlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading roster
     await loadReport();
     await loadActivityLogs();
     await checkUnreadMessages();
@@ -783,9 +796,9 @@ async function loadSubjects() {
 
 function getAppropriateSubjectsForClass(className) {
   if (!className || !subjectsList || subjectsList.length === 0) return [];
-  const cls = (classesList || []).find(c => c.name === className);
+  const cls = (classesList || []).find(c => isClassEqual(c.name, className));
   if (cls && Array.isArray(cls.assignedSubjects) && cls.assignedSubjects.length > 0) {
-    const matched = subjectsList.filter(s => cls.assignedSubjects.includes(s.name));
+    const matched = subjectsList.filter(s => cls.assignedSubjects.some(sub => isClassEqual(sub, s.name)));
     if (matched.length > 0) {
       return matched;
     }
@@ -816,6 +829,16 @@ async function handleClassChange() {
     currentClass = selClassEl.value;
   }
   updateAttendanceSubjectsDropdown(currentClass);
+  attendanceReadyToLoad = true;
+  await loadAttendanceRoster();
+}
+
+async function handleSubjectChange() {
+  const selSubEl = document.getElementById('sel-subject');
+  if (selSubEl) {
+    currentSubject = selSubEl.value;
+  }
+  attendanceReadyToLoad = true;
   await loadAttendanceRoster();
 }
 
@@ -828,7 +851,7 @@ function updateReportSubjectsDropdown(selectedClassName) {
   if (selectedClassName && selectedClassName !== 'all') {
     relevantSubjects = subjectsList.filter(s => {
       const assigned = Array.isArray(s.assignedClasses) ? s.assignedClasses : [];
-      return assigned.length === 0 || assigned.includes(selectedClassName);
+      return assigned.length === 0 || classListIncludes(assigned, selectedClassName);
     });
   }
 
@@ -1061,7 +1084,46 @@ async function deleteSubject(id, name) {
 
 // ================= ATTENDANCE ROSTER =================
 // USER DIRECTIVE: "when taking attendence not show id and roll"
+function renderAttendancePlaceholder() {
+  const container = document.getElementById('attendance-list');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-12 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
+      <div class="w-16 h-16 rounded-2xl bg-[#245b70]/10 dark:bg-cyan-500/10 flex items-center justify-center text-[#245b70] dark:text-cyan-400 mb-3 shadow-inner">
+        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+          <path d="m9 14 2 2 4-4"></path>
+        </svg>
+      </div>
+      <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
+      <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
+        Choose a class and subject above to view students and mark attendance.
+      </p>
+    </div>
+  `;
+
+  _toggleAttendanceControls(false);
+}
+
+function _toggleAttendanceControls(show) {
+  const ids = ['attendance-stats-bar', 'attendance-bulk-bar', 'attendance-action-bar'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (show) el.classList.remove('hidden');
+      else el.classList.add('hidden');
+    }
+  });
+}
+
 async function loadAttendanceRoster() {
+  if (!attendanceReadyToLoad) {
+    renderAttendancePlaceholder();
+    return;
+  }
+
   const selClassEl = document.getElementById('sel-class');
   const selSubEl = document.getElementById('sel-subject');
   if (selClassEl) currentClass = selClassEl.value;
@@ -1102,6 +1164,8 @@ async function loadAttendanceRoster() {
 function renderAttendanceList() {
   const container = document.getElementById('attendance-list');
   if (!container) return;
+
+  _toggleAttendanceControls(true);
 
   if (studentsList.length === 0) {
     container.innerHTML = `<div class="p-6 text-center text-xs text-[var(--text-sub)]">No students enrolled in ${currentClass}. Go to Students tab to add students.</div>`;
@@ -1474,7 +1538,7 @@ async function renderStudentsDirectory() {
     // Calculate class count
     const classCount = filterClass === 'all'
       ? allStudents.length
-      : allStudents.filter(s => s.class === filterClass).length;
+      : allStudents.filter(s => isClassEqual(s.class, filterClass)).length;
 
     // Update Live Count Badges in Students Header
     // USER DIRECTIVE: "Make students total div with round square small color fill div...dont show second div if selected class is all"
@@ -1500,7 +1564,7 @@ async function renderStudentsDirectory() {
     }
 
     // Filter by class
-    let students = filterClass === 'all' ? allStudents : allStudents.filter(s => s.class === filterClass);
+    let students = filterClass === 'all' ? allStudents : allStudents.filter(s => isClassEqual(s.class, filterClass));
 
     // Filter by search query if any
     if (searchTerm) {
@@ -1726,7 +1790,7 @@ async function updateModalStudentCounts() {
       const allStudents = allRes.data;
       const totalCount = allStudents.length;
       const classCount = (selectedClass && selectedClass !== 'all')
-        ? allStudents.filter(s => s.class === selectedClass).length
+        ? allStudents.filter(s => isClassEqual(s.class, selectedClass)).length
         : 0;
 
       const modalTotal = document.getElementById('modal-add-total-count');
@@ -2315,8 +2379,10 @@ async function openEditStudentModal(id) {
     if (classSelect) {
       classSelect.innerHTML = (classesList || []).map(c => {
         const cName = c.name || c;
-        return `<option value="${escapeHtml(cName)}" ${cName === student.class ? 'selected' : ''}>${escapeHtml(cName)}</option>`;
+        return `<option value="${escapeHtml(cName)}" ${isClassEqual(cName, student.class) ? 'selected' : ''}>${escapeHtml(cName)}</option>`;
       }).join('');
+      const matchedOpt = Array.from(classSelect.options).find(o => isClassEqual(o.value, student.class));
+      if (matchedOpt) classSelect.value = matchedOpt.value;
     }
 
     const setVal = (inputKey, val) => {
@@ -3807,7 +3873,7 @@ function renderTeacherLogSessionsList() {
     filtered = filtered.filter(s => s.date && String(s.date).startsWith(selectedYear));
   }
   if (selectedClass !== 'all') {
-    filtered = filtered.filter(s => s.class === selectedClass);
+    filtered = filtered.filter(s => isClassEqual(s.class, selectedClass));
   }
 
   if (filtered.length === 0) {
@@ -4220,7 +4286,7 @@ function filterTimetableSubjectsByClass() {
   const subjectSelect = document.getElementById('slot-input-subject');
   if (!classSelect || !subjectSelect) return;
   const selectedClass = classSelect.value;
-  const cls = classesList.find(c => (c.name || c) === selectedClass);
+  const cls = classesList.find(c => isClassEqual(c.name || c, selectedClass));
   const subjects = (cls && cls.assignedSubjects && cls.assignedSubjects.length > 0)
     ? cls.assignedSubjects
     : subjectsList.map(s => s.name || s);
@@ -4798,7 +4864,7 @@ async function handleExportAttClassChange() {
   if (classVal !== 'all') {
     const classSubs = filteredSubjects.filter(s => {
       if (!s.class || s.class === 'all' || s.class === 'All') return true;
-      return s.class === classVal;
+      return isClassEqual(s.class, classVal);
     });
     if (classSubs.length > 0) filteredSubjects = classSubs;
   }

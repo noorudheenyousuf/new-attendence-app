@@ -3,24 +3,25 @@ const router = express.Router();
 const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
+const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/reports/class
-// @desc    Whole class students report with roll, sessions, present, absent, late, percent
+// @desc    Whole class students report with roll, sessions, present, absent, late, percent (case-insensitive)
 router.get('/class', async (req, res) => {
   try {
     const { class: className, year, period, subject } = req.query;
     const isAllClasses = !className || className === 'all';
 
     // 1. Fetch students (all classes or specific class)
-    const studentFilter = isAllClasses ? {} : { class: className };
+    const studentFilter = isAllClasses ? {} : { class: caseInsensitiveRegex(className) };
     const students = await Student.find(studentFilter).sort({ class: 1, roll: 1 });
 
     // 2. Build attendance match filter
-    let attendanceFilter = isAllClasses ? {} : { class: className };
+    let attendanceFilter = isAllClasses ? {} : { class: caseInsensitiveRegex(className) };
 
     // Subject filter ('whole' means all subjects combined)
     if (subject && subject !== 'whole' && subject !== 'all') {
-      attendanceFilter.subject = subject;
+      attendanceFilter.subject = caseInsensitiveRegex(subject);
     }
 
     // Year and Period / Month filters
