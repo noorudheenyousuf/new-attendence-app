@@ -54,9 +54,35 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Notification click handler: focus or open the app when tapped on phone
+// Notification click handler: handles Snooze and OK actions and app opening
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const action = event.action;
+  const tag = event.notification.tag || '';
+
+  if (action === 'snooze') {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        clientList.forEach((client) => {
+          client.postMessage({ type: 'NOTIFICATION_SNOOZED', tag });
+        });
+      })
+    );
+    return;
+  }
+
+  if (action === 'ok') {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        clientList.forEach((client) => {
+          client.postMessage({ type: 'NOTIFICATION_DISMISSED', tag });
+        });
+      })
+    );
+    return;
+  }
+
+  // Default click: focus or open app
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {

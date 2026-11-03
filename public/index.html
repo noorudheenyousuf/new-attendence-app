@@ -536,7 +536,7 @@
         </div>
 
         <!-- Hidden year/class selects kept for JS compatibility -->
-        <select id="teachers-filter-year" class="hidden"><option value="all">All Years (Total)</option></select>
+        <select id="teachers-filter-year" class="hidden"><option value="all">All Years</option></select>
         <select id="teachers-filter-class" class="hidden"><option value="all">All Classes</option></select>
 
         <!-- Teachers Cards Container -->
@@ -588,7 +588,7 @@
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Class Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
           <select id="input-class-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
-            <option value="">-- Select Class Teacher (optional) --</option>
+            <option value="">-- Select Class Teacher --</option>
           </select>
         </div>
         <div>
@@ -623,7 +623,7 @@
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Class Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
           <select id="edit-class-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
-            <option value="">-- Select Class Teacher (optional) --</option>
+            <option value="">-- Select Class Teacher --</option>
           </select>
         </div>
         <div>
@@ -662,7 +662,7 @@
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Subject Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
           <select id="input-sub-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
-            <option value="">Select teacher (optional)...</option>
+            <option value="">Select teacher...</option>
           </select>
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
@@ -692,7 +692,7 @@
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Subject Teacher <span class="text-[var(--text-sub)] font-normal">(optional)</span></label>
           <select id="edit-sub-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
-            <option value="">Select teacher (optional)...</option>
+            <option value="">Select teacher...</option>
           </select>
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
@@ -1972,7 +1972,7 @@
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Subject</label>
           <select id="export-att-subject" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
-            <option value="whole">All Subjects (Combined Whole)</option>
+            <option value="whole">All Subjects</option>
             <!-- Populated dynamically -->
           </select>
         </div>
@@ -1992,7 +1992,7 @@
           <div>
             <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Month / Period</label>
             <select id="export-att-month" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
-              <option value="all-year">All Months (Whole Year)</option>
+              <option value="all-year">All Months</option>
               <option value="01">January</option>
               <option value="02">February</option>
               <option value="03">March</option>
@@ -2077,6 +2077,92 @@
 
     <!-- Scrollable Screen A4 Container -->
     <div id="printable-student-cards" class="w-full max-w-4xl flex flex-col items-center gap-6 pb-12"></div>
+  </div>
+
+  <!-- ================= 6:00 AM TIMETABLE BUBBLE NOTIFICATION MODAL ================= -->
+  <div id="notif-bubble-timetable-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto hidden no-print transition-all duration-300">
+    <div class="relative w-full max-w-md rounded-3xl p-6 shadow-2xl border border-white/20 bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white overflow-hidden my-auto space-y-4">
+      <!-- Decorative Background Bubbles -->
+      <div class="absolute -top-12 -right-12 w-36 h-36 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-300/15 rounded-full blur-xl pointer-events-none"></div>
+      <div class="absolute top-1/2 right-1/4 w-20 h-20 bg-white/10 rounded-full blur-lg pointer-events-none"></div>
+
+      <!-- Header -->
+      <div class="relative flex items-center justify-between pb-3 border-b border-white/15">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-inner text-amber-300">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[10px] font-black uppercase tracking-wider mb-0.5">
+              <span>🌅 Morning Timetable</span>
+            </div>
+            <h3 id="bubble-tt-day-title" class="font-black text-lg text-white">Today's Schedule</h3>
+          </div>
+        </div>
+        <button type="button" onclick="dismissTimetableSummary()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold text-xs transition">✕</button>
+      </div>
+
+      <!-- Schedule Content List: time and subjects one by one -->
+      <div class="relative space-y-2 max-h-64 overflow-y-auto pr-1">
+        <p class="text-[11px] text-cyan-100/80 font-medium">Scheduled classes for today:</p>
+        <div id="bubble-tt-slots-list" class="space-y-2">
+          <!-- Filled dynamically: 9.00 am - 10 am : maths [class name] -->
+        </div>
+      </div>
+
+      <!-- Action Buttons: Snooze and OK -->
+      <div class="relative pt-2 border-t border-white/15 grid grid-cols-2 gap-2.5">
+        <button type="button" onclick="snoozeTimetableSummary()" class="touch-btn py-2.5 px-4 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white font-bold text-xs border border-white/20 flex items-center justify-center gap-1.5 transition">
+          <svg class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span>Snooze</span>
+        </button>
+        <button type="button" onclick="dismissTimetableSummary()" class="touch-btn py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>OK</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 5-MINUTE BEFORE CLASS NOTIFICATION (Semi-Rounded Square Div) ================= -->
+  <div id="notif-preclass-card" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm bg-[var(--card-bg)] text-[var(--text-main)] rounded-2xl p-4 shadow-2xl border-2 border-amber-500/80 backdrop-blur-md hidden no-print transition-all duration-300">
+    <div class="flex items-start gap-3">
+      <!-- Icon with pulse dot -->
+      <div class="relative w-11 h-11 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+        <span class="absolute -top-1 -right-1 flex h-3 w-3">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+        </span>
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between gap-1">
+          <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 font-black text-[10px] uppercase tracking-wider">Starting In 5 Minutes</span>
+          <button type="button" onclick="dismissPreClassAlert()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold">✕</button>
+        </div>
+        <h4 id="preclass-subject-title" class="font-extrabold text-sm text-[var(--text-main)] mt-1 truncate">Mathematics</h4>
+        <div class="flex items-center gap-2 text-xs text-[var(--text-sub)] mt-0.5 flex-wrap">
+          <span id="preclass-time-badge" class="font-bold text-[#245b70] dark:text-cyan-400">09:00 AM - 10:00 AM</span>
+          <span>•</span>
+          <span id="preclass-class-badge" class="font-semibold">Class: BS-FOUR</span>
+        </div>
+        <p id="preclass-room-badge" class="text-[11px] text-[var(--text-sub)] mt-0.5 hidden"></p>
+      </div>
+    </div>
+
+    <!-- Buttons: Snooze and OK -->
+    <div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[var(--border-color)]">
+      <button type="button" onclick="snoozePreClassAlert()" class="touch-btn py-2 px-3 rounded-xl bg-[var(--bg-page)] hover:bg-slate-200 dark:hover:bg-slate-800 text-[var(--text-main)] font-bold text-xs border border-[var(--border-color)] flex items-center justify-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span>Snooze</span>
+      </button>
+      <button type="button" onclick="dismissPreClassAlert()" class="touch-btn py-2 px-3 rounded-xl bg-[#245b70] hover:bg-[#1b4859] text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>OK</span>
+      </button>
+    </div>
   </div>
 
   <!-- TOAST NOTIFICATION -->

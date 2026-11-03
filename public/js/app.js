@@ -3292,7 +3292,7 @@ async function populateTeacherDropdowns(targetSelectId, selectedValue = '') {
   if (!selectEl) return;
 
   const isClassTeacher = targetSelectId.includes('class-teacher');
-  const defaultLabel = isClassTeacher ? '-- Select Class Teacher (optional) --' : '-- Select Teacher (optional) --';
+  const defaultLabel = isClassTeacher ? '-- Select Class Teacher --' : '-- Select Teacher --';
 
   let optionsHtml = `<option value="">${defaultLabel}</option>`;
   cachedTeachersList.forEach(t => {
@@ -4111,7 +4111,7 @@ async function openAddTimetableSlotModal(slotId = null) {
   const isSlotAdmin = currentUser && currentUser.role === 'admin';
   if (teacherSelect) {
     if (isSlotAdmin) {
-      teacherSelect.innerHTML = `<option value="">Select teacher (optional)...</option>` +
+      teacherSelect.innerHTML = `<option value="">Select teacher...</option>` +
         (cachedTeachersList || []).map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
       if (teacherSelectWrapper) teacherSelectWrapper.classList.remove('hidden');
     } else {
@@ -4803,7 +4803,7 @@ async function handleExportAttClassChange() {
     if (classSubs.length > 0) filteredSubjects = classSubs;
   }
 
-  let optionsHtml = `<option value="whole">All Subjects (Combined Whole)</option>`;
+  let optionsHtml = `<option value="whole">All Subjects</option>`;
   filteredSubjects.forEach(s => {
     const name = s.name || s;
     optionsHtml += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
@@ -4827,23 +4827,31 @@ async function executeAttendanceExportCSV() {
       return;
     }
 
-    const headers = [
-      'Student ID',
-      'Name',
-      'Roll No',
-      'Class',
-      'Total Sessions',
-      'Present',
-      'Absent',
-      'Leave',
-      'Percentage (%)',
-      'Status',
-      'Subject Filter',
-      'Year',
-      'Month'
-    ];
+    // Month label mapping
+    const monthNames = {
+      'all-year': 'All Months',
+      '01': 'January', '02': 'February', '03': 'March', '04': 'April',
+      '05': 'May', '06': 'June', '07': 'July', '08': 'August',
+      '09': 'September', '10': 'October', '11': 'November', '12': 'December',
+      '1': 'January', '2': 'February', '3': 'March', '4': 'April',
+      '5': 'May', '6': 'June', '7': 'July', '8': 'August',
+      '9': 'September'
+    };
+    const monthDisplay = monthNames[monthVal] || (monthVal === 'all-year' ? 'All Months' : monthVal);
+    const subjectDisplay = (subjectVal === 'whole' || subjectVal === 'all') ? 'All Subjects' : subjectVal;
+    const classDisplay = (classVal === 'all') ? 'All Classes' : classVal;
+    const yearDisplay = (yearVal === 'all') ? 'All Years' : yearVal;
 
-    const csvRows = [headers.join(',')];
+    // Common info at top, then blank row, then headings in exact order:
+    // id, name, roll, total, present, absent, leave, percent, status
+    const csvRows = [
+      `"Class","${classDisplay.replace(/"/g, '""')}"`,
+      `"Subject","${subjectDisplay.replace(/"/g, '""')}"`,
+      `"Year","${yearDisplay.replace(/"/g, '""')}"`,
+      `"Month","${monthDisplay.replace(/"/g, '""')}"`,
+      `""`,
+      `"Student ID","Name","Roll No","Total Sessions","Present","Absent","Leave","Percentage (%)","Status"`
+    ];
 
     data.forEach(row => {
       const effStatus = row.status || (row.percent >= 90 ? 'Excellent' : row.percent >= 75 ? 'Regular' : row.percent >= 60 ? 'Warning' : 'Critical');
@@ -4851,16 +4859,12 @@ async function executeAttendanceExportCSV() {
         `"${row.studentId !== undefined ? row.studentId : ''}"`,
         `"${(row.name || '').replace(/"/g, '""')}"`,
         `"${row.roll !== undefined ? row.roll : ''}"`,
-        `"${(row.class || classVal).replace(/"/g, '""')}"`,
         `"${row.sessions !== undefined ? row.sessions : 0}"`,
         `"${row.present !== undefined ? row.present : 0}"`,
         `"${row.absent !== undefined ? row.absent : 0}"`,
         `"${row.leave !== undefined ? row.leave : (row.late !== undefined ? row.late : 0)}"`,
         `"${row.percent !== undefined ? row.percent : 100}%"`,
-        `"${effStatus}"`,
-        `"${(subjectVal === 'whole' ? 'All Subjects' : subjectVal).replace(/"/g, '""')}"`,
-        `"${yearVal === 'all' ? 'All Years' : yearVal}"`,
-        `"${monthVal === 'all-year' ? 'Whole Year' : monthVal}"`
+        `"${effStatus}"`
       ];
       csvRows.push(csvRow.join(','));
     });
@@ -4884,8 +4888,10 @@ async function executeAttendanceExportCSV() {
 }
 
 // ================= TIMETABLE NOTIFICATION SCHEDULER =================
-// 1. Daily 6:00 AM summary notification of total timetable subjects for the day
-// 2. Notification 5 minutes before every class start time
+// 1. Daily 6:00 AM summary notification of total timetable subjects for the day with line-by-line format & Snooze/OK
+// 2. Notification 5 minutes before every class start time in a small semi-rounded square div & Snooze/OK
+let activePreClassSlot = null;
+
 function _parseSlotStartTime(timeStr) {
   if (!timeStr) return null;
   const parts = String(timeStr).split(/[-–—to]/i);
@@ -4926,6 +4932,10 @@ async function showAppNotification(title, options = {}) {
     badge: '/icons/icon-192.png',
     vibrate: [200, 100, 200],
     renotify: true,
+    actions: [
+      { action: 'snooze', title: 'Snooze' },
+      { action: 'ok', title: 'OK' }
+    ],
     ...options
   };
 
@@ -4950,6 +4960,121 @@ async function showAppNotification(title, options = {}) {
   }
 }
 
+// Render the 6:00 AM Bubble Timetable Modal
+function renderBubbleTimetableModal(dayName, slots) {
+  const modal = document.getElementById('notif-bubble-timetable-modal');
+  const titleEl = document.getElementById('bubble-tt-day-title');
+  const listEl = document.getElementById('bubble-tt-slots-list');
+  if (!modal || !listEl) return;
+
+  if (titleEl) {
+    titleEl.textContent = `${dayName}'s Schedule`;
+  }
+
+  if (!slots || slots.length === 0) {
+    listEl.innerHTML = `
+      <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-center text-xs text-cyan-100">
+        No classes scheduled for today. Have a wonderful day!
+      </div>
+    `;
+  } else {
+    listEl.innerHTML = slots.map(slot => {
+      const timeStr = slot.timeSlot || slot.time || 'Period';
+      return `
+        <div class="p-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-between gap-3 transition">
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
+              <span class="text-amber-300 font-extrabold">${escapeHtml(timeStr)}</span>
+              <span>:</span>
+              <span class="text-cyan-100">${escapeHtml(slot.subject)}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/20 text-white font-bold">[${escapeHtml(slot.class)}]</span>
+            </div>
+            ${slot.room ? `<div class="text-[10px] text-cyan-200/80 mt-0.5">Room: ${escapeHtml(slot.room)}</div>` : ''}
+          </div>
+          <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 text-amber-300">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  modal.classList.remove('hidden');
+  try { if (navigator.vibrate) navigator.vibrate([150, 80, 150]); } catch(_) {}
+}
+
+function snoozeTimetableSummary() {
+  const modal = document.getElementById('notif-bubble-timetable-modal');
+  if (modal) modal.classList.add('hidden');
+  // Snooze for 15 minutes
+  const snoozeUntil = Date.now() + 15 * 60 * 1000;
+  try { localStorage.setItem('tt_summary_snooze_until', String(snoozeUntil)); } catch(_) {}
+  showToast('Morning timetable snoozed for 15 mins');
+}
+
+function dismissTimetableSummary() {
+  const modal = document.getElementById('notif-bubble-timetable-modal');
+  if (modal) modal.classList.add('hidden');
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  try {
+    localStorage.setItem(`tt_notif_6am_${todayStr}`, 'done');
+    localStorage.removeItem('tt_summary_snooze_until');
+  } catch(_) {}
+  showToast('Timetable acknowledged');
+}
+
+// Render the 5-Minute Pre-Class Small Semi-Rounded Square Notification Div
+function renderPreClassNotificationCard(slot) {
+  activePreClassSlot = slot;
+  const card = document.getElementById('notif-preclass-card');
+  const subjEl = document.getElementById('preclass-subject-title');
+  const timeEl = document.getElementById('preclass-time-badge');
+  const classEl = document.getElementById('preclass-class-badge');
+  const roomEl = document.getElementById('preclass-room-badge');
+  if (!card) return;
+
+  if (subjEl) subjEl.textContent = slot.subject || 'Class';
+  if (timeEl) timeEl.textContent = slot.timeSlot || slot.time || 'Starting Soon';
+  if (classEl) classEl.textContent = `Class: ${slot.class || '-'}`;
+  if (roomEl) {
+    if (slot.room) {
+      roomEl.textContent = `Room: ${slot.room}`;
+      roomEl.classList.remove('hidden');
+    } else {
+      roomEl.classList.add('hidden');
+    }
+  }
+
+  card.classList.remove('hidden');
+  try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch(_) {}
+}
+
+function snoozePreClassAlert() {
+  const card = document.getElementById('notif-preclass-card');
+  if (card) card.classList.add('hidden');
+  if (activePreClassSlot) {
+    const slotKey = activePreClassSlot._id || (activePreClassSlot.day + '_' + activePreClassSlot.timeSlot + '_' + activePreClassSlot.subject);
+    const snoozeUntil = Date.now() + 2 * 60 * 1000; // Snooze for 2 minutes
+    try { localStorage.setItem(`tt_preclass_snooze_${slotKey}`, String(snoozeUntil)); } catch(_) {}
+  }
+  showToast('Class reminder snoozed for 2 mins');
+}
+
+function dismissPreClassAlert() {
+  const card = document.getElementById('notif-preclass-card');
+  if (card) card.classList.add('hidden');
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (activePreClassSlot) {
+    const slotKey = activePreClassSlot._id || (activePreClassSlot.day + '_' + activePreClassSlot.timeSlot + '_' + activePreClassSlot.subject);
+    try {
+      localStorage.setItem(`tt_notif_5m_${slotKey}_${todayStr}`, 'done');
+      localStorage.removeItem(`tt_preclass_snooze_${slotKey}`);
+    } catch(_) {}
+  }
+}
+
 async function checkAndTriggerTimetableNotifications() {
   try {
     const now = new Date();
@@ -4960,30 +5085,57 @@ async function checkAndTriggerTimetableNotifications() {
     // Fetch all timetable slots
     const res = await API.getTimetable('', '');
     const allSlots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
-    const todaySlots = allSlots.filter(s => {
+    let todaySlots = allSlots.filter(s => {
       const d = (s.day || '').trim().toLowerCase();
       return d === todayName.toLowerCase() || d === 'all days';
     });
 
-    // 1. Daily 6:00 AM summary notification
+    // Sort today's slots chronologically
+    todaySlots.sort((a, b) => {
+      const tA = _parseSlotStartTime(a.timeSlot || a.time);
+      const tB = _parseSlotStartTime(b.timeSlot || b.time);
+      if (!tA && !tB) return 0;
+      if (!tA) return 1;
+      if (!tB) return -1;
+      return (tA.hours * 60 + tA.minutes) - (tB.hours * 60 + tB.minutes);
+    });
+
+    // 1. Daily 6:00 AM summary notification (time and subjects one by one with Snooze & OK)
     const currentHours = now.getHours();
     const summaryNotifKey = `tt_notif_6am_${todayStr}`;
-    if (currentHours >= 6 && !localStorage.getItem(summaryNotifKey)) {
-      localStorage.setItem(summaryNotifKey, 'sent');
-      const uniqueSubjects = [...new Set(todaySlots.map(s => s.subject).filter(Boolean))];
-      const count = todaySlots.length;
-      const title = `📚 Today's Schedule (${todayName})`;
-      const body = count > 0
-        ? `You have ${count} class${count > 1 ? 'es' : ''} today (${uniqueSubjects.join(', ')}).`
+    const snoozeUntil = parseInt(localStorage.getItem('tt_summary_snooze_until') || '0', 10);
+    const isSnoozed = Date.now() < snoozeUntil;
+
+    if (currentHours >= 6 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
+      if (!localStorage.getItem(summaryNotifKey)) {
+        localStorage.setItem(summaryNotifKey, 'shown');
+      }
+
+      // Format line by line: 9.00 am - 10 am : maths [class name]
+      const lines = todaySlots.map(s => {
+        const timePart = s.timeSlot || s.time || 'Period';
+        return `${timePart} : ${s.subject} [${s.class}]`;
+      });
+
+      const bodyText = lines.length > 0
+        ? lines.join('\n')
         : `No classes scheduled for today (${todayName}). Have a wonderful day!`;
 
-      showAppNotification(title, {
-        body,
-        tag: `tt-summary-${todayStr}`
+      // Trigger phone notification
+      showAppNotification(`📚 Today's Schedule (${todayName})`, {
+        body: bodyText,
+        tag: `tt-summary-${todayStr}`,
+        actions: [
+          { action: 'snooze', title: 'Snooze' },
+          { action: 'ok', title: 'OK' }
+        ]
       });
+
+      // Show in-app background bubble notification
+      renderBubbleTimetableModal(todayName, todaySlots);
     }
 
-    // 2. Notification 5 minutes before every class
+    // 2. Notification 5 minutes before every class (semi-rounded square div with Snooze & OK)
     todaySlots.forEach(slot => {
       const timeInfo = _parseSlotStartTime(slot.timeSlot || slot.time);
       if (!timeInfo) return;
@@ -4994,16 +5146,28 @@ async function checkAndTriggerTimetableNotifications() {
 
       // Trigger if class starts in between 0 and 5.5 minutes
       if (diffMinutes >= 0 && diffMinutes <= 5.5) {
-        const slotKey = `tt_notif_5m_${slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject)}_${todayStr}`;
-        if (!localStorage.getItem(slotKey)) {
-          localStorage.setItem(slotKey, 'sent');
-          const title = `⏰ Class in 5 Minutes: ${slot.subject || 'Class'}`;
-          const body = `${slot.subject} for ${slot.class}${slot.room ? ' in ' + slot.room : ''} starts at ${slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`}.`;
+        const slotKey = slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject);
+        const slotDoneKey = `tt_notif_5m_${slotKey}_${todayStr}`;
+        const slotSnoozeUntil = parseInt(localStorage.getItem(`tt_preclass_snooze_${slotKey}`) || '0', 10);
+        const isSlotSnoozed = Date.now() < slotSnoozeUntil;
 
+        if (localStorage.getItem(slotDoneKey) !== 'done' && !isSlotSnoozed) {
+          const timePart = slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`;
+          const title = `⏰ Class in 5 Minutes: ${slot.subject || 'Class'}`;
+          const body = `${timePart} : ${slot.subject} [${slot.class}]${slot.room ? ' • Room ' + slot.room : ''}`;
+
+          // Trigger phone notification with Snooze and OK
           showAppNotification(title, {
             body,
-            tag: `tt-class-${slot._id || slotKey}`
+            tag: `tt-class-${slotKey}`,
+            actions: [
+              { action: 'snooze', title: 'Snooze' },
+              { action: 'ok', title: 'OK' }
+            ]
           });
+
+          // Show in-app small semi-rounded square notification
+          renderPreClassNotificationCard(slot);
         }
       }
     });
@@ -5017,6 +5181,23 @@ function initTimetableNotificationScheduler() {
     setTimeout(() => {
       try { Notification.requestPermission(); } catch(_) {}
     }, 2000);
+  }
+
+  // Listen for actions from Service Worker notification clicks (Snooze / OK)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data) {
+        if (event.data.type === 'NOTIFICATION_SNOOZED') {
+          const tag = event.data.tag || '';
+          if (tag.startsWith('tt-summary-')) snoozeTimetableSummary();
+          else if (tag.startsWith('tt-class-')) snoozePreClassAlert();
+        } else if (event.data.type === 'NOTIFICATION_DISMISSED') {
+          const tag = event.data.tag || '';
+          if (tag.startsWith('tt-summary-')) dismissTimetableSummary();
+          else if (tag.startsWith('tt-class-')) dismissPreClassAlert();
+        }
+      }
+    });
   }
 
   // Check immediately on load
