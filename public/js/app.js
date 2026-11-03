@@ -168,6 +168,7 @@ function hideSplashLoader() {
 
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   initServiceWorker();
   updateDateDisplay();
   selectTopTab('attendance');
@@ -183,6 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadActivityLogs();
     await checkUnreadMessages();
     _applyTeachersTabVisibility();
+    initTimetableNotificationScheduler();
   } catch (err) {
     console.error('[App Init Error]', err);
   } finally {
@@ -337,17 +339,35 @@ function updateUserUI() {
   loadActivityLogs();
 }
 
-// Dark Mode Toggle with Sun SVG
+// Dark Mode Toggle with Sun SVG & persistent storage
+function initTheme() {
+  try {
+    const savedTheme = localStorage.getItem('app_theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    isDarkMode = savedTheme ? savedTheme === 'dark' : prefersDark;
+    const body = document.getElementById('app-body');
+    if (isDarkMode) {
+      body?.classList.add('dark-mode');
+      document.documentElement.classList.add('dark');
+    } else {
+      body?.classList.remove('dark-mode');
+      document.documentElement.classList.remove('dark');
+    }
+  } catch (_) {}
+}
+
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   const body = document.getElementById('app-body');
   if (isDarkMode) {
-    body.classList.add('dark-mode');
+    body?.classList.add('dark-mode');
     document.documentElement.classList.add('dark');
+    try { localStorage.setItem('app_theme', 'dark'); } catch(_) {}
     showToast('Dark Mode Activated');
   } else {
-    body.classList.remove('dark-mode');
+    body?.classList.remove('dark-mode');
     document.documentElement.classList.remove('dark');
+    try { localStorage.setItem('app_theme', 'light'); } catch(_) {}
     showToast('Light Mode Activated');
   }
   renderGoogleButton();
@@ -4450,6 +4470,27 @@ async function handleAdminToggleStudentPrint(checked) {
   }
 }
 
+// ================= PRINT / EXPORT OPTION CHOICE MODAL =================
+function openPrintDataChoiceModal() {
+  const modal = document.getElementById('modal-print-data-choice');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closePrintDataChoiceModal() {
+  const modal = document.getElementById('modal-print-data-choice');
+  if (modal) modal.classList.add('hidden');
+}
+
+function selectPrintOption(type) {
+  closePrintDataChoiceModal();
+  if (type === 'students') {
+    openStudentExportModal();
+  } else if (type === 'attendance') {
+    openAttendanceExportModal();
+  }
+}
+
+// ================= STUDENT DETAILS PRINT & CSV EXPORT =================
 async function openStudentExportModal() {
   const modal = document.getElementById('modal-student-export');
   if (!modal) return;
@@ -4482,18 +4523,24 @@ function toggleAllExportCheckboxes() {
   checkboxes.forEach(c => c.checked = !allChecked);
 }
 
+// Exact order: photo, id, name, class, roll no, address, place, district, state, father's name, father's number, mother's name, year joined, rank, previous college
 function _getSelectedExportFields() {
   return {
     photo: Boolean(document.getElementById('chk-export-photo')?.checked),
     id: Boolean(document.getElementById('chk-export-id')?.checked),
     name: Boolean(document.getElementById('chk-export-name')?.checked),
     class: Boolean(document.getElementById('chk-export-class')?.checked),
+    roll: Boolean(document.getElementById('chk-export-roll')?.checked),
+    address: Boolean(document.getElementById('chk-export-address')?.checked),
+    place: Boolean(document.getElementById('chk-export-place')?.checked),
+    district: Boolean(document.getElementById('chk-export-district')?.checked),
+    state: Boolean(document.getElementById('chk-export-state')?.checked),
     father: Boolean(document.getElementById('chk-export-father')?.checked),
     mobile: Boolean(document.getElementById('chk-export-mobile')?.checked),
-    place: Boolean(document.getElementById('chk-export-place')?.checked),
-    state: Boolean(document.getElementById('chk-export-state')?.checked),
-    roll: Boolean(document.getElementById('chk-export-roll')?.checked),
-    mother: Boolean(document.getElementById('chk-export-mother')?.checked)
+    mother: Boolean(document.getElementById('chk-export-mother')?.checked),
+    year: Boolean(document.getElementById('chk-export-year')?.checked),
+    rank: Boolean(document.getElementById('chk-export-rank')?.checked),
+    college: Boolean(document.getElementById('chk-export-college')?.checked)
   };
 }
 
@@ -4532,15 +4579,20 @@ async function executeStudentPrintA4() {
         const photo = st.photoUrl || DEFAULT_AVATAR;
         const fatherName = (st.familyDetails && st.familyDetails.fatherName) || '-';
         const fatherMobile = (st.familyDetails && st.familyDetails.fatherMobile) || '-';
+        const motherName = (st.familyDetails && st.familyDetails.motherName) || '-';
+        const address = (st.address && st.address.fullAddress) || '-';
         const place = (st.address && st.address.place) || '-';
+        const district = (st.address && st.address.district) || '-';
         const state = (st.address && st.address.state) || '-';
         const roll = st.roll !== undefined ? st.roll : '-';
-        const motherName = (st.familyDetails && st.familyDetails.motherName) || '-';
+        const yearJoined = (st.academicStatus && st.academicStatus.yearJoined) || '-';
+        const rank = (st.academicStatus && st.academicStatus.rank) || '-';
+        const college = (st.academicStatus && st.academicStatus.previousCollege) || '-';
 
         html += `
           <div class="a4-student-card">
             <!-- Header: Photo + ID & Name -->
-            <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3.5px;margin-bottom:2.5px;">
+            <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:2px;">
               ${fields.photo ? `
                 <img src="${photo}" alt="" style="width:34px;height:34px;border-radius:6px;object-fit:cover;border:1px solid #cbd5e1;flex-shrink:0;">
               ` : `
@@ -4558,13 +4610,18 @@ async function executeStudentPrintA4() {
               </div>
             </div>
 
-            <!-- Details Body (Starts directly under header without gap) -->
+            <!-- Details Body (Compact, no redundant spacing) -->
             <div style="display:flex;flex-direction:column;gap:1.5px;font-size:6.8pt;color:#334155;line-height:1.25;min-width:0;">
+              ${fields.address ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Address:</strong> ${escapeHtml(address)}</div>` : ''}
+              ${fields.place ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Place:</strong> ${escapeHtml(place)}</div>` : ''}
+              ${fields.district ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">District:</strong> ${escapeHtml(district)}</div>` : ''}
+              ${fields.state ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">State:</strong> ${escapeHtml(state)}</div>` : ''}
               ${fields.father ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Father:</strong> ${escapeHtml(fatherName)}</div>` : ''}
               ${fields.mobile ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Contact:</strong> ${escapeHtml(fatherMobile)}</div>` : ''}
-              ${fields.place ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Place:</strong> ${escapeHtml(place)}</div>` : ''}
-              ${fields.state ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">State:</strong> ${escapeHtml(state)}</div>` : ''}
               ${fields.mother ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Mother:</strong> ${escapeHtml(motherName)}</div>` : ''}
+              ${fields.year ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Year:</strong> ${escapeHtml(yearJoined)}</div>` : ''}
+              ${fields.rank ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">Rank:</strong> ${escapeHtml(rank)}</div>` : ''}
+              ${fields.college ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="color:#0f172a;font-weight:700;">College:</strong> ${escapeHtml(college)}</div>` : ''}
             </div>
 
             <!-- Footer Badge -->
@@ -4612,6 +4669,8 @@ window.addEventListener('afterprint', () => {
   document.body.classList.remove('print-cards-active');
 });
 
+// CSV Export in the exact order requested by user:
+// photo, id, name, class, roll no, address, place, district, state, father's name, father's number, mother's name, year joined, rank, previous college
 async function executeStudentExportCSV() {
   const classFilter = document.getElementById('export-student-class')?.value || 'all';
   const fields = _getSelectedExportFields();
@@ -4627,15 +4686,21 @@ async function executeStudentExportCSV() {
     }
 
     const headers = [];
+    if (fields.photo) headers.push('Photo URL');
     if (fields.id) headers.push('Student ID');
     if (fields.name) headers.push('Name');
     if (fields.class) headers.push('Class');
     if (fields.roll) headers.push('Roll No');
+    if (fields.address) headers.push('Address');
+    if (fields.place) headers.push('Place');
+    if (fields.district) headers.push('District');
+    if (fields.state) headers.push('State');
     if (fields.father) headers.push("Father's Name");
     if (fields.mobile) headers.push("Father's Number");
-    if (fields.place) headers.push('Place');
-    if (fields.state) headers.push('State');
     if (fields.mother) headers.push("Mother's Name");
+    if (fields.year) headers.push('Year Joined');
+    if (fields.rank) headers.push('Rank');
+    if (fields.college) headers.push('Previous College');
 
     const csvRows = [headers.join(',')];
 
@@ -4643,19 +4708,30 @@ async function executeStudentExportCSV() {
       const row = [];
       const fatherName = (st.familyDetails && st.familyDetails.fatherName) || '';
       const fatherMobile = (st.familyDetails && st.familyDetails.fatherMobile) || '';
-      const place = (st.address && st.address.place) || '';
-      const state = (st.address && st.address.state) || '';
       const motherName = (st.familyDetails && st.familyDetails.motherName) || '';
+      const address = (st.address && st.address.fullAddress) || '';
+      const place = (st.address && st.address.place) || '';
+      const district = (st.address && st.address.district) || '';
+      const state = (st.address && st.address.state) || '';
+      const yearJoined = (st.academicStatus && st.academicStatus.yearJoined) || '';
+      const rank = (st.academicStatus && st.academicStatus.rank) || '';
+      const prevCollege = (st.academicStatus && st.academicStatus.previousCollege) || '';
 
+      if (fields.photo) row.push(`"${(st.photoUrl || '').replace(/"/g, '""')}"`);
       if (fields.id) row.push(`"${st.studentId}"`);
       if (fields.name) row.push(`"${(st.name || '').replace(/"/g, '""')}"`);
       if (fields.class) row.push(`"${(st.class || '').replace(/"/g, '""')}"`);
       if (fields.roll) row.push(`"${st.roll !== undefined ? st.roll : ''}"`);
+      if (fields.address) row.push(`"${address.replace(/"/g, '""')}"`);
+      if (fields.place) row.push(`"${place.replace(/"/g, '""')}"`);
+      if (fields.district) row.push(`"${district.replace(/"/g, '""')}"`);
+      if (fields.state) row.push(`"${state.replace(/"/g, '""')}"`);
       if (fields.father) row.push(`"${fatherName.replace(/"/g, '""')}"`);
       if (fields.mobile) row.push(`"${fatherMobile.replace(/"/g, '""')}"`);
-      if (fields.place) row.push(`"${place.replace(/"/g, '""')}"`);
-      if (fields.state) row.push(`"${state.replace(/"/g, '""')}"`);
       if (fields.mother) row.push(`"${motherName.replace(/"/g, '""')}"`);
+      if (fields.year) row.push(`"${yearJoined.replace(/"/g, '""')}"`);
+      if (fields.rank) row.push(`"${rank.replace(/"/g, '""')}"`);
+      if (fields.college) row.push(`"${prevCollege.replace(/"/g, '""')}"`);
 
       csvRows.push(row.join(','));
     });
@@ -4674,4 +4750,277 @@ async function executeStudentExportCSV() {
   } catch (err) {
     showToast('CSV Export failed: ' + err.message, true);
   }
+}
+
+// ================= ATTENDANCE RECORD CSV EXPORT =================
+async function openAttendanceExportModal() {
+  const modal = document.getElementById('modal-attendance-export');
+  if (!modal) return;
+
+  if (!classesList || classesList.length === 0) {
+    try { await loadClasses(); } catch(_) {}
+  }
+
+  const classSelect = document.getElementById('export-att-class');
+  if (classSelect) {
+    const currentVal = classSelect.value || 'all';
+    classSelect.innerHTML = `<option value="all">All Classes</option>` +
+      classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
+    classSelect.value = currentVal;
+  }
+
+  await handleExportAttClassChange();
+
+  const currentYear = new Date().getFullYear();
+  const yearSelect = document.getElementById('export-att-year');
+  if (yearSelect && !yearSelect.value) {
+    yearSelect.value = String(currentYear);
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeAttendanceExportModal() {
+  const modal = document.getElementById('modal-attendance-export');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleExportAttClassChange() {
+  const classVal = document.getElementById('export-att-class')?.value || 'all';
+  const subjectSelect = document.getElementById('export-att-subject');
+  if (!subjectSelect) return;
+
+  if (!subjectsList || subjectsList.length === 0) {
+    try { await loadSubjects(); } catch(_) {}
+  }
+
+  let filteredSubjects = subjectsList || [];
+  if (classVal !== 'all') {
+    const classSubs = filteredSubjects.filter(s => {
+      if (!s.class || s.class === 'all' || s.class === 'All') return true;
+      return s.class === classVal;
+    });
+    if (classSubs.length > 0) filteredSubjects = classSubs;
+  }
+
+  let optionsHtml = `<option value="whole">All Subjects (Combined Whole)</option>`;
+  filteredSubjects.forEach(s => {
+    const name = s.name || s;
+    optionsHtml += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+  });
+  subjectSelect.innerHTML = optionsHtml;
+}
+
+async function executeAttendanceExportCSV() {
+  const classVal = document.getElementById('export-att-class')?.value || 'all';
+  const subjectVal = document.getElementById('export-att-subject')?.value || 'whole';
+  const yearVal = document.getElementById('export-att-year')?.value || 'all';
+  const monthVal = document.getElementById('export-att-month')?.value || 'all-year';
+
+  try {
+    showToast('Fetching attendance data...');
+    const res = await API.getClassReport(classVal, yearVal, monthVal, subjectVal);
+    const data = (res && res.data) ? res.data : [];
+
+    if (!data || data.length === 0) {
+      showToast('No attendance records found for selected filters', true);
+      return;
+    }
+
+    const headers = [
+      'Student ID',
+      'Name',
+      'Roll No',
+      'Class',
+      'Total Sessions',
+      'Present',
+      'Absent',
+      'Leave',
+      'Percentage (%)',
+      'Status',
+      'Subject Filter',
+      'Year',
+      'Month'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    data.forEach(row => {
+      const effStatus = row.status || (row.percent >= 90 ? 'Excellent' : row.percent >= 75 ? 'Regular' : row.percent >= 60 ? 'Warning' : 'Critical');
+      const csvRow = [
+        `"${row.studentId !== undefined ? row.studentId : ''}"`,
+        `"${(row.name || '').replace(/"/g, '""')}"`,
+        `"${row.roll !== undefined ? row.roll : ''}"`,
+        `"${(row.class || classVal).replace(/"/g, '""')}"`,
+        `"${row.sessions !== undefined ? row.sessions : 0}"`,
+        `"${row.present !== undefined ? row.present : 0}"`,
+        `"${row.absent !== undefined ? row.absent : 0}"`,
+        `"${row.leave !== undefined ? row.leave : (row.late !== undefined ? row.late : 0)}"`,
+        `"${row.percent !== undefined ? row.percent : 100}%"`,
+        `"${effStatus}"`,
+        `"${(subjectVal === 'whole' ? 'All Subjects' : subjectVal).replace(/"/g, '""')}"`,
+        `"${yearVal === 'all' ? 'All Years' : yearVal}"`,
+        `"${monthVal === 'all-year' ? 'Whole Year' : monthVal}"`
+      ];
+      csvRows.push(csvRow.join(','));
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
+    const downloadAnchor = document.createElement('a');
+    const classTag = classVal === 'all' ? 'All_Classes' : classVal.replace(/\s+/g, '_');
+    const subTag = subjectVal === 'whole' ? 'All_Subjects' : subjectVal.replace(/\s+/g, '_');
+    const dateTag = new Date().toISOString().slice(0, 10);
+    downloadAnchor.setAttribute("href", csvContent);
+    downloadAnchor.setAttribute("download", `Attendance_${classTag}_${subTag}_${dateTag}.csv`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    showToast('Attendance CSV downloaded successfully!');
+    closeAttendanceExportModal();
+  } catch (err) {
+    showToast('Attendance Export failed: ' + (err.message || 'Unknown error'), true);
+  }
+}
+
+// ================= TIMETABLE NOTIFICATION SCHEDULER =================
+// 1. Daily 6:00 AM summary notification of total timetable subjects for the day
+// 2. Notification 5 minutes before every class start time
+function _parseSlotStartTime(timeStr) {
+  if (!timeStr) return null;
+  const parts = String(timeStr).split(/[-–—to]/i);
+  let startPart = (parts[0] || '').trim();
+
+  let meridiem = null;
+  const matchMeridiem = String(timeStr).match(/(am|pm)/i);
+  if (matchMeridiem) {
+    const startM = startPart.match(/(am|pm)/i);
+    meridiem = startM ? startM[1].toLowerCase() : matchMeridiem[1].toLowerCase();
+  }
+
+  const timeMatch = startPart.match(/(\d{1,2})[:.](\d{2})/);
+  let hours = 0;
+  let minutes = 0;
+  if (timeMatch) {
+    hours = parseInt(timeMatch[1], 10);
+    minutes = parseInt(timeMatch[2], 10);
+  } else {
+    const singleHourMatch = startPart.match(/(\d{1,2})/);
+    if (!singleHourMatch) return null;
+    hours = parseInt(singleHourMatch[1], 10);
+    minutes = 0;
+  }
+
+  if (meridiem === 'pm' && hours < 12) hours += 12;
+  if (meridiem === 'am' && hours === 12) hours = 0;
+
+  if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  return { hours, minutes };
+}
+
+async function showAppNotification(title, options = {}) {
+  const defaultOpts = {
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: [200, 100, 200],
+    renotify: true,
+    ...options
+  };
+
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch(_) {}
+    }
+    if (Notification.permission !== 'granted') return;
+
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && reg.showNotification) {
+          return reg.showNotification(title, defaultOpts);
+        }
+      } catch(_) {}
+    }
+    return new Notification(title, defaultOpts);
+  } catch (err) {
+    console.warn('[Notification Error]', err);
+  }
+}
+
+async function checkAndTriggerTimetableNotifications() {
+  try {
+    const now = new Date();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = dayNames[now.getDay()];
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Fetch all timetable slots
+    const res = await API.getTimetable('', '');
+    const allSlots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+    const todaySlots = allSlots.filter(s => {
+      const d = (s.day || '').trim().toLowerCase();
+      return d === todayName.toLowerCase() || d === 'all days';
+    });
+
+    // 1. Daily 6:00 AM summary notification
+    const currentHours = now.getHours();
+    const summaryNotifKey = `tt_notif_6am_${todayStr}`;
+    if (currentHours >= 6 && !localStorage.getItem(summaryNotifKey)) {
+      localStorage.setItem(summaryNotifKey, 'sent');
+      const uniqueSubjects = [...new Set(todaySlots.map(s => s.subject).filter(Boolean))];
+      const count = todaySlots.length;
+      const title = `📚 Today's Schedule (${todayName})`;
+      const body = count > 0
+        ? `You have ${count} class${count > 1 ? 'es' : ''} today (${uniqueSubjects.join(', ')}).`
+        : `No classes scheduled for today (${todayName}). Have a wonderful day!`;
+
+      showAppNotification(title, {
+        body,
+        tag: `tt-summary-${todayStr}`
+      });
+    }
+
+    // 2. Notification 5 minutes before every class
+    todaySlots.forEach(slot => {
+      const timeInfo = _parseSlotStartTime(slot.timeSlot || slot.time);
+      if (!timeInfo) return;
+
+      const slotStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), timeInfo.hours, timeInfo.minutes, 0, 0);
+      const diffMs = slotStart.getTime() - now.getTime();
+      const diffMinutes = diffMs / (60 * 1000);
+
+      // Trigger if class starts in between 0 and 5.5 minutes
+      if (diffMinutes >= 0 && diffMinutes <= 5.5) {
+        const slotKey = `tt_notif_5m_${slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject)}_${todayStr}`;
+        if (!localStorage.getItem(slotKey)) {
+          localStorage.setItem(slotKey, 'sent');
+          const title = `⏰ Class in 5 Minutes: ${slot.subject || 'Class'}`;
+          const body = `${slot.subject} for ${slot.class}${slot.room ? ' in ' + slot.room : ''} starts at ${slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`}.`;
+
+          showAppNotification(title, {
+            body,
+            tag: `tt-class-${slot._id || slotKey}`
+          });
+        }
+      }
+    });
+  } catch (err) {
+    console.debug('[Timetable Notification Check Failed]', err);
+  }
+}
+
+function initTimetableNotificationScheduler() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => {
+      try { Notification.requestPermission(); } catch(_) {}
+    }, 2000);
+  }
+
+  // Check immediately on load
+  checkAndTriggerTimetableNotifications();
+  // Check every 30 seconds
+  setInterval(checkAndTriggerTimetableNotifications, 30000);
 }

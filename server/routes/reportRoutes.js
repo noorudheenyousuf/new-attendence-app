@@ -9,15 +9,14 @@ const Subject = require('../models/Subject');
 router.get('/class', async (req, res) => {
   try {
     const { class: className, year, period, subject } = req.query;
-    if (!className) {
-      return res.status(400).json({ success: false, message: 'Class parameter is required' });
-    }
+    const isAllClasses = !className || className === 'all';
 
-    // 1. Fetch all students in this class
-    const students = await Student.find({ class: className }).sort({ roll: 1 });
+    // 1. Fetch students (all classes or specific class)
+    const studentFilter = isAllClasses ? {} : { class: className };
+    const students = await Student.find(studentFilter).sort({ class: 1, roll: 1 });
 
     // 2. Build attendance match filter
-    let attendanceFilter = { class: className };
+    let attendanceFilter = isAllClasses ? {} : { class: className };
 
     // Subject filter ('whole' means all subjects combined)
     if (subject && subject !== 'whole' && subject !== 'all') {
