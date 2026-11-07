@@ -338,11 +338,32 @@ body.dark-mode .status-critical {
     padding: 0 !important;
   }
 
-  body.print-report-active > *:not(main) {
+  body.print-report-active > *:not(#app-shell) {
     display: none !important;
   }
 
-  body.print-report-active main {
+  body.print-report-active #app-shell {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  body.print-report-active #app-shell > header,
+  body.print-report-active #app-shell > nav {
+    display: none !important;
+  }
+
+  body.print-report-active #app-shell > main {
     display: block !important;
     position: static !important;
     overflow: visible !important;
@@ -353,9 +374,10 @@ body.dark-mode .status-critical {
     margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+    background: transparent !important;
   }
 
-  body.print-report-active main > *:not(#view-report) {
+  body.print-report-active #app-shell > main > section:not(#view-report) {
     display: none !important;
   }
 

@@ -1604,11 +1604,13 @@ function closeStudentLogModal() {
 }
 
 function printReport() {
+  const printable = document.getElementById('printable-report');
+  if (!printable || printable.classList.contains('hidden')) {
+    showToast('Please select a class and subject to load a report first.', true);
+    return;
+  }
   document.body.classList.add('print-report-active');
   window.print();
-  setTimeout(() => {
-    document.body.classList.remove('print-report-active');
-  }, 1000);
 }
 
 // ================= STUDENTS DIRECTORY =================
@@ -4923,6 +4925,14 @@ function triggerStudentCardsPrint() {
   }, 1000);
 }
 
+window.addEventListener('beforeprint', () => {
+  const reportView = document.getElementById('view-report');
+  const printable = document.getElementById('printable-report');
+  if (reportView && !reportView.classList.contains('hidden') && printable && !printable.classList.contains('hidden') && !document.body.classList.contains('print-cards-active')) {
+    document.body.classList.add('print-report-active');
+  }
+});
+
 window.addEventListener('afterprint', () => {
   document.body.classList.remove('print-cards-active');
   document.body.classList.remove('print-report-active');
@@ -5393,9 +5403,12 @@ async function checkAndTriggerTimetableNotifications() {
 
     // USER DIRECTIVE: "all accounts only show their own notification..."
     const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
+    const isUserAdmin = currentUser && currentUser.role === 'admin';
     const mySlots = allSlots.filter(s => {
       const slotTeacher = (s.teacher || '').trim().toLowerCase();
-      return myName && slotTeacher === myName;
+      if (myName && slotTeacher === myName) return true;
+      if (isUserAdmin && (!slotTeacher || slotTeacher === myName)) return true;
+      return false;
     });
 
     const currentHours = now.getHours();
