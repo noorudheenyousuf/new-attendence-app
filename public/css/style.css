@@ -314,25 +314,160 @@ body.dark-mode .status-critical {
   border: 1px solid #b91c1c;
 }
 
-/* Print styles for Whole Class Attendance Report */
+/* ==========================================================================
+   PRINT STYLES: Whole Class Attendance Report
+   Ensures seamless multi-page pagination with repeating headers & compact rows
+   (20-25 students per A4 page instead of cutting off after 4 rows)
+   ========================================================================== */
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
   }
-  #printable-report, #printable-report * {
-    visibility: visible;
+
+  /* When printing Report */
+  body.print-report-active {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  #printable-report {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    background: white !important;
-    color: black !important;
-    padding: 20px;
+
+  body.print-report-active > *:not(main) {
+    display: none !important;
+  }
+
+  body.print-report-active main {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body.print-report-active main > *:not(#view-report) {
+    display: none !important;
+  }
+
+  body.print-report-active #view-report {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  body.print-report-active #view-report > *:not(#printable-report) {
+    display: none !important;
+  }
+
+  body.print-report-active #printable-report {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    visibility: visible !important;
   }
+
+  body.print-report-active #printable-report * {
+    visibility: visible !important;
+  }
+
+  body.print-report-active #printable-report .overflow-x-auto {
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  body.print-report-active #printable-report table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: auto !important;
+  }
+
+  body.print-report-active #printable-report thead {
+    display: table-header-group !important;
+  }
+
+  body.print-report-active #printable-report tbody {
+    display: table-row-group !important;
+  }
+
+  body.print-report-active #printable-report tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  body.print-report-active #printable-report th {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-size: 8.5pt !important;
+    font-weight: 800 !important;
+    padding: 5px 4px !important;
+    border-bottom: 2px solid #94a3b8 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.print-report-active #printable-report td {
+    padding: 4px 4px !important;
+    font-size: 8.5pt !important;
+    color: #0f172a !important;
+  }
+
+  body.print-report-active #printable-report td .w-8.h-8 {
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 8pt !important;
+    border-radius: 4px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.print-report-active #printable-report td img {
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 4px !important;
+  }
+
+  body.print-report-active #printable-report .status-badge {
+    padding: 1px 6px !important;
+    font-size: 7.5pt !important;
+    border-radius: 4px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Fallback if Ctrl+P is pressed directly */
+  body:not(.print-cards-active):not(.print-report-active) #printable-report {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
   .no-print {
     display: none !important;
   }

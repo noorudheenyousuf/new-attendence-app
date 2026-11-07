@@ -14,7 +14,13 @@ router.get('/', authMiddleware, async (req, res) => {
       filter.class = caseInsensitiveRegex(className);
     }
     if (day && day !== 'all') {
-      filter.day = { $in: [day, 'All Days'] };
+      filter.$or = [
+        { day: day },
+        { day: 'All Days' },
+        { day: { $regex: new RegExp('\\b' + day + '\\b', 'i') } },
+        { days: day },
+        { days: 'All Days' }
+      ];
     }
 
     const slots = await Timetable.find(filter).sort({ order: 1, createdAt: 1 }).lean();
@@ -31,7 +37,12 @@ router.get('/', authMiddleware, async (req, res) => {
 // @desc    Create a timetable slot
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { day, timeSlot, class: className, subject, teacher, room } = req.body;
+    let { day, days, timeSlot, class: className, subject, teacher, room } = req.body;
+    if (Array.isArray(days) && days.length > 0) {
+      if (!day) day = days.join(', ');
+    } else if (day && (!days || days.length === 0)) {
+      days = day.split(',').map(d => d.trim()).filter(Boolean);
+    }
     if (!day || !timeSlot || !className || !subject) {
       return res.status(400).json({ success: false, message: 'Day, time slot, class, and subject are required' });
     }
@@ -41,6 +52,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const slot = new Timetable({
       day,
+      days: Array.isArray(days) ? days : [day],
       timeSlot: timeSlot.trim(),
       class: className.trim(),
       subject: subject.trim(),
@@ -80,11 +92,18 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 // @desc    Update a timetable slot
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { day, timeSlot, class: className, subject, teacher, room } = req.body;
+    let { day, days, timeSlot, class: className, subject, teacher, room } = req.body;
+    if (Array.isArray(days) && days.length > 0) {
+      if (!day) day = days.join(', ');
+    } else if (day && (!days || days.length === 0)) {
+      days = day.split(',').map(d => d.trim()).filter(Boolean);
+    }
+
     const updated = await Timetable.findByIdAndUpdate(
       req.params.id,
       {
         ...(day && { day }),
+        ...(Array.isArray(days) && { days }),
         ...(timeSlot && { timeSlot: timeSlot.trim() }),
         ...(className && { class: className.trim() }),
         ...(subject && { subject: subject.trim() }),

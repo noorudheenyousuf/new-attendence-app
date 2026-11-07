@@ -3,8 +3,12 @@ const mongoose = require('mongoose');
 const timetableSchema = new mongoose.Schema({
   day: {
     type: String,
-    enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'All Days'],
-    required: true
+    required: true,
+    trim: true
+  },
+  days: {
+    type: [String],
+    default: []
   },
   timeSlot: {
     type: String,

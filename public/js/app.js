@@ -365,8 +365,8 @@ function updateUserUI() {
 function initTheme() {
   try {
     const savedTheme = localStorage.getItem('app_theme');
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    isDarkMode = savedTheme ? savedTheme === 'dark' : prefersDark;
+    // Default theme is light; only activate dark if user explicitly chose it
+    isDarkMode = savedTheme === 'dark';
     const body = document.getElementById('app-body');
     if (isDarkMode) {
       body?.classList.add('dark-mode');
@@ -1604,7 +1604,11 @@ function closeStudentLogModal() {
 }
 
 function printReport() {
+  document.body.classList.add('print-report-active');
   window.print();
+  setTimeout(() => {
+    document.body.classList.remove('print-report-active');
+  }, 1000);
 }
 
 // ================= STUDENTS DIRECTORY =================
@@ -4230,6 +4234,83 @@ async function renderTimetableSlots() {
   }
 }
 
+let selectedSlotDays = [];
+
+function renderSlotDayChips(initialDays = []) {
+  const container = document.getElementById('slot-day-chips');
+  if (!container) return;
+  const daysList = [
+    { label: 'Mon', full: 'Monday' },
+    { label: 'Tue', full: 'Tuesday' },
+    { label: 'Wed', full: 'Wednesday' },
+    { label: 'Thu', full: 'Thursday' },
+    { label: 'Fri', full: 'Friday' },
+    { label: 'Sat', full: 'Saturday' },
+    { label: 'Sun', full: 'Sunday' },
+    { label: 'All', full: 'All Days' }
+  ];
+
+  if (Array.isArray(initialDays)) {
+    selectedSlotDays = initialDays.map(d => d.trim()).filter(Boolean);
+  } else if (typeof initialDays === 'string' && initialDays) {
+    selectedSlotDays = initialDays.split(',').map(d => d.trim()).filter(Boolean);
+  } else {
+    selectedSlotDays = [];
+  }
+
+  container.innerHTML = daysList.map(d => {
+    const isSelected = selectedSlotDays.includes(d.full) || (d.full === 'All Days' && selectedSlotDays.includes('All Days'));
+    const btnCls = isSelected
+      ? 'bg-[#245b70] text-white border-[#245b70] shadow-xs'
+      : 'bg-[var(--bg-page)] text-[var(--text-sub)] border-[var(--border-color)] hover:text-[var(--text-main)]';
+    return `
+      <button type="button" onclick="toggleSlotDaySelection('${d.full}')"
+        data-day="${d.full}"
+        class="slot-day-chip px-2 py-1.5 rounded-xl border text-xs font-bold transition flex items-center justify-center ${btnCls}">
+        ${d.label}
+      </button>
+    `;
+  }).join('');
+
+  _updateSlotDayHiddenInput();
+}
+
+function toggleSlotDaySelection(dayName) {
+  if (dayName === 'All Days') {
+    if (selectedSlotDays.includes('All Days')) {
+      selectedSlotDays = [];
+    } else {
+      selectedSlotDays = ['All Days'];
+    }
+  } else {
+    selectedSlotDays = selectedSlotDays.filter(d => d !== 'All Days');
+    if (selectedSlotDays.includes(dayName)) {
+      selectedSlotDays = selectedSlotDays.filter(d => d !== dayName);
+    } else {
+      selectedSlotDays.push(dayName);
+    }
+  }
+
+  document.querySelectorAll('.slot-day-chip').forEach(btn => {
+    const d = btn.getAttribute('data-day');
+    const isSelected = selectedSlotDays.includes(d);
+    if (isSelected) {
+      btn.className = 'slot-day-chip px-2 py-1.5 rounded-xl border text-xs font-bold transition flex items-center justify-center bg-[#245b70] text-white border-[#245b70] shadow-xs';
+    } else {
+      btn.className = 'slot-day-chip px-2 py-1.5 rounded-xl border text-xs font-bold transition flex items-center justify-center bg-[var(--bg-page)] text-[var(--text-sub)] border-[var(--border-color)] hover:text-[var(--text-main)]';
+    }
+  });
+
+  _updateSlotDayHiddenInput();
+}
+
+function _updateSlotDayHiddenInput() {
+  const hiddenInput = document.getElementById('slot-input-day');
+  if (hiddenInput) {
+    hiddenInput.value = selectedSlotDays.join(', ');
+  }
+}
+
 async function openAddTimetableSlotModal(slotId = null) {
   timetableEditingSlotId = slotId;
   const modal = document.getElementById('modal-add-timetable-slot');
@@ -4241,12 +4322,9 @@ async function openAddTimetableSlotModal(slotId = null) {
   const editIdInput = document.getElementById('slot-edit-id');
   if (editIdInput) editIdInput.value = slotId || '';
 
-  // Populate day dropdown with 'All Days' option
-  const daySelect = document.getElementById('slot-input-day');
-  if (daySelect) {
-    const days = ['All Days', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    daySelect.innerHTML = days.map(d => `<option value="${d}" ${d === currentTimetableDay ? 'selected' : ''}>${d}</option>`).join('');
-  }
+  // Initial day selection
+  const defaultDay = currentTimetableDay === 'all' ? ['All Days'] : [currentTimetableDay];
+  renderSlotDayChips(defaultDay);
 
   // Populate class dropdown
   const classSelect = document.getElementById('slot-input-class');
@@ -4286,7 +4364,11 @@ async function openAddTimetableSlotModal(slotId = null) {
       const slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
       const slot = slots.find(s => String(s._id) === String(slotId));
       if (slot) {
-        if (daySelect) daySelect.value = slot.day || currentTimetableDay;
+        const slotDays = (Array.isArray(slot.days) && slot.days.length > 0)
+          ? slot.days
+          : (slot.day ? slot.day.split(',').map(d => d.trim()).filter(Boolean) : [currentTimetableDay]);
+        renderSlotDayChips(slotDays);
+
         const timeInput = document.getElementById('slot-input-time');
         if (timeInput) timeInput.value = slot.timeSlot || slot.time || '';
         if (classSelect) classSelect.value = slot.class || '';
@@ -4320,8 +4402,13 @@ async function handleSaveTimetableSlot(e) {
     ? (selectedTeacherInput || timetableViewTeacher || '')
     : (timetableViewTeacher || selectedTeacherInput || (currentUser && currentUser.name) || '');
 
+  const daysArr = selectedSlotDays.length > 0
+    ? selectedSlotDays
+    : [((document.getElementById('slot-input-day') || {}).value || '').trim()].filter(Boolean);
+
   const slotData = {
-    day: (document.getElementById('slot-input-day') || {}).value || '',
+    day: daysArr.join(', '),
+    days: daysArr,
     timeSlot: (document.getElementById('slot-input-time') || {}).value || '',
     class: (document.getElementById('slot-input-class') || {}).value || '',
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
@@ -4330,7 +4417,7 @@ async function handleSaveTimetableSlot(e) {
   };
 
   if (!slotData.day || !slotData.timeSlot || !slotData.class || !slotData.subject) {
-    showToast('Day, Time, Class and Subject are required.', true);
+    showToast('Please select at least one day, time, class and subject.', true);
     return;
   }
 
@@ -4346,9 +4433,11 @@ async function handleSaveTimetableSlot(e) {
       showToast('Timetable slot added!');
     }
     closeAddTimetableSlotModal();
-    // update day to match what was saved (show 'all' if 'All Days')
-    currentTimetableDay = slotData.day === 'All Days' ? 'all' : slotData.day;
-    _updateTimetableDayTabs();
+    // update day tab to match one of the saved days or 'all'
+    if (currentTimetableDay !== 'all' && !daysArr.includes(currentTimetableDay) && !daysArr.includes('All Days')) {
+      currentTimetableDay = daysArr[0] || 'all';
+      _updateTimetableDayTabs();
+    }
     await renderTimetableSlots();
   } catch (err) {
     showToast('Failed to save slot: ' + err.message, true);
@@ -4426,6 +4515,15 @@ function _generateTimetableSlotsHtml(slots) {
         </button>
       </div>` : '';
 
+    // Extract day names for clean presentation below subject and class
+    let slotDays = [];
+    if (Array.isArray(slot.days) && slot.days.length > 0) {
+      slotDays = slot.days;
+    } else if (slot.day) {
+      slotDays = slot.day.split(',').map(d => d.trim()).filter(Boolean);
+    }
+    const dayBadgesHtml = slotDays.map(d => `<span class="px-1.5 py-0.5 rounded-md bg-teal-500/10 text-teal-800 dark:text-teal-300 font-bold text-[9px]">${escapeHtml(d)}</span>`).join('');
+
     return `
       <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-3 hover:border-[#245b70] transition shadow-sm cursor-grab active:cursor-grabbing"
         draggable="true"
@@ -4441,10 +4539,9 @@ function _generateTimetableSlotsHtml(slots) {
           <div class="flex-shrink-0 w-9 h-9 rounded-xl bg-[#245b70]/10 flex items-center justify-center">
             <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           </div>
-          <div class="min-w-0 space-y-0.5 flex-1">
+          <div class="min-w-0 space-y-1 flex-1">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="font-black text-xs text-[var(--text-main)]">${escapeHtml(slot.timeSlot || slot.time || '')}</span>
-              ${slot.day ? `<span class="px-1.5 py-0.5 rounded-md bg-teal-500/10 text-teal-800 dark:text-teal-300 font-bold text-[9px]">${escapeHtml(slot.day)}</span>` : ''}
             </div>
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
@@ -4452,6 +4549,10 @@ function _generateTimetableSlotsHtml(slots) {
               ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">· ${escapeHtml(slot.teacher)}</span>` : ''}
               ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">· ${escapeHtml(slot.room)}</span>` : ''}
             </div>
+            ${dayBadgesHtml ? `
+            <div class="flex items-center gap-1 flex-wrap pt-0.5">
+              ${dayBadgesHtml}
+            </div>` : ''}
           </div>
         </div>
         ${editDelBtns}
@@ -4824,6 +4925,7 @@ function triggerStudentCardsPrint() {
 
 window.addEventListener('afterprint', () => {
   document.body.classList.remove('print-cards-active');
+  document.body.classList.remove('print-report-active');
 });
 
 // CSV Export in the exact order requested by user:
@@ -5084,9 +5186,17 @@ function _parseSlotStartTime(timeStr) {
 }
 
 async function showAppNotification(title, options = {}) {
+  const appName = (appSettings && appSettings.appName && appSettings.appName.trim())
+    ? appSettings.appName.trim()
+    : (localStorage.getItem('registerly_app_name') || 'REGISTERLY');
+
+  // Always use the App Name as the notification title so the phone notification bar
+  // shows only the App Name instead of the render site domain!
+  const finalTitle = title || appName;
+
   const defaultOpts = {
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: '/icons/book-modern.svg',
+    badge: '/icons/book-modern.svg',
     vibrate: [200, 100, 200],
     renotify: true,
     actions: [
@@ -5107,53 +5217,87 @@ async function showAppNotification(title, options = {}) {
       try {
         const reg = await navigator.serviceWorker.ready;
         if (reg && reg.showNotification) {
-          return reg.showNotification(title, defaultOpts);
+          return reg.showNotification(finalTitle, defaultOpts);
         }
       } catch(_) {}
     }
-    return new Notification(title, defaultOpts);
+    return new Notification(finalTitle, defaultOpts);
   } catch (err) {
     console.warn('[Notification Error]', err);
   }
 }
 
 // Render the 6:00 AM Bubble Timetable Modal
-function renderBubbleTimetableModal(dayName, slots) {
+function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
   const modal = document.getElementById('notif-bubble-timetable-modal');
   const titleEl = document.getElementById('bubble-tt-day-title');
+  const subtitleEl = document.getElementById('bubble-tt-subtitle');
+  const badgeEl = document.getElementById('bubble-tt-badge');
   const listEl = document.getElementById('bubble-tt-slots-list');
+  const actionsEl = document.getElementById('bubble-tt-actions');
+  const snoozeBtn = document.getElementById('bubble-tt-snooze-btn');
+  const okBtn = document.getElementById('bubble-tt-ok-btn');
   if (!modal || !listEl) return;
 
-  if (titleEl) {
-    titleEl.textContent = `${dayName}'s Schedule`;
-  }
-
-  if (!slots || slots.length === 0) {
+  if (isTimetableNotSet) {
+    if (badgeEl) badgeEl.innerHTML = `<span>⚠️ Notice</span>`;
+    if (titleEl) titleEl.textContent = 'Set Up Timetable';
+    if (subtitleEl) subtitleEl.textContent = 'Your timetable is not configured yet:';
     listEl.innerHTML = `
-      <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-center text-xs text-cyan-100">
-        No classes scheduled for today. Have a wonderful day!
+      <div class="p-4 rounded-2xl bg-white/10 border border-white/15 text-center space-y-2">
+        <div class="text-sm font-extrabold text-amber-300">No Timetable Set for Your Account</div>
+        <p class="text-xs text-cyan-100/90 leading-relaxed">
+          Please add your class slots in the Timetable section so you can receive your daily morning schedules and 5-minute pre-class reminders.
+        </p>
       </div>
     `;
+    // If not set, show only OK button (no snooze)
+    if (snoozeBtn) snoozeBtn.classList.add('hidden');
+    if (okBtn) {
+      okBtn.className = 'touch-btn py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition col-span-2';
+    }
+    if (actionsEl) {
+      actionsEl.className = 'relative pt-2 border-t border-white/15 grid grid-cols-1 gap-2.5 flex-shrink-0';
+    }
   } else {
-    listEl.innerHTML = slots.map(slot => {
-      const timeStr = slot.timeSlot || slot.time || 'Period';
-      return `
-        <div class="p-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-between gap-3 transition">
-          <div class="min-w-0 flex-1">
-            <div class="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
-              <span class="text-amber-300 font-extrabold">${escapeHtml(timeStr)}</span>
-              <span>:</span>
-              <span class="text-cyan-100">${escapeHtml(slot.subject)}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/20 text-white font-bold">[${escapeHtml(slot.class)}]</span>
-            </div>
-            ${slot.room ? `<div class="text-[10px] text-cyan-200/80 mt-0.5">Room: ${escapeHtml(slot.room)}</div>` : ''}
-          </div>
-          <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 text-amber-300">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          </div>
+    if (badgeEl) badgeEl.innerHTML = `<span>🌅 Morning Timetable</span>`;
+    if (titleEl) titleEl.textContent = `${dayName}'s Schedule`;
+    if (subtitleEl) subtitleEl.textContent = 'Scheduled classes for today:';
+    if (snoozeBtn) snoozeBtn.classList.remove('hidden');
+    if (okBtn) {
+      okBtn.className = 'touch-btn py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition';
+    }
+    if (actionsEl) {
+      actionsEl.className = 'relative pt-2 border-t border-white/15 grid grid-cols-2 gap-2.5 flex-shrink-0';
+    }
+
+    if (!slots || slots.length === 0) {
+      listEl.innerHTML = `
+        <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-center text-xs text-cyan-100">
+          No classes scheduled for today. Have a wonderful day!
         </div>
       `;
-    }).join('');
+    } else {
+      listEl.innerHTML = slots.map(slot => {
+        const timeStr = slot.timeSlot || slot.time || 'Period';
+        return `
+          <div class="p-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-between gap-3 transition">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
+                <span class="text-amber-300 font-extrabold">${escapeHtml(timeStr)}</span>
+                <span>:</span>
+                <span class="text-cyan-100">${escapeHtml(slot.subject)}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/20 text-white font-bold">[${escapeHtml(slot.class)}]</span>
+              </div>
+              ${slot.room ? `<div class="text-[10px] text-cyan-200/80 mt-0.5">Room: ${escapeHtml(slot.room)}</div>` : ''}
+            </div>
+            <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 text-cyan-200">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
   }
 
   modal.classList.remove('hidden');
@@ -5239,12 +5383,55 @@ async function checkAndTriggerTimetableNotifications() {
     const todayName = dayNames[now.getDay()];
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+    const appName = (appSettings && appSettings.appName && appSettings.appName.trim())
+      ? appSettings.appName.trim()
+      : (localStorage.getItem('registerly_app_name') || 'REGISTERLY');
+
     // Fetch all timetable slots
     const res = await API.getTimetable('', '');
     const allSlots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
-    let todaySlots = allSlots.filter(s => {
+
+    // USER DIRECTIVE: "all accounts only show their own notification..."
+    const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
+    const mySlots = allSlots.filter(s => {
+      const slotTeacher = (s.teacher || '').trim().toLowerCase();
+      return myName && slotTeacher === myName;
+    });
+
+    const currentHours = now.getHours();
+    const summaryNotifKey = `tt_notif_6am_${todayStr}`;
+    const snoozeUntil = parseInt(localStorage.getItem('tt_summary_snooze_until') || '0', 10);
+    const isSnoozed = Date.now() < snoozeUntil;
+
+    // USER DIRECTIVE: "If no set the account any time table....show at the morning a message to set time table...with not snooze only ok........"
+    if (mySlots.length === 0) {
+      if (currentHours >= 6 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
+        if (!localStorage.getItem(summaryNotifKey)) {
+          localStorage.setItem(summaryNotifKey, 'shown');
+        }
+
+        // Phone notification with ONLY "OK" (no snooze) and App Name as headline
+        showAppNotification(appName, {
+          body: 'Please set up your timetable to receive daily class schedules and 5-minute pre-class reminders.',
+          tag: `tt-notset-${todayStr}`,
+          actions: [
+            { action: 'ok', title: 'OK' }
+          ]
+        });
+
+        // In-app modal with message to set timetable and ONLY "OK"
+        renderBubbleTimetableModal(todayName, [], true);
+      }
+      return;
+    }
+
+    // Filter this account's slots for today (handles multi-day slots, comma-separated, and 'All Days')
+    let todaySlots = mySlots.filter(s => {
       const d = (s.day || '').trim().toLowerCase();
-      return d === todayName.toLowerCase() || d === 'all days';
+      const todayLower = todayName.toLowerCase();
+      const days = Array.isArray(s.days) ? s.days.map(x => x.trim().toLowerCase()) : [];
+      const splitDays = d.split(',').map(x => x.trim().toLowerCase());
+      return d === todayLower || d === 'all days' || splitDays.includes(todayLower) || days.includes(todayLower) || days.includes('all days');
     });
 
     // Sort today's slots chronologically
@@ -5258,11 +5445,6 @@ async function checkAndTriggerTimetableNotifications() {
     });
 
     // 1. Daily 6:00 AM summary notification (time and subjects one by one with Snooze & OK)
-    const currentHours = now.getHours();
-    const summaryNotifKey = `tt_notif_6am_${todayStr}`;
-    const snoozeUntil = parseInt(localStorage.getItem('tt_summary_snooze_until') || '0', 10);
-    const isSnoozed = Date.now() < snoozeUntil;
-
     if (currentHours >= 6 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
       if (!localStorage.getItem(summaryNotifKey)) {
         localStorage.setItem(summaryNotifKey, 'shown');
@@ -5275,11 +5457,11 @@ async function checkAndTriggerTimetableNotifications() {
       });
 
       const bodyText = lines.length > 0
-        ? lines.join('\n')
-        : `No classes scheduled for today (${todayName}). Have a wonderful day!`;
+        ? `Today's Schedule (${todayName}):\n` + lines.join('\n')
+        : `No classes scheduled for you today (${todayName}). Have a wonderful day!`;
 
-      // Trigger phone notification
-      showAppNotification(`📚 Today's Schedule (${todayName})`, {
+      // Trigger phone notification: headline is App Name (no render site URL), modern books icon SVG
+      showAppNotification(appName, {
         body: bodyText,
         tag: `tt-summary-${todayStr}`,
         actions: [
@@ -5288,8 +5470,8 @@ async function checkAndTriggerTimetableNotifications() {
         ]
       });
 
-      // Show in-app background bubble notification
-      renderBubbleTimetableModal(todayName, todaySlots);
+      // Show in-app background bubble notification (enlarged window for up to 9 slots at once, scrollable if >9)
+      renderBubbleTimetableModal(todayName, todaySlots, false);
     }
 
     // 2. Notification 5 minutes before every class (semi-rounded square div with Snooze & OK)
@@ -5310,11 +5492,10 @@ async function checkAndTriggerTimetableNotifications() {
 
         if (localStorage.getItem(slotDoneKey) !== 'done' && !isSlotSnoozed) {
           const timePart = slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`;
-          const title = `⏰ Class in 5 Minutes: ${slot.subject || 'Class'}`;
-          const body = `${timePart} : ${slot.subject} [${slot.class}]${slot.room ? ' • Room ' + slot.room : ''}`;
+          const body = `Class in 5 Minutes: ${slot.subject} [${slot.class}] (${timePart})${slot.room ? ' • Room ' + slot.room : ''}`;
 
-          // Trigger phone notification with Snooze and OK
-          showAppNotification(title, {
+          // Trigger phone notification with Snooze and OK, with App Name as headline
+          showAppNotification(appName, {
             body,
             tag: `tt-class-${slotKey}`,
             actions: [
@@ -5350,7 +5531,7 @@ function initTimetableNotificationScheduler() {
           else if (tag.startsWith('tt-class-')) snoozePreClassAlert();
         } else if (event.data.type === 'NOTIFICATION_DISMISSED') {
           const tag = event.data.tag || '';
-          if (tag.startsWith('tt-summary-')) dismissTimetableSummary();
+          if (tag.startsWith('tt-summary-') || tag.startsWith('tt-notset-')) dismissTimetableSummary();
           else if (tag.startsWith('tt-class-')) dismissPreClassAlert();
         }
       }

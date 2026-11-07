@@ -1,4 +1,4 @@
-const CACHE_NAME = 'registerly-cache-v3';
+const CACHE_NAME = 'registerly-cache-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -7,7 +7,9 @@ const STATIC_ASSETS = [
   '/js/app.js',
   '/manifest.json',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  '/icons/book-modern.svg',
+  '/icons/book-modern.png'
 ];
 
 self.addEventListener('install', (event) => {
