@@ -29,7 +29,7 @@ function getGravatarUrl(email) {
 // @route   GET /api/teachers
 // @desc    Get all teachers with assigned classes, subjects, google connection status, and session counts
 // Supports query: ?year=2026&class=Class+10
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { year, class: classFilter } = req.query;
     const teachers = await User.find().select('-password').sort({ createdAt: -1 }).lean();
@@ -110,7 +110,7 @@ router.get('/', async (req, res) => {
 
 // @route   GET /api/teachers/:id
 // @desc    Get a single teacher profile
-router.get('/:id', async (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const teacher = await User.findById(req.params.id).select('-password').lean();
     if (!teacher) {
@@ -133,7 +133,7 @@ router.get('/:id', async (req, res) => {
 // @route   GET /api/teachers/:id/logs
 // @desc    USER DIRECTIVE: Log button for how many classes attended in which days in which class, and how many sessions
 // Supports query: ?year=2026&class=Class+10
-router.get('/:id/logs', async (req, res) => {
+router.get('/:id/logs', authMiddleware, async (req, res) => {
   try {
     const { year, class: classFilter } = req.query;
     const teacher = await User.findById(req.params.id).select('-password').lean();

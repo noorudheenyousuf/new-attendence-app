@@ -23,7 +23,7 @@ router.get('/export', async (req, res) => {
     const classes = await Class.find().lean();
     const subjects = await Subject.find().lean();
     const students = await Student.find().lean();
-    const teachers = await User.find().lean();
+    const teachers = await User.find().select('-password').lean();
     const attendance = await Attendance.find().lean();
     const settings = await AppSettings.findOne().lean();
 

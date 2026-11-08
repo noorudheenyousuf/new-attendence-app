@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const authMiddleware = require('../middleware/auth');
 const uploadService = require('../services/uploadService');
+
+const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
 // In-memory Multer storage for streaming to Cloudinary or writing to local disk
 const storage = multer.memoryStorage();
@@ -12,8 +15,9 @@ const upload = multer({
     fileSize: 15 * 1024 * 1024 // 15MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Only accept image files
-    if (file.mimetype.startsWith('image/')) {
+    // Only accept image files with allowed mime types
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Only image files (JPEG, PNG, WEBP) are allowed'), false);
@@ -38,9 +42,9 @@ router.get('/status', (req, res) => {
 
 /**
  * POST /api/upload/photo
- * Upload a photo file (multipart/form-data) OR base64 data string
+ * Upload a photo file (multipart/form-data) OR base64 data string (Authenticated users only)
  */
-router.post('/photo', upload.single('photo'), async (req, res) => {
+router.post('/photo', authMiddleware, upload.single('photo'), async (req, res) => {
   try {
     const folder = req.body.folder || 'students';
     let fileSource = null;
@@ -49,7 +53,8 @@ router.post('/photo', upload.single('photo'), async (req, res) => {
     // 1. Multipart form upload via Multer
     if (req.file) {
       fileSource = req.file.buffer;
-      ext = path.extname(req.file.originalname) || '.jpg';
+      const rawExt = (path.extname(req.file.originalname) || '').toLowerCase();
+      ext = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : '.jpg';
     } 
     // 2. Base64 payload in JSON body
     else if (req.body.data && typeof req.body.data === 'string') {

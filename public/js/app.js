@@ -4616,7 +4616,6 @@ function _generateTimetableSlotsHtml(slots) {
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
               <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[10px]">${escapeHtml(slot.class || '')}</span>
-              ${slot.teacher ? `<span class="text-[10px] text-[var(--text-sub)] font-semibold">· ${escapeHtml(slot.teacher)}</span>` : ''}
               ${slot.room ? `<span class="text-[10px] text-[var(--text-sub)]">· ${escapeHtml(slot.room)}</span>` : ''}
             </div>
             ${dayBadgesHtml ? `

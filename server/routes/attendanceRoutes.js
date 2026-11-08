@@ -7,7 +7,7 @@ const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/attendance
 // @desc    Get attendance for date, class, and subject (case-insensitive)
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { date, class: className, subject } = req.query;
     if (!date || !className) {

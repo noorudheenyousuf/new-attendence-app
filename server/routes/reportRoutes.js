@@ -3,11 +3,12 @@ const router = express.Router();
 const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
+const authMiddleware = require('../middleware/auth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/reports/class
 // @desc    Whole class students report with roll, sessions, present, absent, late, percent (case-insensitive)
-router.get('/class', async (req, res) => {
+router.get('/class', authMiddleware, async (req, res) => {
   try {
     const { class: className, year, period, subject } = req.query;
     const isAllClasses = !className || className === 'all';
@@ -24,11 +25,11 @@ router.get('/class', async (req, res) => {
       attendanceFilter.subject = caseInsensitiveRegex(subject);
     }
 
-    // Year and Period / Month filters
-    const hasSpecificYear = year && year !== 'all' && year !== 'all-year';
-    const hasSpecificMonth = period && period !== 'all-year' && period !== 'all';
+    // Year and Period / Month filters (strictly validated)
+    const hasSpecificYear = year && year !== 'all' && year !== 'all-year' && /^\d{4}$/.test(String(year));
+    const hasSpecificMonth = period && period !== 'all-year' && period !== 'all' && /^\d{1,2}$/.test(String(period));
 
-    const yearPattern = hasSpecificYear ? year : '\\d{4}';
+    const yearPattern = hasSpecificYear ? String(year) : '\\d{4}';
     const monthPattern = hasSpecificMonth ? String(period).padStart(2, '0') : '\\d{2}';
 
     if (hasSpecificYear || hasSpecificMonth) {
@@ -104,7 +105,7 @@ router.get('/class', async (req, res) => {
 
 // @route   GET /api/reports/student-logs/:studentId
 // @desc    Detailed log history for a specific student (date, period/subject, status, note)
-router.get('/student-logs/:studentId', async (req, res) => {
+router.get('/student-logs/:studentId', authMiddleware, async (req, res) => {
   try {
     const studentId = Number(req.params.studentId);
     const student = await Student.findOne({ studentId });

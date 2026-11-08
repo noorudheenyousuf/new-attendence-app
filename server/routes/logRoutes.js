@@ -10,7 +10,7 @@ const adminMiddleware = require('../middleware/admin');
 
 // @route   GET /api/logs
 // @desc    Get activity logs (includes counts of present, absent, late)
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const logs = await ActivityLog.find().sort({ createdAt: -1 }).limit(50);
     res.json({ success: true, data: logs });

@@ -7,7 +7,7 @@ const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/students
 // @desc    Get all students (with class filter and search)
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { class: classFilter, search } = req.query;
     let query = {};
@@ -16,8 +16,10 @@ router.get('/', async (req, res) => {
       query.class = caseInsensitiveRegex(classFilter);
     }
 
-    if (search) {
-      const searchRegex = new RegExp(search, 'i');
+    if (search && typeof search === 'string' && search.trim()) {
+      const cleanSearch = search.trim();
+      const escaped = cleanSearch.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
       query.$or = [
         { name: searchRegex },
         { class: searchRegex },
@@ -25,7 +27,7 @@ router.get('/', async (req, res) => {
         { 'familyDetails.fatherMobile': searchRegex },
         { 'familyDetails.fatherWhatsapp': searchRegex }
       ];
-      const parsedNum = Number(search);
+      const parsedNum = Number(cleanSearch);
       if (!isNaN(parsedNum)) {
         query.$or.push({ studentId: parsedNum }, { roll: parsedNum });
       }
@@ -40,7 +42,7 @@ router.get('/', async (req, res) => {
 
 // @route   GET /api/students/next-id
 // @desc    Get next auto-increment student ID (starting with 2000)
-router.get('/next-id', async (req, res) => {
+router.get('/next-id', authMiddleware, async (req, res) => {
   try {
     const nextId = await Student.getNextStudentId();
     res.json({ success: true, nextId });
