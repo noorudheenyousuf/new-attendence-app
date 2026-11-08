@@ -30,6 +30,16 @@ const timetableSchema = new mongoose.Schema({
     default: '',
     trim: true
   },
+  teacherId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   room: {
     type: String,
     default: '',

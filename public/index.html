@@ -373,14 +373,14 @@
           </button>
 
           <!-- Timetable Button -->
-          <button type="button" onclick="openTimetableModal()" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group" title="Open school timetable schedule">
+          <button type="button" onclick="openMyTimetable()" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group" title="Open your personal timetable schedule">
             <div class="flex items-center gap-2.5 min-w-0">
               <div class="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
               </div>
               <div class="text-left min-w-0">
                 <div class="text-xs font-black text-[var(--text-main)] truncate">Timetable</div>
-                <div class="text-[10px] text-[var(--text-sub)] truncate">View & Edit</div>
+                <div class="text-[10px] text-[var(--text-sub)] truncate">My Schedule</div>
               </div>
             </div>
             <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -1671,8 +1671,8 @@
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
           <div>
-            <h3 class="font-extrabold text-base text-[var(--text-main)]">School Timetable</h3>
-            <p class="text-[10px] text-[var(--text-sub)]">Class schedules, periods, and assigned teachers</p>
+            <h3 id="timetable-modal-title" class="font-extrabold text-base text-[var(--text-main)]">My Timetable</h3>
+            <p id="timetable-modal-subtitle" class="text-[10px] text-[var(--text-sub)]">Your class schedule & timetable slots</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -1754,7 +1754,12 @@
           </div>
         </div>
 
+        <div id="slot-assignee-badge" class="px-3 py-2 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center justify-between">
+          <span class="text-[var(--text-sub)]">Account / Teacher:</span>
+          <span id="slot-assignee-name" class="font-extrabold text-[#245b70] dark:text-cyan-300"></span>
+        </div>
         <input type="hidden" id="slot-input-teacher" value="">
+        <input type="hidden" id="slot-input-teacher-id" value="">
 
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Room / Lab / Note (Optional)</label>

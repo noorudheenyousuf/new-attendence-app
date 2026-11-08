@@ -287,6 +287,7 @@ async function loadCurrentUser() {
         updateUserUI();
         const authModal = document.getElementById('auth-modal');
         if (authModal) authModal.classList.add('hidden');
+        checkAndTriggerTimetableNotifications();
         return;
       }
     } catch (error) {
@@ -3384,6 +3385,10 @@ function handleSignout() {
   currentRole = null;
   updateUserUI();
   selectTopTab('attendance');
+  const bubbleModal = document.getElementById('notif-bubble-timetable-modal');
+  if (bubbleModal) bubbleModal.classList.add('hidden');
+  const preclassCard = document.getElementById('notif-preclass-card');
+  if (preclassCard) preclassCard.classList.add('hidden');
   showToast('Signed out successfully');
   openAuthModal();
 }
@@ -3676,7 +3681,7 @@ async function renderTeachersList() {
 
               <!-- Row 2: Timetable + Log buttons -->
               <div class="flex gap-1.5">
-                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}')"
+                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}', '${t._id}')"
                   class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-bold transition shadow-sm" title="View timetable">
                   <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                   <span>Timetable</span>
@@ -4140,9 +4145,51 @@ async function handleSendMessage(e) {
 
 // ================= TIMETABLE MODULE =================
 let currentTimetableDay = 'all';
-let timetableViewTeacher = null; // null=admin/all view, string=filter to this teacher's slots
-let timetableReadOnly = false;   // true=no add/edit/delete buttons
+let timetableViewTeacher = null;     // string: teacher name being viewed
+let timetableViewTeacherId = null;   // string: teacher ObjectId if available
+let timetableReadOnly = false;       // true=no add/edit/delete buttons
 let timetableEditingSlotId = null;
+
+// Helper: match slot strictly to teacher name or id (no blank or partial string collisions!)
+function isSlotForTeacher(slot, teacherName, teacherId = null) {
+  if (!slot) return false;
+  const target = (teacherName || '').trim().toLowerCase();
+  const slotTeacher = (slot.teacher || '').trim().toLowerCase();
+
+  if (teacherId && slot.teacherId && String(slot.teacherId) === String(teacherId)) {
+    return true;
+  }
+  if (target && slotTeacher && target === slotTeacher) {
+    return true;
+  }
+  return false;
+}
+
+// Open current logged-in account's timetable (from Profile tab)
+async function openMyTimetable() {
+  if (!currentUser) return;
+  timetableViewTeacher = (currentUser.name || '').trim();
+  timetableViewTeacherId = currentUser._id || currentUser.id || null;
+  timetableReadOnly = false; // Always editable for the user's own profile!
+  await openTimetableModal();
+}
+
+// Open timetable for a specific teacher (from Teachers tab)
+// USER DIRECTIVE:
+// "In teachers tab.... When click time of a teacher ....show that teacher time table only which he seted in his account from profile tab...."
+// "In teacher tab....Also gave admin to edit and delete and and slot to time table of every teacher....."
+async function openTeacherTimetable(teacherName, teacherId = null) {
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
+  const targetTeacher = (teacherName || '').trim();
+  const isMe = myName && myName === targetTeacher.toLowerCase();
+
+  timetableViewTeacher = targetTeacher;
+  timetableViewTeacherId = teacherId || null;
+  // Editable for admin AND the teacher themselves!
+  timetableReadOnly = !(isAdmin || isMe);
+  await openTimetableModal();
+}
 
 async function openTimetableModal() {
   const modal = document.getElementById('modal-timetable');
@@ -4155,28 +4202,44 @@ async function openTimetableModal() {
       classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
   }
 
-  // Set view based on role
-  const isAdminTT = currentUser && currentUser.role === 'admin';
-  if (!timetableViewTeacher && !isAdminTT) {
-    timetableViewTeacher = (currentUser && currentUser.name) || null;
+  // Fallback: If timetableViewTeacher was not set, default to currentUser
+  if (!timetableViewTeacher && currentUser) {
+    timetableViewTeacher = (currentUser.name || '').trim();
+    timetableViewTeacherId = currentUser._id || currentUser.id || null;
   }
-  // Show/hide Add button
+
+  const isAdminTT = currentUser && currentUser.role === 'admin';
+  const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
+  const targetLower = (timetableViewTeacher || '').toLowerCase();
+  const isMe = myName && myName === targetLower;
+
+  // Show/hide Add button:
+  // Admin can add a slot to ANY teacher's timetable (or their own);
+  // Non-admin can add a slot to their OWN timetable.
   const addSlotBtn = document.getElementById('btn-add-timetable-slot');
-  // Show Add Slot for admin, or when viewing own/editable timetable
-  const canAddSlot = isAdminTT || !timetableReadOnly;
+  const canAddSlot = !timetableReadOnly && (isAdminTT || isMe);
   if (addSlotBtn) addSlotBtn.classList.toggle('hidden', !canAddSlot);
 
-  // Update title
-  const ttTitleEl = document.querySelector('#modal-timetable h3');
+  // Update title & subtitle
+  const ttTitleEl = document.getElementById('timetable-modal-title') || document.querySelector('#modal-timetable h3');
+  const ttSubtitleEl = document.getElementById('timetable-modal-subtitle');
   if (ttTitleEl) {
-    if (timetableViewTeacher) {
-      const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
-      const isMe = myName && myName === timetableViewTeacher.trim().toLowerCase();
-      ttTitleEl.textContent = isMe ? 'My Timetable' : `${timetableViewTeacher}'s Timetable`;
+    if (isMe) {
+      ttTitleEl.textContent = 'My Timetable';
+    } else if (timetableViewTeacher) {
+      ttTitleEl.textContent = `${timetableViewTeacher}'s Timetable`;
     } else {
-      ttTitleEl.textContent = 'School Timetable';
+      ttTitleEl.textContent = 'Timetable';
     }
   }
+  if (ttSubtitleEl) {
+    if (isMe) {
+      ttSubtitleEl.textContent = 'Your personal class schedule & timetable slots';
+    } else if (timetableViewTeacher) {
+      ttSubtitleEl.textContent = `Class schedule assigned to ${timetableViewTeacher}`;
+    }
+  }
+
   // Default to All Days
   currentTimetableDay = 'all';
   _updateTimetableDayTabs();
@@ -4187,6 +4250,7 @@ function closeTimetableModal() {
   const modal = document.getElementById('modal-timetable');
   if (modal) modal.classList.add('hidden');
   timetableViewTeacher = null;
+  timetableViewTeacherId = null;
   timetableReadOnly = false;
 }
 
@@ -4217,22 +4281,20 @@ async function renderTimetableSlots() {
 
   try {
     const dayParam = currentTimetableDay === 'all' ? '' : currentTimetableDay;
-    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam);
-    // Backend returns { success: true, data: [...] }
+    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam, timetableViewTeacher || '');
     let slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
-    // Filter by teacher if viewing a specific teacher's timetable
+
+    // USER DIRECTIVE:
+    // "Not mix all time tables.."
+    // Strictly filter by teacher/account
     if (timetableViewTeacher) {
-      const target = timetableViewTeacher.trim().toLowerCase();
-      slots = slots.filter(s => {
-        const slotTeacher = (s.teacher || '').trim().toLowerCase();
-        return slotTeacher === target || slotTeacher.includes(target) || target.includes(slotTeacher);
-      });
+      slots = slots.filter(s => isSlotForTeacher(s, timetableViewTeacher, timetableViewTeacherId));
     }
 
     if (slots.length === 0) {
       const emptyMsg = timetableViewTeacher
         ? `No timetable slots scheduled for ${escapeHtml(timetableViewTeacher)} on ${escapeHtml(currentTimetableDay)}.`
-        : `No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' · ' + escapeHtml(selectedClass) : ''}. Add one!`;
+        : `No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' · ' + escapeHtml(selectedClass) : ''}.`;
       container.innerHTML = `
         <div class="text-center py-8 text-xs text-[var(--text-sub)]">
           <svg class="w-10 h-10 mx-auto mb-2 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
@@ -4337,7 +4399,7 @@ async function openAddTimetableSlotModal(slotId = null) {
   if (editIdInput) editIdInput.value = slotId || '';
 
   // Initial day selection
-  const defaultDay = currentTimetableDay === 'all' ? ['All Days'] : [currentTimetableDay];
+  const defaultDay = currentTimetableDay === 'all' ? ['Monday'] : [currentTimetableDay];
   renderSlotDayChips(defaultDay);
 
   // Populate class dropdown
@@ -4354,31 +4416,22 @@ async function openAddTimetableSlotModal(slotId = null) {
       subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
   }
 
-  // Populate teacher dropdown - admin can choose any teacher; non-admin is locked to self
-  const teacherSelect = document.getElementById('slot-input-teacher');
-  const teacherSelectWrapper = document.getElementById('slot-teacher-field-wrapper');
-  const isSlotAdmin = currentUser && currentUser.role === 'admin';
-  if (teacherSelect) {
-    if (isSlotAdmin) {
-      teacherSelect.innerHTML = `<option value="">Select teacher...</option>` +
-        (cachedTeachersList || []).map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('');
-      if (teacherSelectWrapper) teacherSelectWrapper.classList.remove('hidden');
-      if (timetableViewTeacher) {
-        teacherSelect.value = timetableViewTeacher;
-      }
-    } else {
-      // Non-admin: auto-fill their own name or viewed teacher
-      const defTeacher = timetableViewTeacher || (currentUser && currentUser.name) || '';
-      teacherSelect.innerHTML = `<option value="${escapeHtml(defTeacher)}" selected>${escapeHtml(defTeacher)}</option>`;
-      teacherSelect.value = defTeacher;
-      if (teacherSelectWrapper) teacherSelectWrapper.classList.add('hidden');
-    }
-  }
+  // Target teacher / account
+  const targetTeacherName = timetableViewTeacher || (currentUser && currentUser.name) || '';
+  const targetTeacherId = timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '';
+
+  const teacherInput = document.getElementById('slot-input-teacher');
+  const teacherIdInput = document.getElementById('slot-input-teacher-id');
+  const assigneeNameEl = document.getElementById('slot-assignee-name');
+
+  if (teacherInput) teacherInput.value = targetTeacherName;
+  if (teacherIdInput) teacherIdInput.value = targetTeacherId;
+  if (assigneeNameEl) assigneeNameEl.textContent = targetTeacherName;
 
   // If editing, pre-fill values
   if (slotId) {
     try {
-      const res = await API.getTimetable('', '');
+      const res = await API.getTimetable('', '', '');
       const slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
       const slot = slots.find(s => String(s._id) === String(slotId));
       if (slot) {
@@ -4390,8 +4443,11 @@ async function openAddTimetableSlotModal(slotId = null) {
         const timeInput = document.getElementById('slot-input-time');
         if (timeInput) timeInput.value = slot.timeSlot || slot.time || '';
         if (classSelect) classSelect.value = slot.class || '';
+        filterTimetableSubjectsByClass();
         if (subjectSelect) subjectSelect.value = slot.subject || '';
-        if (teacherSelect) teacherSelect.value = slot.teacher || '';
+        if (teacherInput && slot.teacher) teacherInput.value = slot.teacher;
+        if (teacherIdInput && slot.teacherId) teacherIdInput.value = slot.teacherId;
+        if (assigneeNameEl && slot.teacher) assigneeNameEl.textContent = slot.teacher;
         const roomInput = document.getElementById('slot-input-room');
         if (roomInput) roomInput.value = slot.room || '';
       }
@@ -4414,11 +4470,8 @@ function closeAddTimetableSlotModal() {
 async function handleSaveTimetableSlot(e) {
   e.preventDefault();
   const slotId = (document.getElementById('slot-edit-id') || {}).value || timetableEditingSlotId;
-  const selectedTeacherInput = ((document.getElementById('slot-input-teacher') || {}).value || '').trim();
-  const isSlotAdmin = currentUser && currentUser.role === 'admin';
-  const assignedTeacher = isSlotAdmin
-    ? (selectedTeacherInput || timetableViewTeacher || '')
-    : (timetableViewTeacher || selectedTeacherInput || (currentUser && currentUser.name) || '');
+  const teacherName = ((document.getElementById('slot-input-teacher') || {}).value || timetableViewTeacher || (currentUser && currentUser.name) || '').trim();
+  const teacherIdVal = ((document.getElementById('slot-input-teacher-id') || {}).value || timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '').trim();
 
   const daysArr = selectedSlotDays.length > 0
     ? selectedSlotDays
@@ -4430,7 +4483,8 @@ async function handleSaveTimetableSlot(e) {
     timeSlot: (document.getElementById('slot-input-time') || {}).value || '',
     class: (document.getElementById('slot-input-class') || {}).value || '',
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
-    teacher: assignedTeacher,
+    teacher: teacherName,
+    teacherId: teacherIdVal || null,
     room: (document.getElementById('slot-input-room') || {}).value || '',
   };
 
@@ -4451,16 +4505,16 @@ async function handleSaveTimetableSlot(e) {
       showToast('Timetable slot added!');
     }
     closeAddTimetableSlotModal();
-    // update day tab to match one of the saved days or 'all'
     if (currentTimetableDay !== 'all' && !daysArr.includes(currentTimetableDay) && !daysArr.includes('All Days')) {
       currentTimetableDay = daysArr[0] || 'all';
       _updateTimetableDayTabs();
     }
     await renderTimetableSlots();
+    checkAndTriggerTimetableNotifications();
   } catch (err) {
     showToast('Failed to save slot: ' + err.message, true);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = slotId ? 'Save Changes' : 'Add Slot'; }
+    if (btn) { btn.disabled = false; btn.textContent = slotId ? 'Save Changes' : 'Save Slot'; }
   }
 }
 
@@ -4471,6 +4525,7 @@ async function deleteTimetableSlot(id) {
     await API.deleteTimetableSlot(id);
     showToast('Slot deleted.');
     await renderTimetableSlots();
+    checkAndTriggerTimetableNotifications();
   } catch (err) {
     showToast('Failed to delete slot: ' + err.message, true);
   }
@@ -4493,18 +4548,6 @@ function filterTimetableSubjectsByClass() {
     subjects.map(s => '<option value="' + escapeHtml(s) + '" ' + (s === currentVal ? 'selected' : '') + '>' + escapeHtml(s) + '</option>').join('');
 }
 
-// Open timetable for a specific teacher (editable for admin and that teacher themselves)
-async function openTeacherTimetable(teacherName) {
-  const isAdmin = currentUser && currentUser.role === 'admin';
-  const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
-  const targetTeacher = (teacherName || '').trim();
-  const isMe = myName && myName === targetTeacher.toLowerCase();
-
-  timetableViewTeacher = targetTeacher;
-  timetableReadOnly = !(isAdmin || isMe); // Editable for admin AND the teacher themselves
-  await openTimetableModal();
-}
-
 
 // ================= TIMETABLE DRAG & DROP AND GENERATOR =================
 let cachedCurrentTimetableSlots = [];
@@ -4521,18 +4564,23 @@ function _generateTimetableSlotsHtml(slots) {
 
   const isAdminUser = currentUser && currentUser.role === 'admin';
   const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
+  const myId = currentUser ? String(currentUser._id || currentUser.id || '') : '';
 
   return slots.map(slot => {
     const slotTeacher = (slot.teacher || '').trim().toLowerCase();
-    const isOwnSlot = myName && slotTeacher === myName;
+    const isOwnSlot = (myName && slotTeacher === myName) || (myId && slot.teacherId && String(slot.teacherId) === myId);
+
+    // USER DIRECTIVE:
+    // "Also add edit, delete button to time table window in admin and all users..."
+    // "In teacher tab....Also gave admin to edit and delete and and slot to time table of every teacher....."
     const canEditThisSlot = !timetableReadOnly && (isAdminUser || isOwnSlot);
 
     const editDelBtns = canEditThisSlot ? `
       <div class="flex gap-1 flex-shrink-0">
-        <button type="button" onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-7 h-7 rounded-lg bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
+        <button type="button" onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button type="button" onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-7 h-7 rounded-lg btn-delete flex items-center justify-center transition">
+        <button type="button" onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition active:scale-95 shadow-xs">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>` : '';
@@ -5257,7 +5305,7 @@ async function showAppNotification(title, options = {}) {
   }
 }
 
-// Render the 6:00 AM Bubble Timetable Modal
+// Render the Morning Bubble Timetable Modal
 function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
   const modal = document.getElementById('notif-bubble-timetable-modal');
   const titleEl = document.getElementById('bubble-tt-day-title');
@@ -5269,30 +5317,34 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
   const okBtn = document.getElementById('bubble-tt-ok-btn');
   if (!modal || !listEl) return;
 
+  const currentUserName = currentUser ? currentUser.name : '';
+
+  // USER DIRECTIVE:
+  // "If no set the account any time table....show at the morning a message to set time table...with not snooze only ok........"
   if (isTimetableNotSet) {
     if (badgeEl) badgeEl.innerHTML = `<span>⚠️ Notice</span>`;
     if (titleEl) titleEl.textContent = 'Set Up Timetable';
-    if (subtitleEl) subtitleEl.textContent = 'Your timetable is not configured yet:';
+    if (subtitleEl) subtitleEl.textContent = currentUserName ? `Schedule not set for ${currentUserName}:` : 'Your timetable is not configured yet:';
     listEl.innerHTML = `
-      <div class="p-4 rounded-2xl bg-white/10 border border-white/15 text-center space-y-2">
+      <div class="p-4 rounded-2xl bg-white/10 border border-white/15 text-center space-y-2.5">
         <div class="text-sm font-extrabold text-amber-300">No Timetable Set for Your Account</div>
         <p class="text-xs text-cyan-100/90 leading-relaxed">
-          Please add your class slots in the Timetable section so you can receive your daily morning schedules and 5-minute pre-class reminders.
+          Please set up your class timetable from your Profile tab so you can receive your daily morning schedules and 5-minute pre-class reminders.
         </p>
       </div>
     `;
-    // If not set, show only OK button (no snooze)
+    // USER DIRECTIVE: "with not snooze only ok........"
     if (snoozeBtn) snoozeBtn.classList.add('hidden');
     if (okBtn) {
-      okBtn.className = 'touch-btn py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition col-span-2';
+      okBtn.className = 'touch-btn w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition';
     }
     if (actionsEl) {
-      actionsEl.className = 'relative pt-2 border-t border-white/15 grid grid-cols-1 gap-2.5 flex-shrink-0';
+      actionsEl.className = 'relative pt-2 border-t border-white/15 flex flex-col gap-2 flex-shrink-0';
     }
   } else {
     if (badgeEl) badgeEl.innerHTML = `<span>🌅 Morning Timetable</span>`;
     if (titleEl) titleEl.textContent = `${dayName}'s Schedule`;
-    if (subtitleEl) subtitleEl.textContent = 'Scheduled classes for today:';
+    if (subtitleEl) subtitleEl.textContent = currentUserName ? `Classes for ${currentUserName}:` : 'Scheduled classes for today:';
     if (snoozeBtn) snoozeBtn.classList.remove('hidden');
     if (okBtn) {
       okBtn.className = 'touch-btn py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition';
@@ -5304,7 +5356,7 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
     if (!slots || slots.length === 0) {
       listEl.innerHTML = `
         <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-center text-xs text-cyan-100">
-          No classes scheduled for today. Have a wonderful day!
+          No classes scheduled for you today (${escapeHtml(dayName)}). Have a wonderful day!
         </div>
       `;
     } else {
@@ -5337,9 +5389,9 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
 function snoozeTimetableSummary() {
   const modal = document.getElementById('notif-bubble-timetable-modal');
   if (modal) modal.classList.add('hidden');
-  // Snooze for 15 minutes
+  const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
   const snoozeUntil = Date.now() + 15 * 60 * 1000;
-  try { localStorage.setItem('tt_summary_snooze_until', String(snoozeUntil)); } catch(_) {}
+  try { localStorage.setItem(`tt_summary_snooze_${myKey}`, String(snoozeUntil)); } catch(_) {}
   showToast('Morning timetable snoozed for 15 mins');
 }
 
@@ -5348,9 +5400,10 @@ function dismissTimetableSummary() {
   if (modal) modal.classList.add('hidden');
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
   try {
-    localStorage.setItem(`tt_notif_6am_${todayStr}`, 'done');
-    localStorage.removeItem('tt_summary_snooze_until');
+    localStorage.setItem(`tt_summary_${myKey}_${todayStr}`, 'done');
+    localStorage.removeItem(`tt_summary_snooze_${myKey}`);
   } catch(_) {}
   showToast('Timetable acknowledged');
 }
@@ -5386,8 +5439,9 @@ function snoozePreClassAlert() {
   if (card) card.classList.add('hidden');
   if (activePreClassSlot) {
     const slotKey = activePreClassSlot._id || (activePreClassSlot.day + '_' + activePreClassSlot.timeSlot + '_' + activePreClassSlot.subject);
+    const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
     const snoozeUntil = Date.now() + 2 * 60 * 1000; // Snooze for 2 minutes
-    try { localStorage.setItem(`tt_preclass_snooze_${slotKey}`, String(snoozeUntil)); } catch(_) {}
+    try { localStorage.setItem(`tt_preclass_snooze_${myKey}_${slotKey}`, String(snoozeUntil)); } catch(_) {}
   }
   showToast('Class reminder snoozed for 2 mins');
 }
@@ -5397,17 +5451,20 @@ function dismissPreClassAlert() {
   if (card) card.classList.add('hidden');
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
   if (activePreClassSlot) {
     const slotKey = activePreClassSlot._id || (activePreClassSlot.day + '_' + activePreClassSlot.timeSlot + '_' + activePreClassSlot.subject);
     try {
-      localStorage.setItem(`tt_notif_5m_${slotKey}_${todayStr}`, 'done');
-      localStorage.removeItem(`tt_preclass_snooze_${slotKey}`);
+      localStorage.setItem(`tt_notif_5m_${myKey}_${slotKey}_${todayStr}`, 'done');
+      localStorage.removeItem(`tt_preclass_snooze_${myKey}_${slotKey}`);
     } catch(_) {}
   }
 }
 
 async function checkAndTriggerTimetableNotifications() {
   try {
+    if (!currentUser) return; // Must have an authenticated user account
+
     const now = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayName = dayNames[now.getDay()];
@@ -5417,36 +5474,38 @@ async function checkAndTriggerTimetableNotifications() {
       ? appSettings.appName.trim()
       : (localStorage.getItem('registerly_app_name') || 'REGISTERLY');
 
+    const myAccountKey = String(currentUser._id || currentUser.name || 'user');
+    const myName = (currentUser.name || '').trim();
+    const myId = currentUser._id || currentUser.id || null;
+
     // Fetch all timetable slots
-    const res = await API.getTimetable('', '');
+    const res = await API.getTimetable('', '', '');
     const allSlots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
-    // USER DIRECTIVE: "all accounts only show their own notification..."
-    const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
-    const isUserAdmin = currentUser && currentUser.role === 'admin';
-    const mySlots = allSlots.filter(s => {
-      const slotTeacher = (s.teacher || '').trim().toLowerCase();
-      if (myName && slotTeacher === myName) return true;
-      if (isUserAdmin && (!slotTeacher || slotTeacher === myName)) return true;
-      return false;
-    });
+    // USER DIRECTIVE:
+    // "In time table notification.....all accounts only show their own notification...
+    // When Notification....only show each teacher account their own time table which he set from the profile tab...
+    // Also show admin time table...what he set in his profile tab
+    // Not mix all time tables.."
+    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId));
 
     const currentHours = now.getHours();
-    const summaryNotifKey = `tt_notif_6am_${todayStr}`;
-    const snoozeUntil = parseInt(localStorage.getItem('tt_summary_snooze_until') || '0', 10);
+    const summaryNotifKey = `tt_summary_${myAccountKey}_${todayStr}`;
+    const snoozeUntil = parseInt(localStorage.getItem(`tt_summary_snooze_${myAccountKey}`) || '0', 10);
     const isSnoozed = Date.now() < snoozeUntil;
 
-    // USER DIRECTIVE: "If no set the account any time table....show at the morning a message to set time table...with not snooze only ok........"
+    // USER DIRECTIVE:
+    // "If no set the account any time table....show at the morning a message to set time table...with not snooze only ok........"
     if (mySlots.length === 0) {
-      if (currentHours >= 6 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
+      if (currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
         if (!localStorage.getItem(summaryNotifKey)) {
           localStorage.setItem(summaryNotifKey, 'shown');
         }
 
         // Phone notification with ONLY "OK" (no snooze) and App Name as headline
         showAppNotification(appName, {
-          body: 'Please set up your timetable to receive daily class schedules and 5-minute pre-class reminders.',
-          tag: `tt-notset-${todayStr}`,
+          body: 'Please set up your timetable from the Profile tab to receive daily class schedules and 5-minute pre-class reminders.',
+          tag: `tt-notset-${myAccountKey}-${todayStr}`,
           actions: [
             { action: 'ok', title: 'OK' }
           ]
@@ -5477,8 +5536,8 @@ async function checkAndTriggerTimetableNotifications() {
       return (tA.hours * 60 + tA.minutes) - (tB.hours * 60 + tB.minutes);
     });
 
-    // 1. Daily 6:00 AM summary notification (time and subjects one by one with Snooze & OK)
-    if (currentHours >= 6 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
+    // 1. Daily morning summary notification for this account only
+    if (currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
       if (!localStorage.getItem(summaryNotifKey)) {
         localStorage.setItem(summaryNotifKey, 'shown');
       }
@@ -5493,21 +5552,21 @@ async function checkAndTriggerTimetableNotifications() {
         ? `Today's Schedule (${todayName}):\n` + lines.join('\n')
         : `No classes scheduled for you today (${todayName}). Have a wonderful day!`;
 
-      // Trigger phone notification: headline is App Name (no render site URL), modern books icon SVG
+      // Trigger phone notification: headline is App Name
       showAppNotification(appName, {
         body: bodyText,
-        tag: `tt-summary-${todayStr}`,
+        tag: `tt-summary-${myAccountKey}-${todayStr}`,
         actions: [
           { action: 'snooze', title: 'Snooze' },
           { action: 'ok', title: 'OK' }
         ]
       });
 
-      // Show in-app background bubble notification (enlarged window for up to 9 slots at once, scrollable if >9)
+      // Show in-app background bubble notification
       renderBubbleTimetableModal(todayName, todaySlots, false);
     }
 
-    // 2. Notification 5 minutes before every class (semi-rounded square div with Snooze & OK)
+    // 2. Notification 5 minutes before every class for this account only
     todaySlots.forEach(slot => {
       const timeInfo = _parseSlotStartTime(slot.timeSlot || slot.time);
       if (!timeInfo) return;
@@ -5519,22 +5578,18 @@ async function checkAndTriggerTimetableNotifications() {
       // Trigger if class starts in between 0 and 5.5 minutes
       if (diffMinutes >= 0 && diffMinutes <= 5.5) {
         const slotKey = slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject);
-        const slotDoneKey = `tt_notif_5m_${slotKey}_${todayStr}`;
-        const slotSnoozeUntil = parseInt(localStorage.getItem(`tt_preclass_snooze_${slotKey}`) || '0', 10);
+        const slotDoneKey = `tt_notif_5m_${myAccountKey}_${slotKey}_${todayStr}`;
+        const slotSnoozeUntil = parseInt(localStorage.getItem(`tt_preclass_snooze_${myAccountKey}_${slotKey}`) || '0', 10);
         const isSlotSnoozed = Date.now() < slotSnoozeUntil;
 
         if (localStorage.getItem(slotDoneKey) !== 'done' && !isSlotSnoozed) {
           const timePart = slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`;
-          // Format exactly as requested:
-          // REGISTERLY
-          // Next Subject
-          // KHULASA (10.30 am - 11.45 am) [BS 4]
           const body = `Next Subject\n${slot.subject} (${timePart}) [${slot.class}]${slot.room ? ' • Room ' + slot.room : ''}`;
 
-          // Trigger phone notification with Snooze and OK, with App Name as headline
+          // Trigger phone notification with Snooze and OK
           showAppNotification(appName, {
             body,
-            tag: `tt-class-${slotKey}`,
+            tag: `tt-class-${myAccountKey}-${slotKey}`,
             actions: [
               { action: 'snooze', title: 'Snooze' },
               { action: 'ok', title: 'OK' }

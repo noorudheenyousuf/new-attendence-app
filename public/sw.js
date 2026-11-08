@@ -1,4 +1,4 @@
-const CACHE_NAME = 'registerly-cache-v4';
+const CACHE_NAME = 'registerly-cache-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
