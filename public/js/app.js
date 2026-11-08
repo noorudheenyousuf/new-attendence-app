@@ -360,8 +360,9 @@ function updateUserUI() {
     }
   }
 
-  // Reload activity logs
+  // Reload activity logs & profile dashboard stats
   loadActivityLogs();
+  updateProfileDashboardKPIs();
 }
 
 // Dark Mode Toggle with Sun SVG & persistent storage
@@ -2642,6 +2643,67 @@ async function confirmDeleteStudent(id, name, studentId) {
 // USER DIRECTIVE:
 // "add in logs of attendence .....present,absent,late"
 // "remove undo from activity logs of non admin accounts"
+let cachedActivityLogs = [];
+let currentActivityLogFilter = 'all';
+
+function setActivityLogFilter(filter) {
+  currentActivityLogFilter = filter;
+  const btnAll = document.getElementById('btn-log-filter-all');
+  const btnMine = document.getElementById('btn-log-filter-mine');
+  if (btnAll && btnMine) {
+    if (filter === 'all') {
+      btnAll.className = 'px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-xs font-bold transition';
+      btnMine.className = 'px-2 py-0.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-semibold transition';
+    } else {
+      btnMine.className = 'px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-xs font-bold transition';
+      btnAll.className = 'px-2 py-0.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-semibold transition';
+    }
+  }
+  renderActivityLogsList();
+}
+
+function renderActivityLogsList() {
+  const container = document.getElementById('activity-logs-container');
+  if (!container) return;
+
+  const logs = cachedActivityLogs || [];
+  const myName = (currentUser && currentUser.name) ? currentUser.name.trim().toLowerCase() : '';
+
+  let filteredLogs = logs;
+  if (currentActivityLogFilter === 'mine' && myName) {
+    filteredLogs = logs.filter(log => {
+      const performed = (log.performedBy || '').trim().toLowerCase();
+      const details = (log.details || '').trim().toLowerCase();
+      return performed === myName || performed.includes(myName) || details.includes(myName);
+    });
+  }
+
+  if (filteredLogs.length === 0) {
+    container.innerHTML = `<div class="p-3 text-xs text-center text-[var(--text-sub)]">${currentActivityLogFilter === 'mine' ? 'No actions recorded for your account yet.' : 'No recent activity logs.'}</div>`;
+    return;
+  }
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  container.innerHTML = filteredLogs.map(log => `
+    <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2 ${log.isUndone ? 'opacity-50' : ''}">
+      <div>
+        <div class="font-bold text-[var(--text-main)] text-xs">${escapeHtml(log.action)}</div>
+        <div class="text-[10px] text-[var(--text-sub)]">${escapeHtml(log.details || '')}</div>
+        <div class="text-[9px] text-[#245b70] font-semibold mt-0.5">by ${escapeHtml(log.performedBy || '')}</div>
+      </div>
+      ${log.isUndone ? `
+        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Reverted</span>
+      ` : (isAdmin && log.canUndo ? `
+        <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
+        <button onclick="undoLog('${log._id}', '${escapeHtml(log.action)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition">
+          Undo
+        </button>
+      ` : '')}
+    </div>
+  `).join('');
+}
+
 async function loadActivityLogs() {
   const container = document.getElementById('activity-logs-container');
   if (!container) return;
@@ -2649,36 +2711,81 @@ async function loadActivityLogs() {
   try {
     const res = await API.getLogs();
     if (res.success && res.data) {
-      const logs = res.data;
-      if (logs.length === 0) {
-        container.innerHTML = `<div class="p-3 text-xs text-center text-[var(--text-sub)]">No recent activity logs.</div>`;
-        return;
-      }
-
-      // Check if current user is admin
-      const isAdmin = currentUser && currentUser.role === 'admin';
-
-      container.innerHTML = logs.map(log => `
-        <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2 ${log.isUndone ? 'opacity-50' : ''}">
-          <div>
-            <div class="font-bold text-[var(--text-main)] text-xs">${log.action}</div>
-            <div class="text-[10px] text-[var(--text-sub)]">${log.details || ''}</div>
-            <div class="text-[9px] text-[#245b70] font-semibold mt-0.5">by ${log.performedBy}</div>
-          </div>
-          ${log.isUndone ? `
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Reverted</span>
-          ` : (isAdmin && log.canUndo ? `
-            <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
-            <button onclick="undoLog('${log._id}', '${log.action}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition">
-              Undo
-            </button>
-          ` : '')}
-        </div>
-      `).join('');
+      cachedActivityLogs = res.data;
+      renderActivityLogsList();
+      updateProfileDashboardKPIs();
     }
   } catch (error) {
     console.log('[Logs Load]', error);
   }
+}
+
+// Teacher Daily Summary & KPI Badges (At-a-Glance Dashboard)
+async function updateProfileDashboardKPIs() {
+  if (!currentUser) return;
+
+  const todayClassesEl = document.getElementById('kpi-today-classes');
+  const markedEl = document.getElementById('kpi-attendance-marked');
+  const assignedEl = document.getElementById('kpi-assigned-classes');
+  if (!todayClassesEl && !markedEl && !assignedEl) return;
+
+  const myName = (currentUser.name || '').trim().toLowerCase();
+  const myId = currentUser._id || currentUser.id || null;
+  const isAdmin = currentUser.role === 'admin';
+
+  // 1. Calculate today's classes from timetable
+  try {
+    const now = new Date();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = dayNames[now.getDay()].toLowerCase();
+
+    const ttRes = await API.getTimetable('', '', '');
+    const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
+    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId));
+
+    const todaySlots = mySlots.filter(s => {
+      const d = (s.day || '').trim().toLowerCase();
+      const days = Array.isArray(s.days) ? s.days.map(x => x.trim().toLowerCase()) : [];
+      const splitDays = d.split(',').map(x => x.trim().toLowerCase());
+      return d === todayName || d === 'all days' || splitDays.includes(todayName) || days.includes(todayName) || days.includes('all days');
+    });
+
+    if (todayClassesEl) todayClassesEl.textContent = String(todaySlots.length);
+  } catch (_) {}
+
+  // 2. Count attendance marked today from logs
+  try {
+    const now = new Date();
+    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const logs = cachedActivityLogs || [];
+    let markedTodayCount = 0;
+    logs.forEach(log => {
+      if (log.action && log.action.toLowerCase().includes('attendance')) {
+        const performed = (log.performedBy || '').trim().toLowerCase();
+        const isMyLog = isAdmin || performed === myName || performed.includes(myName);
+        const logDate = log.timestamp || log.createdAt;
+        if (isMyLog && logDate && String(logDate).startsWith(todayDateStr)) {
+          markedTodayCount++;
+        }
+      }
+    });
+    if (markedEl) markedEl.textContent = String(markedTodayCount);
+  } catch (_) {}
+
+  // 3. Count assigned classes
+  try {
+    if (assignedEl) {
+      if (isAdmin) {
+        assignedEl.textContent = String(classesList.length);
+      } else {
+        const myAssigned = classesList.filter(c => {
+          const ct = (c.classTeacher || '').trim().toLowerCase();
+          return ct === myName || ct.includes(myName);
+        });
+        assignedEl.textContent = String(myAssigned.length || classesList.length);
+      }
+    }
+  } catch (_) {}
 }
 
 async function undoLog(logId, actionName) {
@@ -2709,9 +2816,38 @@ function closeActivityLogsModal() {
 }
 
 // ================= ADMIN PANEL & TEACHERS LIST =================
+function handleAdminToggleNotifMorning(enabled) {
+  try {
+    localStorage.setItem('admin_notif_morning', enabled ? 'true' : 'false');
+    showToast(enabled ? 'Morning timetable alerts enabled' : 'Morning timetable alerts disabled');
+  } catch(_) {}
+}
+
+function handleAdminToggleNotifPreclass(enabled) {
+  try {
+    localStorage.setItem('admin_notif_preclass', enabled ? 'true' : 'false');
+    showToast(enabled ? '5-minute pre-class reminders enabled' : '5-minute pre-class reminders disabled');
+  } catch(_) {}
+}
+
+function handleAdminToggleNotifVibrate(enabled) {
+  try {
+    localStorage.setItem('admin_notif_vibrate', enabled ? 'true' : 'false');
+    showToast(enabled ? 'Alert vibration enabled' : 'Alert vibration disabled');
+  } catch(_) {}
+}
+
 function openAdminPanel() {
   document.getElementById('modal-admin-panel').classList.remove('hidden');
   loadAdminTeachersList();
+
+  // Sync notification toggles in Admin Panel
+  const tMorning = document.getElementById('admin-toggle-notif-morning');
+  const tPreclass = document.getElementById('admin-toggle-notif-preclass');
+  const tVibrate = document.getElementById('admin-toggle-notif-vibrate');
+  if (tMorning) tMorning.checked = localStorage.getItem('admin_notif_morning') !== 'false';
+  if (tPreclass) tPreclass.checked = localStorage.getItem('admin_notif_preclass') !== 'false';
+  if (tVibrate) tVibrate.checked = localStorage.getItem('admin_notif_vibrate') !== 'false';
 }
 
 function closeAdminPanel() {
@@ -4201,12 +4337,6 @@ async function openTimetableModal() {
   const modal = document.getElementById('modal-timetable');
   if (modal) modal.classList.remove('hidden');
 
-  // Sync reminder lead time selector
-  const leadSelect = document.getElementById('tt-reminder-lead-select');
-  if (leadSelect) {
-    leadSelect.value = String(getTimetableReminderLeadTime());
-  }
-
   // Populate class filter
   const classFilter = document.getElementById('timetable-filter-class');
   if (classFilter) {
@@ -4642,69 +4772,7 @@ function _parseSlotTimeRange(timeStr) {
   return { startMin, endMin };
 }
 
-// Feature 1: Quick take attendance from anywhere
-async function quickTakeAttendance(targetClass, targetSubject) {
-  closeTimetableModal();
-  dismissPreClassAlert();
-  switchTab('attendance');
-  if (targetClass) {
-    currentClass = targetClass;
-    const selClass = document.getElementById('sel-class');
-    if (selClass) selClass.value = targetClass;
-    updateAttendanceSubjectsDropdown(targetClass);
-  }
-  if (targetSubject) {
-    currentSubject = targetSubject;
-    const selSub = document.getElementById('sel-subject');
-    if (selSub) selSub.value = targetSubject;
-  }
-  attendanceReadyToLoad = true;
-  await loadAttendanceRoster();
-}
-
-function quickTakeAttendanceFromAlert() {
-  if (!activePreClassSlot) {
-    dismissPreClassAlert();
-    switchTab('attendance');
-    return;
-  }
-  const cls = activePreClassSlot.class;
-  const subj = activePreClassSlot.subject;
-  quickTakeAttendance(cls, subj);
-}
-
-// Feature 5: Duplicate Timetable Slot (Clone)
-function duplicateTimetableSlot(slotId) {
-  const slot = (cachedCurrentTimetableSlots || []).find(s => String(s._id) === String(slotId));
-  if (!slot) return;
-  triggerNavHaptic('click');
-
-  openAddTimetableSlotModal();
-  const titleEl = document.getElementById('timetable-slot-modal-title');
-  if (titleEl) titleEl.textContent = 'Duplicate Timetable Slot';
-
-  const timeInput = document.getElementById('slot-input-time');
-  const classInput = document.getElementById('slot-input-class');
-  const subjInput = document.getElementById('slot-input-subject');
-  const roomInput = document.getElementById('slot-input-room');
-
-  if (timeInput) timeInput.value = slot.timeSlot || slot.time || '';
-  if (classInput) {
-    classInput.value = slot.class || '';
-    filterTimetableSubjectsByClass();
-  }
-  if (subjInput) subjInput.value = slot.subject || '';
-  if (roomInput) roomInput.value = slot.room || '';
-
-  const days = Array.isArray(slot.days) && slot.days.length > 0
-    ? slot.days
-    : (slot.day ? slot.day.split(',').map(d => d.trim()).filter(Boolean) : []);
-  renderSlotDayChips(days);
-
-  showToast('Slot duplicated! Make adjustments and tap Save.');
-}
-
-// Feature 6: Clean printable weekly schedule view (Print / Save as PDF)
+// Clean printable weekly schedule view (Print / Save as PDF)
 function printTimetableSchedule() {
   const printSheet = document.getElementById('timetable-print-sheet');
   if (!printSheet) return;
@@ -4823,21 +4891,6 @@ function printTimetableSchedule() {
   }, 1000);
 }
 
-// Feature 7: Customizable pre-class reminder lead time
-function getTimetableReminderLeadTime() {
-  const saved = localStorage.getItem('tt_reminder_lead_time');
-  const val = parseInt(saved, 10);
-  return [2, 5, 10, 15].includes(val) ? val : 5;
-}
-
-function handleReminderLeadChange(val) {
-  const mins = parseInt(val, 10);
-  if ([2, 5, 10, 15].includes(mins)) {
-    localStorage.setItem('tt_reminder_lead_time', String(mins));
-    showToast(`Pre-class reminder set to ${mins} minutes before`);
-  }
-}
-
 function _generateTimetableSlotsHtml(slots) {
   if (!slots || slots.length === 0) {
     return `
@@ -4906,30 +4959,15 @@ function _generateTimetableSlotsHtml(slots) {
       }
     }
 
-    // Feature 1: One-tap Take Attendance button
-    const takeAttendanceBtn = `
-      <button type="button" onclick="quickTakeAttendance('${escapeHtml(slot.class)}', '${escapeHtml(slot.subject)}')" title="Take Attendance for this Class" class="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white flex items-center justify-center transition border border-emerald-500/20 active:scale-95 shadow-xs">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      </button>
-    `;
-
-    // Feature 5: Duplicate Slot button + Edit & Delete
-    const actionBtns = `
-      <div class="flex items-center gap-1 flex-shrink-0">
-        ${takeAttendanceBtn}
-        ${canEditThisSlot ? `
-          <button type="button" onclick="duplicateTimetableSlot('${escapeHtml(String(slot._id))}')" title="Duplicate Slot" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          </button>
-          <button type="button" onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-          </button>
-          <button type="button" onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition active:scale-95 shadow-xs">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          </button>
-        ` : ''}
-      </div>
-    `;
+    const editDelBtns = canEditThisSlot ? `
+      <div class="flex gap-1 flex-shrink-0">
+        <button type="button" onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </button>
+        <button type="button" onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition active:scale-95 shadow-xs">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>` : '';
 
     const liveBorderClass = isLiveNow
       ? 'border-emerald-500/60 dark:border-emerald-400/60 shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/30'
@@ -4966,7 +5004,7 @@ function _generateTimetableSlotsHtml(slots) {
             </div>` : ''}
           </div>
         </div>
-        ${actionBtns}
+        ${editDelBtns}
       </div>
     `;
   }).join('');
@@ -5728,7 +5766,10 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
   }
 
   modal.classList.remove('hidden');
-  try { if (navigator.vibrate) navigator.vibrate([150, 80, 150]); } catch(_) {}
+  const allowVibrate = localStorage.getItem('admin_notif_vibrate') !== 'false';
+  if (allowVibrate) {
+    try { if (navigator.vibrate) navigator.vibrate([150, 80, 150]); } catch(_) {}
+  }
 }
 
 function snoozeTimetableSummary() {
@@ -5770,13 +5811,7 @@ function renderPreClassNotificationCard(slot) {
   const timeEl = document.getElementById('preclass-time-badge');
   const classEl = document.getElementById('preclass-class-badge');
   const roomEl = document.getElementById('preclass-room-badge');
-  const leadBadge = document.getElementById('preclass-lead-badge');
   if (!card) return;
-
-  const leadMins = getTimetableReminderLeadTime();
-  if (leadBadge) {
-    leadBadge.textContent = `Starting In ${leadMins} Minutes`;
-  }
 
   if (subjEl) subjEl.textContent = slot.subject || 'Class';
   if (timeEl) timeEl.textContent = slot.timeSlot || slot.time || 'Starting Soon';
@@ -5791,7 +5826,10 @@ function renderPreClassNotificationCard(slot) {
   }
 
   card.classList.remove('hidden');
-  try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch(_) {}
+  const allowVibrate = localStorage.getItem('admin_notif_vibrate') !== 'false';
+  if (allowVibrate) {
+    try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch(_) {}
+  }
 }
 
 function snoozePreClassAlert() {
@@ -5854,10 +5892,13 @@ async function checkAndTriggerTimetableNotifications() {
     const snoozeUntil = parseInt(localStorage.getItem(`tt_summary_snooze_${myAccountKey}`) || '0', 10);
     const isSnoozed = Date.now() < snoozeUntil;
 
+    const allowMorning = localStorage.getItem('admin_notif_morning') !== 'false';
+    const allowPreclass = localStorage.getItem('admin_notif_preclass') !== 'false';
+
     // USER DIRECTIVE:
     // "If no set the account any time table....show at the morning a message to set time table...with not snooze only ok........"
     if (mySlots.length === 0) {
-      if (currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
+      if (allowMorning && currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
         if (!localStorage.getItem(summaryNotifKey)) {
           localStorage.setItem(summaryNotifKey, 'shown');
         }
@@ -5897,7 +5938,7 @@ async function checkAndTriggerTimetableNotifications() {
     });
 
     // 1. Daily morning summary notification for this account only
-    if (currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
+    if (allowMorning && currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
       if (!localStorage.getItem(summaryNotifKey)) {
         localStorage.setItem(summaryNotifKey, 'shown');
       }
@@ -5926,43 +5967,43 @@ async function checkAndTriggerTimetableNotifications() {
       renderBubbleTimetableModal(todayName, todaySlots, false);
     }
 
-    // 2. Pre-class notification for this account only
-    const leadMins = getTimetableReminderLeadTime();
-    todaySlots.forEach(slot => {
-      const timeInfo = _parseSlotStartTime(slot.timeSlot || slot.time);
-      if (!timeInfo) return;
+    // 2. Notification 5 minutes before every class for this account only
+    if (allowPreclass) {
+      todaySlots.forEach(slot => {
+        const timeInfo = _parseSlotStartTime(slot.timeSlot || slot.time);
+        if (!timeInfo) return;
 
-      const slotStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), timeInfo.hours, timeInfo.minutes, 0, 0);
-      const diffMs = slotStart.getTime() - now.getTime();
-      const diffMinutes = diffMs / (60 * 1000);
+        const slotStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), timeInfo.hours, timeInfo.minutes, 0, 0);
+        const diffMs = slotStart.getTime() - now.getTime();
+        const diffMinutes = diffMs / (60 * 1000);
 
-      // Trigger if class starts in between 0 and (leadMins + 0.5) minutes
-      if (diffMinutes >= 0 && diffMinutes <= (leadMins + 0.5)) {
-        const slotKey = slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject);
-        const slotDoneKey = `tt_notif_${leadMins}m_${myAccountKey}_${slotKey}_${todayStr}`;
-        const slotSnoozeUntil = parseInt(localStorage.getItem(`tt_preclass_snooze_${myAccountKey}_${slotKey}`) || '0', 10);
-        const isSlotSnoozed = Date.now() < slotSnoozeUntil;
+        // Trigger if class starts in between 0 and 5.5 minutes
+        if (diffMinutes >= 0 && diffMinutes <= 5.5) {
+          const slotKey = slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject);
+          const slotDoneKey = `tt_notif_5m_${myAccountKey}_${slotKey}_${todayStr}`;
+          const slotSnoozeUntil = parseInt(localStorage.getItem(`tt_preclass_snooze_${myAccountKey}_${slotKey}`) || '0', 10);
+          const isSlotSnoozed = Date.now() < slotSnoozeUntil;
 
-        if (localStorage.getItem(slotDoneKey) !== 'done' && !isSlotSnoozed) {
-          const timePart = slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`;
-          const body = `Next Subject\n${slot.subject} (${timePart}) [${slot.class}]${slot.room ? ' • Room ' + slot.room : ''}`;
+          if (localStorage.getItem(slotDoneKey) !== 'done' && !isSlotSnoozed) {
+            const timePart = slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`;
+            const body = `Next Subject\n${slot.subject} (${timePart}) [${slot.class}]${slot.room ? ' • Room ' + slot.room : ''}`;
 
-          // Trigger phone notification with Take Attendance, Snooze, and OK
-          showAppNotification(appName, {
-            body,
-            tag: `tt-class-${myAccountKey}-${slotKey}`,
-            actions: [
-              { action: 'attendance', title: 'Take Attendance' },
-              { action: 'snooze', title: 'Snooze' },
-              { action: 'ok', title: 'OK' }
-            ]
-          });
+            // Trigger phone notification with Snooze and OK
+            showAppNotification(appName, {
+              body,
+              tag: `tt-class-${myAccountKey}-${slotKey}`,
+              actions: [
+                { action: 'snooze', title: 'Snooze' },
+                { action: 'ok', title: 'OK' }
+              ]
+            });
 
-          // Show in-app small semi-rounded square notification
-          renderPreClassNotificationCard(slot);
+            // Show in-app small semi-rounded square notification
+            renderPreClassNotificationCard(slot);
+          }
         }
-      }
-    });
+      });
+    }
   } catch (err) {
     console.debug('[Timetable Notification Check Failed]', err);
   }
@@ -5975,13 +6016,11 @@ function initTimetableNotificationScheduler() {
     }, 2000);
   }
 
-  // Listen for actions from Service Worker notification clicks (Attendance / Snooze / OK)
+  // Listen for actions from Service Worker notification clicks (Snooze / OK)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data) {
-        if (event.data.type === 'TAKE_ATTENDANCE_ACTION') {
-          quickTakeAttendanceFromAlert();
-        } else if (event.data.type === 'NOTIFICATION_SNOOZED') {
+        if (event.data.type === 'NOTIFICATION_SNOOZED') {
           const tag = event.data.tag || '';
           if (tag.startsWith('tt-summary-')) snoozeTimetableSummary();
           else if (tag.startsWith('tt-class-')) snoozePreClassAlert();

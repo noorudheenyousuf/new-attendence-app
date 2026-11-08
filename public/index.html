@@ -346,7 +346,37 @@
           </div>
         </div>
 
-        <!-- 1. ADMIN PANEL BUTTON (Just below the profile name and photo div) -->
+        <!-- 1. TEACHER DAILY SUMMARY & KPI STATS (At-a-Glance Dashboard) -->
+        <div id="profile-kpi-dashboard" class="grid grid-cols-3 gap-2">
+          <!-- Today's Classes -->
+          <div class="bg-[var(--card-bg)] p-2.5 rounded-2xl border border-[var(--border-color)] shadow-sm text-center">
+            <div class="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 mx-auto mb-1 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+            <div id="kpi-today-classes" class="text-sm font-black text-[var(--text-main)]">0</div>
+            <div class="text-[9px] font-bold text-[var(--text-sub)] uppercase tracking-wider">Today's Classes</div>
+          </div>
+
+          <!-- Attendance Marked Today -->
+          <div class="bg-[var(--card-bg)] p-2.5 rounded-2xl border border-[var(--border-color)] shadow-sm text-center">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mx-auto mb-1 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div id="kpi-attendance-marked" class="text-sm font-black text-[var(--text-main)]">0</div>
+            <div class="text-[9px] font-bold text-[var(--text-sub)] uppercase tracking-wider">Marked Today</div>
+          </div>
+
+          <!-- Assigned Classes -->
+          <div class="bg-[var(--card-bg)] p-2.5 rounded-2xl border border-[var(--border-color)] shadow-sm text-center">
+            <div class="w-7 h-7 rounded-lg bg-teal-500/10 text-[#245b70] dark:text-teal-300 mx-auto mb-1 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            </div>
+            <div id="kpi-assigned-classes" class="text-sm font-black text-[var(--text-main)]">0</div>
+            <div class="text-[9px] font-bold text-[var(--text-sub)] uppercase tracking-wider">My Classes</div>
+          </div>
+        </div>
+
+        <!-- 2. ADMIN PANEL BUTTON (Just below the profile name and photo div) -->
         <div id="admin-settings-section" class="space-y-3">
           <button onclick="openAdminPanel()" class="touch-btn w-full custom-gradient-btn font-extrabold text-xs sm:text-sm rounded-2xl shadow-md flex items-center justify-center gap-2 active:scale-98 transition py-3">
             <svg class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
@@ -407,7 +437,7 @@
 
           <!-- Direct Inline Activity Log (Directly below Print Students Data) -->
           <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
-            <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
+            <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2 flex-wrap gap-2">
               <div class="flex items-center gap-2">
                 <div class="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
@@ -416,6 +446,11 @@
                   <h3 class="font-extrabold text-xs text-[var(--text-main)]">Activity Log</h3>
                   <p class="text-[10px] text-[var(--text-sub)]">Live audit trail & attendance history</p>
                 </div>
+              </div>
+              <!-- Log Filter Pills: All vs My Actions -->
+              <div class="flex items-center gap-1 bg-[var(--bg-page)] p-0.5 rounded-xl border border-[var(--border-color)] text-[10px] font-bold">
+                <button type="button" id="btn-log-filter-all" onclick="setActivityLogFilter('all')" class="px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-xs font-bold transition">All</button>
+                <button type="button" id="btn-log-filter-mine" onclick="setActivityLogFilter('mine')" class="px-2 py-0.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-semibold transition">My Actions</button>
               </div>
             </div>
             <div class="space-y-2 text-xs overflow-y-auto max-h-60 pr-1" id="activity-logs-container">
@@ -1408,6 +1443,50 @@
         </label>
       </div>
 
+      <!-- Notification & Alert Settings (Admin Only) -->
+      <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-3">
+        <div class="text-xs font-black text-[#245b70] uppercase flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span>Timetable Notification Controls</span>
+        </div>
+
+        <!-- Morning Timetable Summary Toggle -->
+        <div class="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border-color)]">
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-bold text-[var(--text-main)]">Daily Morning Timetable Alert</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Show morning class schedule notification and summary popup to teachers</div>
+          </div>
+          <label class="switch-label flex-shrink-0" title="Toggle morning timetable alerts">
+            <input type="checkbox" id="admin-toggle-notif-morning" onchange="handleAdminToggleNotifMorning(this.checked)" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- 5-Minute Pre-Class Alert Toggle -->
+        <div class="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border-color)]">
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-bold text-[var(--text-main)]">5-Minute Pre-Class Reminders</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Trigger popup and sound reminder 5 minutes before each scheduled class begins</div>
+          </div>
+          <label class="switch-label flex-shrink-0" title="Toggle 5-minute pre-class reminders">
+            <input type="checkbox" id="admin-toggle-notif-preclass" onchange="handleAdminToggleNotifPreclass(this.checked)" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Haptic Vibration Feedback Toggle -->
+        <div class="flex items-center justify-between gap-3 pt-1 border-t border-[var(--border-color)]">
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-bold text-[var(--text-main)]">Haptic Vibration on Alerts</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Vibrate the device when timetable alerts or notifications appear</div>
+          </div>
+          <label class="switch-label flex-shrink-0" title="Toggle vibration on alerts">
+            <input type="checkbox" id="admin-toggle-notif-vibrate" onchange="handleAdminToggleNotifVibrate(this.checked)" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </div>
+
       <!-- Teachers List -->
       <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
         <div class="flex items-center justify-between">
@@ -1700,22 +1779,11 @@
           <button type="button" onclick="selectTimetableDay('Saturday')" data-day="Saturday" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition">Sat</button>
         </div>
 
-        <!-- Class Filter & Reminder Lead Time -->
-        <div class="flex items-center gap-2 flex-wrap">
-          <div class="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-sub)]">
-            <span class="hidden sm:inline">Alert:</span>
-            <select id="tt-reminder-lead-select" onchange="handleReminderLeadChange(this.value)" title="Pre-class reminder timing" class="bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
-              <option value="2">2m before</option>
-              <option value="5" selected>5m before</option>
-              <option value="10">10m before</option>
-              <option value="15">15m before</option>
-            </select>
-          </div>
-          <div class="min-w-[120px]">
-            <select id="timetable-filter-class" onchange="renderTimetableSlots()" class="w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
-              <option value="all">All Classes</option>
-            </select>
-          </div>
+        <!-- Class Filter for Timetable -->
+        <div class="min-w-[130px]">
+          <select id="timetable-filter-class" onchange="renderTimetableSlots()" class="w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
+            <option value="all">All Classes</option>
+          </select>
         </div>
       </div>
 
@@ -2182,22 +2250,16 @@
       </div>
     </div>
 
-    <!-- Buttons: Take Attendance (Quick Action) & Snooze/OK -->
-    <div class="mt-3 pt-2.5 border-t border-[var(--border-color)] space-y-2">
-      <button type="button" onclick="quickTakeAttendanceFromAlert()" class="touch-btn w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5 transition">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-        <span>Take Attendance Now</span>
+    <!-- Buttons: Snooze and OK -->
+    <div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[var(--border-color)]">
+      <button type="button" onclick="snoozePreClassAlert()" class="touch-btn py-2 px-3 rounded-xl bg-[var(--bg-page)] hover:bg-slate-200 dark:hover:bg-slate-800 text-[var(--text-main)] font-bold text-xs border border-[var(--border-color)] flex items-center justify-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span>Snooze</span>
       </button>
-      <div class="grid grid-cols-2 gap-2">
-        <button type="button" onclick="snoozePreClassAlert()" class="touch-btn py-1.5 px-3 rounded-xl bg-[var(--bg-page)] hover:bg-slate-200 dark:hover:bg-slate-800 text-[var(--text-main)] font-bold text-xs border border-[var(--border-color)] flex items-center justify-center gap-1.5 transition">
-          <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          <span>Snooze</span>
-        </button>
-        <button type="button" onclick="dismissPreClassAlert()" class="touch-btn py-1.5 px-3 rounded-xl bg-[#245b70] hover:bg-[#1b4859] text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition">
-          <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>OK</span>
-        </button>
-      </div>
+      <button type="button" onclick="dismissPreClassAlert()" class="touch-btn py-2 px-3 rounded-xl bg-[#245b70] hover:bg-[#1b4859] text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>OK</span>
+      </button>
     </div>
   </div>
 

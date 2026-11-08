@@ -62,23 +62,6 @@ self.addEventListener('notificationclick', (event) => {
   const action = event.action;
   const tag = event.notification.tag || '';
 
-  if (action === 'attendance') {
-    event.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        for (const client of clientList) {
-          if ('focus' in client) {
-            client.postMessage({ type: 'TAKE_ATTENDANCE_ACTION', tag });
-            return client.focus();
-          }
-        }
-        if (self.clients.openWindow) {
-          return self.clients.openWindow('/');
-        }
-      })
-    );
-    return;
-  }
-
   if (action === 'snooze') {
     event.waitUntil(
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
