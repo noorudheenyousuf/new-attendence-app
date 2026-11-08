@@ -1676,6 +1676,9 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <button type="button" onclick="printTimetableSchedule()" title="Print / PDF Schedule" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          </button>
           <button type="button" onclick="openAddTimetableSlotModal()" id="btn-add-timetable-slot" class="px-3 py-1.5 custom-gradient-btn text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>Add Slot</span>
@@ -1684,7 +1687,7 @@
         </div>
       </div>
 
-      <!-- Controls: Day Tabs & Class Filter -->
+      <!-- Controls: Day Tabs & Class Filter & Reminder Lead Time -->
       <div class="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
         <!-- Day Selector Pills -->
         <div class="flex items-center gap-1 overflow-x-auto pb-1 max-w-full no-scrollbar text-xs font-bold" id="timetable-day-tabs">
@@ -1697,11 +1700,22 @@
           <button type="button" onclick="selectTimetableDay('Saturday')" data-day="Saturday" class="tt-day-btn px-2.5 py-1 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition">Sat</button>
         </div>
 
-        <!-- Class Filter for Timetable -->
-        <div class="min-w-[130px]">
-          <select id="timetable-filter-class" onchange="renderTimetableSlots()" class="w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
-            <option value="all">All Classes</option>
-          </select>
+        <!-- Class Filter & Reminder Lead Time -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-sub)]">
+            <span class="hidden sm:inline">Alert:</span>
+            <select id="tt-reminder-lead-select" onchange="handleReminderLeadChange(this.value)" title="Pre-class reminder timing" class="bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
+              <option value="2">2m before</option>
+              <option value="5" selected>5m before</option>
+              <option value="10">10m before</option>
+              <option value="15">15m before</option>
+            </select>
+          </div>
+          <div class="min-w-[120px]">
+            <select id="timetable-filter-class" onchange="renderTimetableSlots()" class="w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
+              <option value="all">All Classes</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -2155,7 +2169,7 @@
 
       <div class="min-w-0 flex-1">
         <div class="flex items-center justify-between gap-1">
-          <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 font-black text-[10px] uppercase tracking-wider">Starting In 5 Minutes</span>
+          <span id="preclass-lead-badge" class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 font-black text-[10px] uppercase tracking-wider">Starting In 5 Minutes</span>
           <button type="button" onclick="dismissPreClassAlert()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold">✕</button>
         </div>
         <h4 id="preclass-subject-title" class="font-extrabold text-sm text-[var(--text-main)] mt-1 truncate">Mathematics</h4>
@@ -2168,18 +2182,27 @@
       </div>
     </div>
 
-    <!-- Buttons: Snooze and OK -->
-    <div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[var(--border-color)]">
-      <button type="button" onclick="snoozePreClassAlert()" class="touch-btn py-2 px-3 rounded-xl bg-[var(--bg-page)] hover:bg-slate-200 dark:hover:bg-slate-800 text-[var(--text-main)] font-bold text-xs border border-[var(--border-color)] flex items-center justify-center gap-1.5 transition">
-        <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-        <span>Snooze</span>
+    <!-- Buttons: Take Attendance (Quick Action) & Snooze/OK -->
+    <div class="mt-3 pt-2.5 border-t border-[var(--border-color)] space-y-2">
+      <button type="button" onclick="quickTakeAttendanceFromAlert()" class="touch-btn w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5 transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        <span>Take Attendance Now</span>
       </button>
-      <button type="button" onclick="dismissPreClassAlert()" class="touch-btn py-2 px-3 rounded-xl bg-[#245b70] hover:bg-[#1b4859] text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition">
-        <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        <span>OK</span>
-      </button>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" onclick="snoozePreClassAlert()" class="touch-btn py-1.5 px-3 rounded-xl bg-[var(--bg-page)] hover:bg-slate-200 dark:hover:bg-slate-800 text-[var(--text-main)] font-bold text-xs border border-[var(--border-color)] flex items-center justify-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span>Snooze</span>
+        </button>
+        <button type="button" onclick="dismissPreClassAlert()" class="touch-btn py-1.5 px-3 rounded-xl bg-[#245b70] hover:bg-[#1b4859] text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>OK</span>
+        </button>
+      </div>
     </div>
   </div>
+
+  <!-- TIMETABLE PRINT SHEET -->
+  <div id="timetable-print-sheet" class="hidden"></div>
 
   <!-- TOAST NOTIFICATION -->
   <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#14323d] text-white text-xs font-bold px-4 py-2 rounded-full shadow-2xl flex items-center gap-1.5 transform -translate-y-20 opacity-0 transition-all duration-300 pointer-events-none no-print">

@@ -763,3 +763,19 @@ input:checked + .switch-slider:before {
   transition: transform 0.08s ease-in-out;
 }
 
+/* Printable Timetable Grid Styles */
+@media print {
+  body.printing-timetable > *:not(#timetable-print-sheet) {
+    display: none !important;
+  }
+  #timetable-print-sheet {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+}
+

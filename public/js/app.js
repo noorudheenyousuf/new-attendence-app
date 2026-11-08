@@ -4201,6 +4201,12 @@ async function openTimetableModal() {
   const modal = document.getElementById('modal-timetable');
   if (modal) modal.classList.remove('hidden');
 
+  // Sync reminder lead time selector
+  const leadSelect = document.getElementById('tt-reminder-lead-select');
+  if (leadSelect) {
+    leadSelect.value = String(getTimetableReminderLeadTime());
+  }
+
   // Populate class filter
   const classFilter = document.getElementById('timetable-filter-class');
   if (classFilter) {
@@ -4499,6 +4505,37 @@ async function handleSaveTimetableSlot(e) {
     return;
   }
 
+  // Feature 3: Schedule conflict / overlap detection
+  const newRange = _parseSlotTimeRange(slotData.timeSlot);
+  if (newRange && cachedCurrentTimetableSlots && cachedCurrentTimetableSlots.length > 0) {
+    const overlapping = cachedCurrentTimetableSlots.find(s => {
+      if (slotId && String(s._id) === String(slotId)) return false;
+      const existingDays = Array.isArray(s.days) && s.days.length > 0
+        ? s.days
+        : (s.day || '').split(',').map(x => x.trim()).filter(Boolean);
+      const daysOverlap = daysArr.some(d =>
+        d === 'All Days' || existingDays.includes('All Days') || existingDays.includes(d)
+      );
+      if (!daysOverlap) return false;
+
+      const existRange = _parseSlotTimeRange(s.timeSlot || s.time);
+      if (!existRange) return false;
+
+      return (newRange.startMin < existRange.endMin && existRange.startMin < newRange.endMin);
+    });
+
+    if (overlapping) {
+      const proceed = confirm(
+        `⚠️ Schedule Conflict Warning!\n\nThis slot overlaps with an existing class:\n` +
+        `• Subject: ${overlapping.subject} (${overlapping.class})\n` +
+        `• Time: ${overlapping.timeSlot || overlapping.time}\n` +
+        `• Day(s): ${overlapping.day || (overlapping.days || []).join(', ')}\n\n` +
+        `Do you still want to save this slot?`
+      );
+      if (!proceed) return;
+    }
+  }
+
   const btn = e.target.querySelector('button[type="submit"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
@@ -4559,6 +4596,248 @@ function filterTimetableSubjectsByClass() {
 let cachedCurrentTimetableSlots = [];
 let draggedTimetableSlotId = null;
 
+// Parse a slot time range like "09:00 AM - 10:00 AM" into start and end minute numbers
+function _parseSlotTimeRange(timeStr) {
+  if (!timeStr) return null;
+  const parts = String(timeStr).split(/[-–—to]/i).map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+
+  const meridiems = String(timeStr).match(/(am|pm)/gi) || [];
+  const defaultMeridiem = meridiems[meridiems.length - 1] ? meridiems[meridiems.length - 1].toLowerCase() : null;
+
+  function parsePart(partStr, fallbackMeridiem) {
+    if (!partStr) return null;
+    let m = fallbackMeridiem;
+    const directM = partStr.match(/(am|pm)/i);
+    if (directM) m = directM[1].toLowerCase();
+
+    const timeMatch = partStr.match(/(\d{1,2})[:.](\d{2})/);
+    let h = 0, min = 0;
+    if (timeMatch) {
+      h = parseInt(timeMatch[1], 10);
+      min = parseInt(timeMatch[2], 10);
+    } else {
+      const singleH = partStr.match(/(\d{1,2})/);
+      if (!singleH) return null;
+      h = parseInt(singleH[1], 10);
+      min = 0;
+    }
+    if (m === 'pm' && h < 12) h += 12;
+    if (m === 'am' && h === 12) h = 0;
+    if (isNaN(h) || isNaN(min) || h < 0 || h > 23 || min < 0 || min > 59) return null;
+    return h * 60 + min;
+  }
+
+  const startMin = parsePart(parts[0], meridiems.length > 1 ? meridiems[0].toLowerCase() : defaultMeridiem);
+  if (startMin === null) return null;
+
+  let endMin = null;
+  if (parts.length > 1) {
+    endMin = parsePart(parts[1], defaultMeridiem);
+  }
+  if (endMin === null || endMin <= startMin) {
+    endMin = startMin + 50; // default period 50 mins
+  }
+
+  return { startMin, endMin };
+}
+
+// Feature 1: Quick take attendance from anywhere
+async function quickTakeAttendance(targetClass, targetSubject) {
+  closeTimetableModal();
+  dismissPreClassAlert();
+  switchTab('attendance');
+  if (targetClass) {
+    currentClass = targetClass;
+    const selClass = document.getElementById('sel-class');
+    if (selClass) selClass.value = targetClass;
+    updateAttendanceSubjectsDropdown(targetClass);
+  }
+  if (targetSubject) {
+    currentSubject = targetSubject;
+    const selSub = document.getElementById('sel-subject');
+    if (selSub) selSub.value = targetSubject;
+  }
+  attendanceReadyToLoad = true;
+  await loadAttendanceRoster();
+}
+
+function quickTakeAttendanceFromAlert() {
+  if (!activePreClassSlot) {
+    dismissPreClassAlert();
+    switchTab('attendance');
+    return;
+  }
+  const cls = activePreClassSlot.class;
+  const subj = activePreClassSlot.subject;
+  quickTakeAttendance(cls, subj);
+}
+
+// Feature 5: Duplicate Timetable Slot (Clone)
+function duplicateTimetableSlot(slotId) {
+  const slot = (cachedCurrentTimetableSlots || []).find(s => String(s._id) === String(slotId));
+  if (!slot) return;
+  triggerNavHaptic('click');
+
+  openAddTimetableSlotModal();
+  const titleEl = document.getElementById('timetable-slot-modal-title');
+  if (titleEl) titleEl.textContent = 'Duplicate Timetable Slot';
+
+  const timeInput = document.getElementById('slot-input-time');
+  const classInput = document.getElementById('slot-input-class');
+  const subjInput = document.getElementById('slot-input-subject');
+  const roomInput = document.getElementById('slot-input-room');
+
+  if (timeInput) timeInput.value = slot.timeSlot || slot.time || '';
+  if (classInput) {
+    classInput.value = slot.class || '';
+    filterTimetableSubjectsByClass();
+  }
+  if (subjInput) subjInput.value = slot.subject || '';
+  if (roomInput) roomInput.value = slot.room || '';
+
+  const days = Array.isArray(slot.days) && slot.days.length > 0
+    ? slot.days
+    : (slot.day ? slot.day.split(',').map(d => d.trim()).filter(Boolean) : []);
+  renderSlotDayChips(days);
+
+  showToast('Slot duplicated! Make adjustments and tap Save.');
+}
+
+// Feature 6: Clean printable weekly schedule view (Print / Save as PDF)
+function printTimetableSchedule() {
+  const printSheet = document.getElementById('timetable-print-sheet');
+  if (!printSheet) return;
+
+  const appName = (appSettings && appSettings.appName && appSettings.appName.trim())
+    ? appSettings.appName.trim()
+    : (localStorage.getItem('registerly_app_name') || 'REGISTERLY');
+
+  const teacherDisplay = timetableViewTeacher || (currentUser ? currentUser.name : 'Weekly Schedule');
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  // Group slots by day
+  const slotsByDay = {};
+  daysOfWeek.forEach(d => { slotsByDay[d] = []; });
+
+  (cachedCurrentTimetableSlots || []).forEach(slot => {
+    let days = [];
+    if (Array.isArray(slot.days) && slot.days.length > 0) {
+      days = slot.days;
+    } else if (slot.day) {
+      days = slot.day.split(',').map(d => d.trim()).filter(Boolean);
+    }
+    days.forEach(day => {
+      if (day.toLowerCase() === 'all days' || day.toLowerCase() === 'all') {
+        daysOfWeek.forEach(d => slotsByDay[d].push(slot));
+      } else {
+        const match = daysOfWeek.find(d => d.toLowerCase() === day.toLowerCase());
+        if (match) slotsByDay[match].push(slot);
+      }
+    });
+  });
+
+  // Sort each day chronologically
+  daysOfWeek.forEach(day => {
+    slotsByDay[day].sort((a, b) => {
+      const tA = _parseSlotStartTime(a.timeSlot || a.time);
+      const tB = _parseSlotStartTime(b.timeSlot || b.time);
+      if (!tA && !tB) return 0;
+      if (!tA) return 1;
+      if (!tB) return -1;
+      return (tA.hours * 60 + tA.minutes) - (tB.hours * 60 + tB.minutes);
+    });
+  });
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  let tablesHtml = daysOfWeek.map(day => {
+    const slots = slotsByDay[day];
+    if (slots.length === 0) return '';
+    const rows = slots.map(s => `
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 8px 12px; font-weight: 700; color: #1e293b; font-size: 12px; white-space: nowrap;">${escapeHtml(s.timeSlot || s.time || '-')}</td>
+        <td style="padding: 8px 12px; font-weight: 800; color: #0f172a; font-size: 13px;">${escapeHtml(s.subject || '-')}</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #334155; font-size: 12px;">${escapeHtml(s.class || '-')}</td>
+        <td style="padding: 8px 12px; color: #64748b; font-size: 11px;">${s.room ? escapeHtml(s.room) : '-'}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div style="margin-bottom: 20px; break-inside: avoid;">
+        <div style="background: #f1f5f9; padding: 6px 12px; border-left: 4px solid #245b70; font-weight: 800; font-size: 13px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">
+          ${day}
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 4px; text-align: left;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 2px solid #cbd5e1; font-size: 11px; text-transform: uppercase; color: #475569;">
+              <th style="padding: 6px 12px;">Time</th>
+              <th style="padding: 6px 12px;">Subject</th>
+              <th style="padding: 6px 12px;">Class</th>
+              <th style="padding: 6px 12px;">Room</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }).filter(Boolean).join('');
+
+  if (!tablesHtml) {
+    tablesHtml = `
+      <div style="padding: 30px; text-align: center; color: #64748b; font-size: 13px;">
+        No timetable slots scheduled to display.
+      </div>
+    `;
+  }
+
+  printSheet.innerHTML = `
+    <div style="font-family: system-ui, -apple-system, sans-serif; padding: 24px; color: #0f172a; max-width: 900px; margin: 0 auto;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px;">
+        <div>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 900; color: #245b70; text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(appName)}</h1>
+          <h2 style="margin: 4px 0 0 0; font-size: 16px; font-weight: 700; color: #1e293b;">Timetable: ${escapeHtml(teacherDisplay)}</h2>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #64748b;">
+          <div>Generated: ${escapeHtml(dateStr)}</div>
+          <div style="font-weight: 600; color: #245b70; margin-top: 2px;">Official Schedule</div>
+        </div>
+      </div>
+      <div>
+        ${tablesHtml}
+      </div>
+      <div style="margin-top: 30px; border-top: 1px dashed #cbd5e1; padding-top: 8px; text-align: center; font-size: 10px; color: #94a3b8;">
+        Printed from ${escapeHtml(appName)} Attendance & Timetable Management System
+      </div>
+    </div>
+  `;
+
+  document.body.classList.add('printing-timetable');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('printing-timetable');
+    printSheet.innerHTML = '';
+  }, 1000);
+}
+
+// Feature 7: Customizable pre-class reminder lead time
+function getTimetableReminderLeadTime() {
+  const saved = localStorage.getItem('tt_reminder_lead_time');
+  const val = parseInt(saved, 10);
+  return [2, 5, 10, 15].includes(val) ? val : 5;
+}
+
+function handleReminderLeadChange(val) {
+  const mins = parseInt(val, 10);
+  if ([2, 5, 10, 15].includes(mins)) {
+    localStorage.setItem('tt_reminder_lead_time', String(mins));
+    showToast(`Pre-class reminder set to ${mins} minutes before`);
+  }
+}
+
 function _generateTimetableSlotsHtml(slots) {
   if (!slots || slots.length === 0) {
     return `
@@ -4572,6 +4851,12 @@ function _generateTimetableSlotsHtml(slots) {
   const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
   const myId = currentUser ? String(currentUser._id || currentUser.id || '') : '';
 
+  const now = new Date();
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const todayName = dayNames[now.getDay()];
+  const todayLower = todayName.toLowerCase();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
   return slots.map(slot => {
     const slotTeacher = (slot.teacher || '').trim().toLowerCase();
     const isOwnSlot = (myName && slotTeacher === myName) || (myId && slot.teacherId && String(slot.teacherId) === myId);
@@ -4580,16 +4865,6 @@ function _generateTimetableSlotsHtml(slots) {
     // "Also add edit, delete button to time table window in admin and all users..."
     // "In teacher tab....Also gave admin to edit and delete and and slot to time table of every teacher....."
     const canEditThisSlot = !timetableReadOnly && (isAdminUser || isOwnSlot);
-
-    const editDelBtns = canEditThisSlot ? `
-      <div class="flex gap-1 flex-shrink-0">
-        <button type="button" onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        </button>
-        <button type="button" onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition active:scale-95 shadow-xs">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
-      </div>` : '';
 
     // Extract day names for clean presentation below subject and class
     let slotDays = [];
@@ -4600,8 +4875,68 @@ function _generateTimetableSlotsHtml(slots) {
     }
     const dayBadgesHtml = slotDays.map(d => `<span class="px-1.5 py-0.5 rounded-md bg-teal-500/10 text-teal-800 dark:text-teal-300 font-bold text-[9px]">${escapeHtml(d)}</span>`).join('');
 
+    // Feature 2: LIVE NOW and NEXT (in Xm) status indicators
+    const isTodaySlot = slotDays.some(d => {
+      const dl = d.trim().toLowerCase();
+      return dl === todayLower || dl === 'all days' || dl === 'all';
+    });
+
+    let liveBadgeHtml = '';
+    let isLiveNow = false;
+    if (isTodaySlot) {
+      const range = _parseSlotTimeRange(slot.timeSlot || slot.time);
+      if (range) {
+        if (nowMin >= range.startMin && nowMin < range.endMin) {
+          isLiveNow = true;
+          liveBadgeHtml = `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black text-[9px] animate-pulse border border-emerald-500/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              LIVE NOW
+            </span>
+          `;
+        } else if (nowMin < range.startMin && (range.startMin - nowMin) <= 90) {
+          const diff = range.startMin - nowMin;
+          liveBadgeHtml = `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-extrabold text-[9px] border border-amber-500/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              NEXT (in ${diff}m)
+            </span>
+          `;
+        }
+      }
+    }
+
+    // Feature 1: One-tap Take Attendance button
+    const takeAttendanceBtn = `
+      <button type="button" onclick="quickTakeAttendance('${escapeHtml(slot.class)}', '${escapeHtml(slot.subject)}')" title="Take Attendance for this Class" class="w-8 h-8 rounded-xl bg-emerald-500/10 hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white flex items-center justify-center transition border border-emerald-500/20 active:scale-95 shadow-xs">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </button>
+    `;
+
+    // Feature 5: Duplicate Slot button + Edit & Delete
+    const actionBtns = `
+      <div class="flex items-center gap-1 flex-shrink-0">
+        ${takeAttendanceBtn}
+        ${canEditThisSlot ? `
+          <button type="button" onclick="duplicateTimetableSlot('${escapeHtml(String(slot._id))}')" title="Duplicate Slot" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+          <button type="button" onclick="openAddTimetableSlotModal('${escapeHtml(String(slot._id))}')" title="Edit Slot" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)] active:scale-95 shadow-xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+          <button type="button" onclick="deleteTimetableSlot('${escapeHtml(String(slot._id))}')" title="Delete Slot" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition active:scale-95 shadow-xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        ` : ''}
+      </div>
+    `;
+
+    const liveBorderClass = isLiveNow
+      ? 'border-emerald-500/60 dark:border-emerald-400/60 shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+      : 'border-[var(--border-color)] hover:border-[#245b70]';
+
     return `
-      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-3 hover:border-[#245b70] transition shadow-sm cursor-grab active:cursor-grabbing"
+      <div class="bg-[var(--bg-page)] p-3 rounded-2xl border ${liveBorderClass} flex items-center justify-between gap-3 transition shadow-sm cursor-grab active:cursor-grabbing"
         draggable="true"
         data-slot-id="${slot._id}"
         ondragstart="handleTimetableDragStart(event, '${slot._id}')"
@@ -4612,12 +4947,13 @@ function _generateTimetableSlotsHtml(slots) {
           <div class="cursor-grab text-slate-400 hover:text-[#245b70] flex-shrink-0" title="Drag to reorder slots">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
           </div>
-          <div class="flex-shrink-0 w-9 h-9 rounded-xl bg-[#245b70]/10 flex items-center justify-center">
-            <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <div class="flex-shrink-0 w-9 h-9 rounded-xl ${isLiveNow ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-[#245b70]/10 text-[#245b70] dark:text-cyan-400'} flex items-center justify-center">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           </div>
           <div class="min-w-0 space-y-1 flex-1">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="font-black text-xs text-[var(--text-main)]">${escapeHtml(slot.timeSlot || slot.time || '')}</span>
+              ${liveBadgeHtml}
             </div>
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">${escapeHtml(slot.subject || '')}</span>
@@ -4630,7 +4966,7 @@ function _generateTimetableSlotsHtml(slots) {
             </div>` : ''}
           </div>
         </div>
-        ${editDelBtns}
+        ${actionBtns}
       </div>
     `;
   }).join('');
@@ -5334,17 +5670,21 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
       <div class="p-4 rounded-2xl bg-white/10 border border-white/15 text-center space-y-2.5">
         <div class="text-sm font-extrabold text-amber-300">No Timetable Set for Your Account</div>
         <p class="text-xs text-cyan-100/90 leading-relaxed">
-          Please set up your class timetable from your Profile tab so you can receive your daily morning schedules and 5-minute pre-class reminders.
+          Please set up your class timetable so you can receive your daily morning schedules and pre-class reminders.
         </p>
       </div>
     `;
-    // USER DIRECTIVE: "with not snooze only ok........"
-    if (snoozeBtn) snoozeBtn.classList.add('hidden');
-    if (okBtn) {
-      okBtn.className = 'touch-btn w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition';
-    }
     if (actionsEl) {
       actionsEl.className = 'relative pt-2 border-t border-white/15 flex flex-col gap-2 flex-shrink-0';
+      actionsEl.innerHTML = `
+        <button type="button" onclick="handleQuickSetupTimetable()" class="touch-btn w-full py-2.5 px-4 rounded-xl custom-gradient-btn text-white font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition active:scale-95">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Set Up Timetable Now</span>
+        </button>
+        <button type="button" onclick="dismissTimetableSummary()" class="touch-btn w-full py-2 px-3 rounded-xl bg-white/15 hover:bg-white/20 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1 transition">
+          <span>Later / OK</span>
+        </button>
+      `;
     }
   } else {
     if (badgeEl) badgeEl.innerHTML = `<span>🌅 Morning Timetable</span>`;
@@ -5413,7 +5753,16 @@ function dismissTimetableSummary() {
   showToast('Timetable acknowledged');
 }
 
-// Render the 5-Minute Pre-Class Small Semi-Rounded Square Notification Div
+// Feature 4: Quick setup timetable action from morning reminder
+function handleQuickSetupTimetable() {
+  dismissTimetableSummary();
+  openMyTimetable();
+  setTimeout(() => {
+    openAddTimetableSlotModal();
+  }, 300);
+}
+
+// Render the Pre-Class Small Semi-Rounded Square Notification Div
 function renderPreClassNotificationCard(slot) {
   activePreClassSlot = slot;
   const card = document.getElementById('notif-preclass-card');
@@ -5421,7 +5770,13 @@ function renderPreClassNotificationCard(slot) {
   const timeEl = document.getElementById('preclass-time-badge');
   const classEl = document.getElementById('preclass-class-badge');
   const roomEl = document.getElementById('preclass-room-badge');
+  const leadBadge = document.getElementById('preclass-lead-badge');
   if (!card) return;
+
+  const leadMins = getTimetableReminderLeadTime();
+  if (leadBadge) {
+    leadBadge.textContent = `Starting In ${leadMins} Minutes`;
+  }
 
   if (subjEl) subjEl.textContent = slot.subject || 'Class';
   if (timeEl) timeEl.textContent = slot.timeSlot || slot.time || 'Starting Soon';
@@ -5571,7 +5926,8 @@ async function checkAndTriggerTimetableNotifications() {
       renderBubbleTimetableModal(todayName, todaySlots, false);
     }
 
-    // 2. Notification 5 minutes before every class for this account only
+    // 2. Pre-class notification for this account only
+    const leadMins = getTimetableReminderLeadTime();
     todaySlots.forEach(slot => {
       const timeInfo = _parseSlotStartTime(slot.timeSlot || slot.time);
       if (!timeInfo) return;
@@ -5580,10 +5936,10 @@ async function checkAndTriggerTimetableNotifications() {
       const diffMs = slotStart.getTime() - now.getTime();
       const diffMinutes = diffMs / (60 * 1000);
 
-      // Trigger if class starts in between 0 and 5.5 minutes
-      if (diffMinutes >= 0 && diffMinutes <= 5.5) {
+      // Trigger if class starts in between 0 and (leadMins + 0.5) minutes
+      if (diffMinutes >= 0 && diffMinutes <= (leadMins + 0.5)) {
         const slotKey = slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject);
-        const slotDoneKey = `tt_notif_5m_${myAccountKey}_${slotKey}_${todayStr}`;
+        const slotDoneKey = `tt_notif_${leadMins}m_${myAccountKey}_${slotKey}_${todayStr}`;
         const slotSnoozeUntil = parseInt(localStorage.getItem(`tt_preclass_snooze_${myAccountKey}_${slotKey}`) || '0', 10);
         const isSlotSnoozed = Date.now() < slotSnoozeUntil;
 
@@ -5591,11 +5947,12 @@ async function checkAndTriggerTimetableNotifications() {
           const timePart = slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`;
           const body = `Next Subject\n${slot.subject} (${timePart}) [${slot.class}]${slot.room ? ' • Room ' + slot.room : ''}`;
 
-          // Trigger phone notification with Snooze and OK
+          // Trigger phone notification with Take Attendance, Snooze, and OK
           showAppNotification(appName, {
             body,
             tag: `tt-class-${myAccountKey}-${slotKey}`,
             actions: [
+              { action: 'attendance', title: 'Take Attendance' },
               { action: 'snooze', title: 'Snooze' },
               { action: 'ok', title: 'OK' }
             ]
@@ -5618,11 +5975,13 @@ function initTimetableNotificationScheduler() {
     }, 2000);
   }
 
-  // Listen for actions from Service Worker notification clicks (Snooze / OK)
+  // Listen for actions from Service Worker notification clicks (Attendance / Snooze / OK)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data) {
-        if (event.data.type === 'NOTIFICATION_SNOOZED') {
+        if (event.data.type === 'TAKE_ATTENDANCE_ACTION') {
+          quickTakeAttendanceFromAlert();
+        } else if (event.data.type === 'NOTIFICATION_SNOOZED') {
           const tag = event.data.tag || '';
           if (tag.startsWith('tt-summary-')) snoozeTimetableSummary();
           else if (tag.startsWith('tt-class-')) snoozePreClassAlert();
