@@ -2685,23 +2685,48 @@ function renderActivityLogsList() {
 
   const isAdmin = currentUser && currentUser.role === 'admin';
 
-  container.innerHTML = filteredLogs.map(log => `
-    <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2 ${log.isUndone ? 'opacity-50' : ''}">
-      <div>
-        <div class="font-bold text-[var(--text-main)] text-xs">${escapeHtml(log.action)}</div>
-        <div class="text-[10px] text-[var(--text-sub)]">${escapeHtml(log.details || '')}</div>
-        <div class="text-[9px] text-[#245b70] font-semibold mt-0.5">by ${escapeHtml(log.performedBy || '')}</div>
+  container.innerHTML = filteredLogs.map(log => {
+    const actionLower = (log.action || '').toLowerCase();
+    let dotColor = 'bg-[#245b70]';
+    let dotBorder = 'ring-[#245b70]/30';
+    if (log.isUndone) {
+      dotColor = 'bg-slate-400';
+      dotBorder = 'ring-slate-400/30';
+    } else if (actionLower.includes('attendance')) {
+      dotColor = 'bg-emerald-500';
+      dotBorder = 'ring-emerald-500/30';
+    } else if (actionLower.includes('delete') || actionLower.includes('remove')) {
+      dotColor = 'bg-rose-500';
+      dotBorder = 'ring-rose-500/30';
+    } else if (actionLower.includes('edit') || actionLower.includes('update') || actionLower.includes('change')) {
+      dotColor = 'bg-amber-500';
+      dotBorder = 'ring-amber-500/30';
+    } else if (actionLower.includes('add') || actionLower.includes('create') || actionLower.includes('new')) {
+      dotColor = 'bg-blue-500';
+      dotBorder = 'ring-blue-500/30';
+    }
+
+    return `
+      <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2.5 ${log.isUndone ? 'opacity-50' : ''} hover:border-[#245b70]/40 transition">
+        <div class="flex items-start gap-2.5 min-w-0 flex-1">
+          <span class="w-2 h-2 rounded-full ${dotColor} mt-1.5 flex-shrink-0 ring-2 ${dotBorder}"></span>
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-[var(--text-main)] text-xs truncate">${escapeHtml(log.action)}</div>
+            <div class="text-[10px] text-[var(--text-sub)] line-clamp-2">${escapeHtml(log.details || '')}</div>
+            <div class="text-[9px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5">by ${escapeHtml(log.performedBy || '')}</div>
+          </div>
+        </div>
+        ${log.isUndone ? `
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 flex-shrink-0">Reverted</span>
+        ` : (isAdmin && log.canUndo ? `
+          <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
+          <button onclick="undoLog('${log._id}', '${escapeHtml(log.action)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition flex-shrink-0">
+            Undo
+          </button>
+        ` : '')}
       </div>
-      ${log.isUndone ? `
-        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Reverted</span>
-      ` : (isAdmin && log.canUndo ? `
-        <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
-        <button onclick="undoLog('${log._id}', '${escapeHtml(log.action)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition">
-          Undo
-        </button>
-      ` : '')}
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 async function loadActivityLogs() {
