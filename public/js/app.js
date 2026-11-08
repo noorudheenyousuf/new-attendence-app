@@ -189,24 +189,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await initGoogleAuth();
     await loadCurrentUser();
-    await loadAppSettings();
-    await loadClasses();
-    await loadSubjects();
-    await loadTeachersData();
-    renderAttendancePlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading roster
+    if (currentUser) {
+      await loadAppSettings();
+      await loadClasses();
+      await loadSubjects();
+      await loadTeachersData();
+      renderAttendancePlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading roster
 
-    // Set default year and month to current date for reports
-    const initDate = new Date();
-    const repYearEl = document.getElementById('report-year');
-    const repPeriodEl = document.getElementById('report-period');
-    if (repYearEl) repYearEl.value = initDate.getFullYear().toString();
-    if (repPeriodEl) repPeriodEl.value = 'all-year'; // Default to "All Months"
-    renderReportPlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading report
+      // Set default year and month to current date for reports
+      const initDate = new Date();
+      const repYearEl = document.getElementById('report-year');
+      const repPeriodEl = document.getElementById('report-period');
+      if (repYearEl) repYearEl.value = initDate.getFullYear().toString();
+      if (repPeriodEl) repPeriodEl.value = 'all-year'; // Default to "All Months"
+      renderReportPlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading report
 
-    await loadActivityLogs();
-    await checkUnreadMessages();
-    _applyTeachersTabVisibility();
-    initTimetableNotificationScheduler();
+      await loadActivityLogs();
+      await checkUnreadMessages();
+      _applyTeachersTabVisibility();
+      initTimetableNotificationScheduler();
+    }
   } catch (err) {
     console.error('[App Init Error]', err);
   } finally {
@@ -3235,6 +3237,7 @@ async function handleGoogleTokenResponse(tokenResponse) {
       await loadAppSettings();
       await loadClasses();
       await loadSubjects();
+      await loadTeachersData();
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
@@ -3263,6 +3266,7 @@ async function handleGoogleCredentialResponse(response) {
       await loadAppSettings();
       await loadClasses();
       await loadSubjects();
+      await loadTeachersData();
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
@@ -3303,6 +3307,7 @@ async function handleEmailLogin(e) {
       await loadAppSettings();
       await loadClasses();
       await loadSubjects();
+      await loadTeachersData();
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
@@ -3363,6 +3368,7 @@ async function handleEmailRegister(e) {
       await loadAppSettings();
       await loadClasses();
       await loadSubjects();
+      await loadTeachersData();
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
