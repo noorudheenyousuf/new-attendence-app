@@ -8,25 +8,11 @@ const Class = require('../models/Class');
 const authMiddleware = require('../middleware/auth');
 const adminMiddleware = require('../middleware/admin');
 
-const { caseInsensitiveRegex } = require('../utils/caseHelper');
-
 // @route   GET /api/logs
-// @desc    Get activity logs (includes counts of present, absent, late, and optional email filtering)
+// @desc    Get activity logs (includes counts of present, absent, late)
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { email, limit } = req.query;
-    let query = {};
-    if (email && email.trim()) {
-      const cleanEmail = email.trim();
-      query = {
-        $or: [
-          { performedByEmail: caseInsensitiveRegex(cleanEmail) },
-          { performedBy: caseInsensitiveRegex(cleanEmail) }
-        ]
-      };
-    }
-    const maxLimit = Math.min(parseInt(limit, 10) || 100, 200);
-    const logs = await ActivityLog.find(query).sort({ createdAt: -1 }).limit(maxLimit);
+    const logs = await ActivityLog.find().sort({ createdAt: -1 }).limit(50);
     res.json({ success: true, data: logs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -314,7 +314,6 @@ router.post('/', authMiddleware, async (req, res) => {
       action: `Teacher Profile Created: ${newTeacher.name}`,
       details: `Email: ${newTeacher.email || 'None'} | Classes: ${classesArray.join(', ') || 'None'} | Subjects: ${subjectsArray.join(', ') || 'None'}`,
       performedBy: req.user ? req.user.name : 'Admin',
-      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: req.user ? req.user.role : 'admin',
       entityType: 'settings',
       canUndo: false
@@ -416,7 +415,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
       action: `Teacher Profile Updated: ${teacher.name}`,
       details: `Updated by ${req.user ? req.user.name : 'User'}`,
       performedBy: req.user ? req.user.name : 'Admin',
-      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: req.user ? req.user.role : 'admin',
       entityType: 'settings',
       canUndo: false
@@ -477,7 +475,6 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       action: `Teacher Account Deleted: ${teacher.name}`,
       details: `Email: ${teacher.email} deleted by ${req.user ? req.user.name : 'Admin'}`,
       performedBy: req.user ? req.user.name : 'Admin',
-      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: req.user ? req.user.role : 'admin',
       entityType: 'settings',
       canUndo: false

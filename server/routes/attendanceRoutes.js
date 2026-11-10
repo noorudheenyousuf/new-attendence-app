@@ -81,7 +81,6 @@ router.post('/', authMiddleware, async (req, res) => {
       action: `Attendance Marked: ${cleanClass}`,
       details: `${present} Present, ${absent} Absent, ${leave} Leave (${percentage}%) • Date: ${date}`,
       performedBy: markedBy,
-      performedByEmail: (markedByEmail || (req.user ? req.user.email : '') || '').toLowerCase().trim(),
       role: req.user ? req.user.role : 'teacher',
       counts: { present, absent, leave, late: leave },
       entityType: 'attendance',
@@ -117,7 +116,6 @@ router.delete('/', authMiddleware, async (req, res) => {
         action: `Attendance Deleted: ${className}`,
         details: `Deleted attendance record for ${className} • Subject: ${targetSubject} • Date: ${date}`,
         performedBy: req.user ? req.user.name : 'Teacher',
-        performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
         role: req.user ? req.user.role : 'teacher',
         entityType: 'attendance',
         canUndo: false

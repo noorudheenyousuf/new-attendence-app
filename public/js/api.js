@@ -325,9 +325,8 @@ const API = {
   },
 
   // Logs
-  async getLogs(email = '') {
-    const url = email ? `/logs?email=${encodeURIComponent(email)}` : '/logs';
-    return this.request(url);
+  async getLogs() {
+    return this.request('/logs');
   },
 
   async undoLog(logId) {
@@ -398,13 +397,12 @@ const API = {
   },
 
   // Timetable API
-  async getTimetable(className, day, teacher, teacherEmail = '') {
+  async getTimetable(className, day, teacher) {
     let url = '/timetable';
     const params = new URLSearchParams();
     if (className && className !== 'all') params.append('class', className);
     if (day && day !== 'all') params.append('day', day);
-    if (teacherEmail && teacherEmail !== 'all') params.append('teacherEmail', teacherEmail);
-    else if (teacher && teacher !== 'all') params.append('teacher', teacher);
+    if (teacher && teacher !== 'all') params.append('teacher', teacher);
     const qs = params.toString();
     return this.request(qs ? `${url}?${qs}` : url);
   },
