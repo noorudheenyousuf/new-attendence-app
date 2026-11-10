@@ -581,6 +581,7 @@ async function loadClasses() {
       classesList = res.data;
       populateClassDropdowns();
       renderClassesList();
+      renderSubjectsList();
     }
   } catch (error) {
     console.log('[Classes Load]', error);
@@ -622,15 +623,16 @@ function populateClassDropdowns() {
 }
 
 // Drag & Drop Sorting for Classes
-let draggedClassIndex = null;
+let draggedClassId = null;
 
-function handleClassDragStart(e, index) {
-  draggedClassIndex = index;
+function handleClassDragStart(e, classId) {
+  draggedClassId = classId;
   e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(classId));
   e.currentTarget.classList.add('dragging');
 }
 
-function handleClassDragOver(e, index) {
+function handleClassDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   const item = e.currentTarget;
@@ -640,25 +642,33 @@ function handleClassDragOver(e, index) {
 }
 
 function handleClassDragLeave(e) {
+  if (e.currentTarget.contains(e.relatedTarget)) return;
   e.currentTarget.classList.remove('drag-over');
 }
 
 function handleClassDragEnd(e) {
-  e.currentTarget.classList.remove('dragging');
-  document.querySelectorAll('#class-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+  if (e && e.currentTarget) e.currentTarget.classList.remove('dragging');
+  draggedClassId = null;
+  document.querySelectorAll('#class-cards-container .drag-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
 }
 
-async function handleClassDrop(e, targetIndex) {
+async function handleClassDrop(e, targetClassId) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
-  if (draggedClassIndex === null || draggedClassIndex === targetIndex) return;
+  if (!draggedClassId || String(draggedClassId) === String(targetClassId)) return;
 
-  const movedClass = classesList.splice(draggedClassIndex, 1)[0];
-  classesList.splice(targetIndex, 0, movedClass);
-  draggedClassIndex = null;
+  const fromIndex = classesList.findIndex(c => String(c._id) === String(draggedClassId));
+  const toIndex = classesList.findIndex(c => String(c._id) === String(targetClassId));
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  const movedClass = classesList.splice(fromIndex, 1)[0];
+  classesList.splice(toIndex, 0, movedClass);
+  draggedClassId = null;
 
   renderClassesList();
   populateClassDropdowns();
+  renderStudentsDirectory();
+  renderSubjectsList();
 
   try {
     const orderedIds = classesList.map(c => c._id);
@@ -666,6 +676,42 @@ async function handleClassDrop(e, targetIndex) {
     showToast('Class order updated!');
   } catch (err) {
     console.error('[Reorder Classes Error]', err);
+  }
+}
+
+async function moveClassUp(classId) {
+  const index = classesList.findIndex(c => String(c._id) === String(classId));
+  if (index <= 0) return;
+  const item = classesList.splice(index, 1)[0];
+  classesList.splice(index - 1, 0, item);
+  renderClassesList();
+  populateClassDropdowns();
+  renderStudentsDirectory();
+  renderSubjectsList();
+  try {
+    const orderedIds = classesList.map(c => c._id);
+    await API.reorderClasses(orderedIds);
+    showToast('Class moved up!');
+  } catch (err) {
+    console.error('[Move Class Error]', err);
+  }
+}
+
+async function moveClassDown(classId) {
+  const index = classesList.findIndex(c => String(c._id) === String(classId));
+  if (index === -1 || index >= classesList.length - 1) return;
+  const item = classesList.splice(index, 1)[0];
+  classesList.splice(index + 1, 0, item);
+  renderClassesList();
+  populateClassDropdowns();
+  renderStudentsDirectory();
+  renderSubjectsList();
+  try {
+    const orderedIds = classesList.map(c => c._id);
+    await API.reorderClasses(orderedIds);
+    showToast('Class moved down!');
+  } catch (err) {
+    console.error('[Move Class Error]', err);
   }
 }
 
@@ -696,14 +742,25 @@ function renderClassesList() {
     return `
     <div class="drag-item rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden hover:shadow-md transition-shadow"
          draggable="true"
-         ondragstart="handleClassDragStart(event, ${index})"
-         ondragover="handleClassDragOver(event, ${index})"
+         ondragstart="handleClassDragStart(event, '${c._id}')"
+         ondragover="handleClassDragOver(event)"
          ondragleave="handleClassDragLeave(event)"
          ondragend="handleClassDragEnd(event)"
-         ondrop="handleClassDrop(event, ${index})">
+         ondrop="handleClassDrop(event, '${c._id}')">
       <div class="custom-gradient-header px-3.5 py-3 flex items-center gap-2.5">
-        <div class="text-white/50 hover:text-white cursor-grab active:cursor-grabbing flex-shrink-0" title="Drag to reorder">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        <!-- Drag Handle Icon & Up/Down Arrows -->
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <div class="text-white/50 hover:text-white cursor-grab active:cursor-grabbing p-1" title="Drag to reorder">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+          </div>
+          <div class="flex flex-col gap-0.5">
+            <button onclick="event.stopPropagation(); moveClassUp('${c._id}')" ${index === 0 ? 'disabled' : ''} class="w-4 h-4 rounded bg-white/20 hover:bg-white/40 disabled:opacity-20 disabled:pointer-events-none text-white flex items-center justify-center transition" title="Move Up">
+              <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </button>
+            <button onclick="event.stopPropagation(); moveClassDown('${c._id}')" ${index === classesList.length - 1 ? 'disabled' : ''} class="w-4 h-4 rounded bg-white/20 hover:bg-white/40 disabled:opacity-20 disabled:pointer-events-none text-white flex items-center justify-center transition" title="Move Down">
+              <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </div>
         </div>
         <div class="min-w-0 flex-1">
           <h3 class="font-black text-white text-sm leading-tight truncate">${escapeHtml(c.name)}</h3>
@@ -923,15 +980,16 @@ function populateSubjectDropdowns() {
 }
 
 // Drag & Drop Sorting for Subjects
-let draggedSubjectIndex = null;
+let draggedSubjectId = null;
 
-function handleSubjectDragStart(e, index) {
-  draggedSubjectIndex = index;
+function handleSubjectDragStart(e, subjectId) {
+  draggedSubjectId = subjectId;
   e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(subjectId));
   e.currentTarget.classList.add('dragging');
 }
 
-function handleSubjectDragOver(e, index) {
+function handleSubjectDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   const item = e.currentTarget;
@@ -941,22 +999,28 @@ function handleSubjectDragOver(e, index) {
 }
 
 function handleSubjectDragLeave(e) {
+  if (e.currentTarget.contains(e.relatedTarget)) return;
   e.currentTarget.classList.remove('drag-over');
 }
 
 function handleSubjectDragEnd(e) {
-  e.currentTarget.classList.remove('dragging');
-  document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+  if (e && e.currentTarget) e.currentTarget.classList.remove('dragging');
+  draggedSubjectId = null;
+  document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
 }
 
-async function handleSubjectDrop(e, targetIndex) {
+async function handleSubjectDrop(e, targetSubjectId) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
-  if (draggedSubjectIndex === null || draggedSubjectIndex === targetIndex) return;
+  if (!draggedSubjectId || String(draggedSubjectId) === String(targetSubjectId)) return;
 
-  const movedSubject = subjectsList.splice(draggedSubjectIndex, 1)[0];
-  subjectsList.splice(targetIndex, 0, movedSubject);
-  draggedSubjectIndex = null;
+  const fromIndex = subjectsList.findIndex(s => String(s._id) === String(draggedSubjectId));
+  const toIndex = subjectsList.findIndex(s => String(s._id) === String(targetSubjectId));
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  const movedSubject = subjectsList.splice(fromIndex, 1)[0];
+  subjectsList.splice(toIndex, 0, movedSubject);
+  draggedSubjectId = null;
 
   renderSubjectsList();
   populateSubjectDropdowns();
@@ -970,52 +1034,159 @@ async function handleSubjectDrop(e, targetIndex) {
   }
 }
 
-function renderSubjectsList() {
-  const container = document.getElementById('subject-cards-container');
-  if (!container) return;
-
-  if (subjectsList.length === 0) {
-    container.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No subjects added yet.</div>`;
-    return;
+async function moveSubjectUp(subjectId) {
+  const index = subjectsList.findIndex(s => String(s._id) === String(subjectId));
+  if (index <= 0) return;
+  const item = subjectsList.splice(index, 1)[0];
+  subjectsList.splice(index - 1, 0, item);
+  renderSubjectsList();
+  populateSubjectDropdowns();
+  try {
+    const orderedIds = subjectsList.map(s => s._id);
+    await API.reorderSubjects(orderedIds);
+    showToast('Subject moved up!');
+  } catch (err) {
+    console.error('[Move Subject Error]', err);
   }
+}
 
-  container.innerHTML = subjectsList.map((s, index) => `
+async function moveSubjectDown(subjectId) {
+  const index = subjectsList.findIndex(s => String(s._id) === String(subjectId));
+  if (index === -1 || index >= subjectsList.length - 1) return;
+  const item = subjectsList.splice(index, 1)[0];
+  subjectsList.splice(index + 1, 0, item);
+  renderSubjectsList();
+  populateSubjectDropdowns();
+  try {
+    const orderedIds = subjectsList.map(s => s._id);
+    await API.reorderSubjects(orderedIds);
+    showToast('Subject moved down!');
+  } catch (err) {
+    console.error('[Move Subject Error]', err);
+  }
+}
+
+function isSubjectInClass(subject, classObj) {
+  if (!subject || !classObj) return false;
+  const subName = (subject.name || '').trim().toLowerCase();
+  const className = (classObj.name || '').trim().toLowerCase();
+
+  const inClassSubjects = (classObj.assignedSubjects || []).some(s => (s || '').trim().toLowerCase() === subName);
+  const inSubjectClasses = (subject.assignedClasses || []).some(c => (c || '').trim().toLowerCase() === className);
+  return inClassSubjects || inSubjectClasses;
+}
+
+function _renderSingleSubjectCardHtml(s, idxInList, totalInList) {
+  return `
     <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between"
          draggable="true"
-         ondragstart="handleSubjectDragStart(event, ${index})"
-         ondragover="handleSubjectDragOver(event, ${index})"
+         ondragstart="handleSubjectDragStart(event, '${s._id}')"
+         ondragover="handleSubjectDragOver(event)"
          ondragleave="handleSubjectDragLeave(event)"
          ondragend="handleSubjectDragEnd(event)"
-         ondrop="handleSubjectDrop(event, ${index})">
-      <div class="flex items-center gap-3">
-        <!-- Drag Handle Icon -->
-        <div class="text-[var(--text-sub)] hover:text-[#245b70] cursor-grab active:cursor-grabbing p-1" title="Drag to reorder subject">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-          </svg>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h3 class="font-bold text-[var(--text-main)] text-sm">${s.name}</h3>
-            <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70]">${s.subjectCode}</span>
+         ondrop="handleSubjectDrop(event, '${s._id}')">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Drag Handle Icon & Up/Down Arrows -->
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <div class="text-[var(--text-sub)] hover:text-[#245b70] cursor-grab active:cursor-grabbing p-1" title="Drag to reorder subject">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+              <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+              <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+            </svg>
           </div>
-          ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5">Teacher: ${s.teacher}</p>` : ''}
+          <div class="flex flex-col gap-0.5">
+            <button onclick="event.stopPropagation(); moveSubjectUp('${s._id}')" ${idxInList === 0 ? 'disabled' : ''} class="w-4 h-4 rounded bg-[var(--bg-page)] hover:bg-[#245b70] hover:text-white disabled:opacity-20 disabled:pointer-events-none text-[var(--text-sub)] flex items-center justify-center transition" title="Move Up">
+              <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </button>
+            <button onclick="event.stopPropagation(); moveSubjectDown('${s._id}')" ${idxInList === totalInList - 1 ? 'disabled' : ''} class="w-4 h-4 rounded bg-[var(--bg-page)] hover:bg-[#245b70] hover:text-white disabled:opacity-20 disabled:pointer-events-none text-[var(--text-sub)] flex items-center justify-center transition" title="Move Down">
+              <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </div>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 truncate">
+            <h3 class="font-bold text-[var(--text-main)] text-sm truncate">${escapeHtml(s.name)}</h3>
+            ${s.subjectCode ? `<span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70] flex-shrink-0">${escapeHtml(s.subjectCode)}</span>` : ''}
+          </div>
+          ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] truncate mt-0.5">Teacher: ${escapeHtml(s.teacher)}</p>` : ''}
         </div>
       </div>
       ${canUserEditDelete() ? `
-      <div class="flex items-center gap-1.5 flex-shrink-0">
-        <button onclick="openEditSubjectModal('${s._id}', '${s.name}', '${s.subjectCode}', '${s.teacher || ''}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+      <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+        <button onclick="openEditSubjectModal('${s._id}', '${escapeQuotes(s.name)}', '${escapeQuotes(s.subjectCode || '')}', '${escapeQuotes(s.teacher || '')}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteSubject('${s._id}', '${s.name.replace(/'/g, "\\'")}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+        <button onclick="deleteSubject('${s._id}', '${escapeQuotes(s.name)}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
       ` : ''}
     </div>
-  `).join('');
+  `;
+}
+
+function renderSubjectsList() {
+  const container = document.getElementById('subject-cards-container');
+  if (!container) return;
+
+  if (subjectsList.length === 0) {
+    container.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No subjects added yet. Click "Add Subject" to create one.</div>`;
+    return;
+  }
+
+  // USER DIRECTIVE:
+  // "Categories subjects with assigned class ....if a class have two same subjects....show that subject in both class categoryies...
+  // Class order should be followed by the order of class in add class tab....."
+
+  let html = '';
+  const assignedSubjectIds = new Set();
+
+  // Iterate over classes in the exact order defined in Add Class tab
+  (classesList || []).forEach(cls => {
+    const classSubs = subjectsList.filter(s => isSubjectInClass(s, cls));
+    classSubs.forEach(s => assignedSubjectIds.add(String(s._id)));
+
+    html += `
+      <div class="mt-3.5 mb-2">
+        <div class="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-gradient-to-r from-[#245b70] to-[#1a4454] text-white shadow-sm font-black text-xs sm:text-sm tracking-wide">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0"></span>
+            <span class="uppercase truncate">${escapeHtml(cls.name)} : ${classSubs.length}</span>
+          </div>
+          <span class="bg-white/20 text-white font-extrabold px-2 py-0.5 rounded-full text-[11px] flex-shrink-0">
+            ${classSubs.length} ${classSubs.length === 1 ? 'Subject' : 'Subjects'}
+          </span>
+        </div>
+      </div>
+    `;
+
+    if (classSubs.length === 0) {
+      html += `<div class="p-3 text-center text-xs text-[var(--text-sub)] italic bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)]">No subjects assigned to ${escapeHtml(cls.name)} yet.</div>`;
+    } else {
+      html += `<div class="space-y-2">` + classSubs.map((s, idx) => _renderSingleSubjectCardHtml(s, idx, classSubs.length)).join('') + `</div>`;
+    }
+  });
+
+  // Check for any unassigned subjects
+  const unassignedSubs = subjectsList.filter(s => !assignedSubjectIds.has(String(s._id)));
+  if (unassignedSubs.length > 0) {
+    html += `
+      <div class="mt-4 mb-2">
+        <div class="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-slate-700 text-white shadow-sm font-black text-xs sm:text-sm tracking-wide">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
+            <span class="uppercase truncate">UNASSIGNED SUBJECTS : ${unassignedSubs.length}</span>
+          </div>
+          <span class="bg-white/20 text-white font-extrabold px-2 py-0.5 rounded-full text-[11px] flex-shrink-0">
+            ${unassignedSubs.length}
+          </span>
+        </div>
+      </div>
+      <div class="space-y-2">` + unassignedSubs.map((s, idx) => _renderSingleSubjectCardHtml(s, idx, unassignedSubs.length)).join('') + `</div>`;
+  }
+
+  container.innerHTML = html;
 }
 
 // Checkbox helper for Class assigned subjects
@@ -1123,29 +1294,76 @@ async function deleteSubject(id, name) {
   }
 }
 
+// Quick class select helpers for modern actionable placeholders
+function quickSelectAttendanceClass(className) {
+  const select = document.getElementById('class-select');
+  if (select) {
+    select.value = className;
+    handleClassChange();
+  }
+}
+
+function quickSelectReportClass(className) {
+  const select = document.getElementById('report-class');
+  if (select) {
+    select.value = className;
+    handleReportClassChange();
+    reportReadyToLoad = true;
+    loadReport();
+  }
+}
+
 // ================= ATTENDANCE ROSTER =================
 // USER DIRECTIVE: "when taking attendence not show id and roll"
 function renderAttendancePlaceholder() {
   const container = document.getElementById('attendance-list');
   if (!container) return;
 
+  const quickClassChips = (classesList && classesList.length > 0)
+    ? classesList.map(c => `
+        <button type="button" onclick="quickSelectAttendanceClass('${escapeQuotes(c.name || c)}')"
+          class="px-3 py-1.5 rounded-xl bg-[var(--bg-page)] hover:bg-[#245b70] hover:text-white border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] transition shadow-xs flex items-center gap-1.5 active:scale-95">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>${escapeHtml(c.name || c)}</span>
+        </button>
+      `).join('')
+    : `<span class="text-xs text-[var(--text-sub)] italic">Add classes in Classes tab to quick select</span>`;
+
   container.innerHTML = `
-    <div class="flex flex-col items-center justify-center py-10 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
-      <!-- Modern Minimalist Dual-tone Checklist in Soft Light Teal Rounded Square -->
-      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-900/50 flex items-center justify-center mb-3 shadow-sm">
-        <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <rect x="5" y="4" width="14" height="17" rx="3" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M8.5 10l1.5 1.5 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="14.5" y1="10" x2="16.5" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M8.5 15l1.5 1.5 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="14.5" y1="15" x2="16.5" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+    <div class="flex flex-col items-center justify-center py-8 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1 space-y-4">
+      <!-- Modern Minimalist Dual-tone Digital Register Badge with Pulse Dot -->
+      <div class="relative">
+        <div class="w-16 h-16 sm:w-18 sm:h-18 rounded-3xl bg-gradient-to-tr from-[#245b70]/20 via-[#245b70]/10 to-teal-500/20 text-[#245b70] dark:text-cyan-400 border border-[#245b70]/30 flex items-center justify-center shadow-md">
+          <svg class="w-8 h-8 sm:w-9 sm:h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <!-- Modern Calendar Base -->
+            <rect x="3" y="4" width="18" height="18" rx="4" fill="currentColor" fill-opacity="0.1" stroke="currentColor" stroke-width="2"/>
+            <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="1.8"/>
+            <!-- Dual-tone Smart Verification Check -->
+            <path d="M8.5 15.5l2.5 2.5 5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-[var(--card-bg)]"></span>
+        </span>
       </div>
-      <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
-      <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
-        Choose a class and subject above to view students and mark attendance.
-      </p>
+
+      <div class="space-y-1 max-w-sm">
+        <h3 class="text-sm sm:text-base font-black text-[var(--text-main)]">Daily Attendance Register</h3>
+        <p class="text-xs text-[var(--text-sub)] leading-relaxed">
+          Select a class and subject above, or tap a quick-launch class below to mark attendance.
+        </p>
+      </div>
+
+      <!-- Quick Class Launcher -->
+      <div class="w-full max-w-md pt-2 border-t border-[var(--border-color)]">
+        <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] mb-2">Quick Select Class</div>
+        <div class="flex flex-wrap justify-center gap-1.5">
+          ${quickClassChips}
+        </div>
+      </div>
     </div>
   `;
 
@@ -1167,21 +1385,52 @@ function renderReportPlaceholder() {
   const container = document.getElementById('report-placeholder');
   if (!container) return;
 
+  const quickClassChips = (classesList && classesList.length > 0)
+    ? classesList.map(c => `
+        <button type="button" onclick="quickSelectReportClass('${escapeQuotes(c.name || c)}')"
+          class="px-3 py-1.5 rounded-xl bg-[var(--bg-page)] hover:bg-[#245b70] hover:text-white border border-[var(--border-color)] text-xs font-bold text-[var(--text-main)] transition shadow-xs flex items-center gap-1.5 active:scale-95">
+          <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+          <span>${escapeHtml(c.name || c)}</span>
+        </button>
+      `).join('')
+    : `<span class="text-xs text-[var(--text-sub)] italic">Add classes to quick generate reports</span>`;
+
   container.innerHTML = `
-    <div class="flex flex-col items-center justify-center py-10 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
-      <!-- Modern Minimalist Dual-tone Bar Chart in Soft Light Purple Rounded Square -->
-      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/50 flex items-center justify-center mb-3 shadow-sm">
-        <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="2"/>
-          <rect x="6.5" y="12" width="2.5" height="5" rx="1" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="10.75" y="8.5" width="2.5" height="8.5" rx="1" fill="currentColor" fill-opacity="0.5" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="15" y="6" width="2.5" height="11" rx="1" fill="currentColor" fill-opacity="0.75" stroke="currentColor" stroke-width="1.5"/>
-        </svg>
+    <div class="flex flex-col items-center justify-center py-8 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1 space-y-4">
+      <!-- Modern Minimalist Analytics Trend & Growth Beacon -->
+      <div class="relative">
+        <div class="w-16 h-16 sm:w-18 sm:h-18 rounded-3xl bg-gradient-to-tr from-indigo-500/20 via-purple-500/10 to-teal-500/20 text-[#245b70] dark:text-cyan-400 border border-indigo-500/30 flex items-center justify-center shadow-md">
+          <svg class="w-8 h-8 sm:w-9 sm:h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <!-- Modern Analytics Board with Upward Growth Curve -->
+            <rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" fill-opacity="0.1" stroke="currentColor" stroke-width="2"/>
+            <path d="M7 16l3.5-3.5 3 3L17 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="7" cy="16" r="1.5" fill="currentColor"/>
+            <circle cx="10.5" cy="12.5" r="1.5" fill="currentColor"/>
+            <circle cx="13.5" cy="15.5" r="1.5" fill="currentColor"/>
+            <circle cx="17" cy="11" r="1.5" fill="currentColor"/>
+            <polyline points="13 11 17 11 17 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border-2 border-[var(--card-bg)]"></span>
+        </span>
       </div>
-      <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
-      <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
-        Choose a class and subject above to view the attendance report and student analytics.
-      </p>
+
+      <div class="space-y-1 max-w-sm">
+        <h3 class="text-sm sm:text-base font-black text-[var(--text-main)]">Attendance Analytics &amp; Reports</h3>
+        <p class="text-xs text-[var(--text-sub)] leading-relaxed">
+          Select class, month, and year above, or tap a quick-launch class below to instantly view attendance charts.
+        </p>
+      </div>
+
+      <!-- Quick Class Launcher for Reports -->
+      <div class="w-full max-w-md pt-2 border-t border-[var(--border-color)]">
+        <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] mb-2">Instant Report by Class</div>
+        <div class="flex flex-wrap justify-center gap-1.5">
+          ${quickClassChips}
+        </div>
+      </div>
     </div>
   `;
 
@@ -1680,34 +1929,97 @@ async function renderStudentsDirectory() {
       return;
     }
 
-      container.innerHTML = students.map(st => `
-        <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2.5 min-w-0 select-none">
-              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
-              <div class="truncate">
-                <div class="flex items-center gap-1.5">
-                  <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
-                  <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
-                </div>
-                <p class="text-xs text-[var(--text-sub)] truncate">${st.class} · Roll: ${st.roll}</p>
+    const _renderSingleStudentCard = (st) => `
+      <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5 min-w-0 select-none">
+            <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
+            <div class="truncate">
+              <div class="flex items-center gap-1.5">
+                <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${escapeHtml(st.name)}</span>
+                <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
               </div>
+              <p class="text-xs text-[var(--text-sub)] truncate">${escapeHtml(st.class)} · Roll: ${st.roll}</p>
             </div>
-
-            <!-- Edit and Delete Buttons -->
-            ${canUserEditDelete() ? `
-            <div class="flex items-center gap-1 flex-shrink-0">
-              <button onclick="openEditStudentModal('${st._id}')" title="Edit Student (All fields)" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              </button>
-              <button onclick="confirmDeleteStudent('${st._id}', '${st.name.replace(/'/g, "\\'")}', ${st.studentId})" title="Delete Student" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
-            </div>
-            ` : ''}
           </div>
+
+          <!-- Edit and Delete Buttons -->
+          ${canUserEditDelete() ? `
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button onclick="openEditStudentModal('${st._id}')" title="Edit Student (All fields)" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button onclick="confirmDeleteStudent('${st._id}', '${escapeQuotes(st.name)}', ${st.studentId})" title="Delete Student" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+          ` : ''}
         </div>
-      `).join('');
+      </div>
+    `;
+
+    // USER DIRECTIVE:
+    // "In students tab ..... Categerise students with class ....
+    // So under the class filter name of class with theme like colour with bold font like PLUS ONE : 13 ....below that student cards....then next class name..... students.....
+    // This is only when filter select' all classes ' ...if user select a special class .... don't display these categories names...show like before....
+    // The class name order should be similar to classes ordered in add class tab.....if we drag a class to down in add class tab....show that class at the bottom in add student tab...."
+
+    if (filterClass !== 'all') {
+      // Special class selected: do NOT display category names, show like before
+      container.innerHTML = students.map(_renderSingleStudentCard).join('');
+    } else {
+      // 'all' classes selected: Categorise students by class in exact classesList order!
+      let html = '';
+      const renderedStudentIds = new Set();
+
+      (classesList || []).forEach(cls => {
+        const classStudents = students.filter(s => isClassEqual(s.class, cls.name));
+        classStudents.forEach(s => renderedStudentIds.add(String(s._id || s.studentId)));
+
+        // If filtering by search term and class has 0 matching students, skip showing this category
+        if (searchTerm && classStudents.length === 0) return;
+
+        html += `
+          <div class="mt-3.5 mb-2">
+            <div class="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-gradient-to-r from-[#245b70] to-[#1a4454] text-white shadow-sm font-black text-xs sm:text-sm tracking-wide">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                <span class="uppercase truncate">${escapeHtml(cls.name)} : ${classStudents.length}</span>
+              </div>
+              <span class="bg-white/20 text-white font-extrabold px-2 py-0.5 rounded-full text-[11px] flex-shrink-0">
+                ${classStudents.length} ${classStudents.length === 1 ? 'Student' : 'Students'}
+              </span>
+            </div>
+          </div>
+        `;
+
+        if (classStudents.length === 0) {
+          html += `<div class="p-3 text-center text-xs text-[var(--text-sub)] italic bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)]">No students enrolled in ${escapeHtml(cls.name)} yet.</div>`;
+        } else {
+          html += `<div class="space-y-2">` + classStudents.map(_renderSingleStudentCard).join('') + `</div>`;
+        }
+      });
+
+      // Check for unassigned students (whose class name is not in classesList)
+      const unassignedStudents = students.filter(s => !renderedStudentIds.has(String(s._id || s.studentId)));
+      if (unassignedStudents.length > 0) {
+        html += `
+          <div class="mt-4 mb-2">
+            <div class="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-slate-700 text-white shadow-sm font-black text-xs sm:text-sm tracking-wide">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
+                <span class="uppercase truncate">UNASSIGNED / OTHER : ${unassignedStudents.length}</span>
+              </div>
+              <span class="bg-white/20 text-white font-extrabold px-2 py-0.5 rounded-full text-[11px] flex-shrink-0">
+                ${unassignedStudents.length}
+              </span>
+            </div>
+          </div>
+          <div class="space-y-2">` + unassignedStudents.map(_renderSingleStudentCard).join('') + `</div>`;
+      }
+
+      container.innerHTML = html;
+    }
   } catch (error) {
     console.log('[Students Directory Load]', error);
   }
@@ -2667,14 +2979,19 @@ function renderActivityLogsList() {
   if (!container) return;
 
   const logs = cachedActivityLogs || [];
+  const myEmail = (currentUser && currentUser.email) ? currentUser.email.trim().toLowerCase() : '';
   const myName = (currentUser && currentUser.name) ? currentUser.name.trim().toLowerCase() : '';
 
   let filteredLogs = logs;
-  if (currentActivityLogFilter === 'mine' && myName) {
+  if (currentActivityLogFilter === 'mine') {
     filteredLogs = logs.filter(log => {
+      const performedEmail = (log.performedByEmail || '').trim().toLowerCase();
+      if (myEmail && performedEmail) {
+        return myEmail === performedEmail;
+      }
       const performed = (log.performedBy || '').trim().toLowerCase();
       const details = (log.details || '').trim().toLowerCase();
-      return performed === myName || performed.includes(myName) || details.includes(myName);
+      return (myName && (performed === myName || performed.includes(myName) || details.includes(myName)));
     });
   }
 
@@ -2683,50 +3000,96 @@ function renderActivityLogsList() {
     return;
   }
 
+  container.innerHTML = filteredLogs.map(log => _renderSingleLogItemHtml(log)).join('');
+}
+
+function _renderSingleLogItemHtml(log) {
+  const actionLower = (log.action || '').toLowerCase();
+  let dotColor = 'bg-[#245b70]';
+  let dotBorder = 'ring-[#245b70]/30';
+  if (log.isUndone) {
+    dotColor = 'bg-slate-400';
+    dotBorder = 'ring-slate-400/30';
+  } else if (actionLower.includes('attendance')) {
+    dotColor = 'bg-emerald-500';
+    dotBorder = 'ring-emerald-500/30';
+  } else if (actionLower.includes('delete') || actionLower.includes('remove')) {
+    dotColor = 'bg-rose-500';
+    dotBorder = 'ring-rose-500/30';
+  } else if (actionLower.includes('edit') || actionLower.includes('update') || actionLower.includes('change')) {
+    dotColor = 'bg-amber-500';
+    dotBorder = 'ring-amber-500/30';
+  } else if (actionLower.includes('add') || actionLower.includes('create') || actionLower.includes('new')) {
+    dotColor = 'bg-blue-500';
+    dotBorder = 'ring-blue-500/30';
+  }
+
   const isAdmin = currentUser && currentUser.role === 'admin';
 
-  container.innerHTML = filteredLogs.map(log => {
-    const actionLower = (log.action || '').toLowerCase();
-    let dotColor = 'bg-[#245b70]';
-    let dotBorder = 'ring-[#245b70]/30';
-    if (log.isUndone) {
-      dotColor = 'bg-slate-400';
-      dotBorder = 'ring-slate-400/30';
-    } else if (actionLower.includes('attendance')) {
-      dotColor = 'bg-emerald-500';
-      dotBorder = 'ring-emerald-500/30';
-    } else if (actionLower.includes('delete') || actionLower.includes('remove')) {
-      dotColor = 'bg-rose-500';
-      dotBorder = 'ring-rose-500/30';
-    } else if (actionLower.includes('edit') || actionLower.includes('update') || actionLower.includes('change')) {
-      dotColor = 'bg-amber-500';
-      dotBorder = 'ring-amber-500/30';
-    } else if (actionLower.includes('add') || actionLower.includes('create') || actionLower.includes('new')) {
-      dotColor = 'bg-blue-500';
-      dotBorder = 'ring-blue-500/30';
-    }
-
-    return `
-      <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2.5 ${log.isUndone ? 'opacity-50' : ''} hover:border-[#245b70]/40 transition">
-        <div class="flex items-start gap-2.5 min-w-0 flex-1">
-          <span class="w-2 h-2 rounded-full ${dotColor} mt-1.5 flex-shrink-0 ring-2 ${dotBorder}"></span>
-          <div class="min-w-0 flex-1">
-            <div class="font-bold text-[var(--text-main)] text-xs truncate">${escapeHtml(log.action)}</div>
-            <div class="text-[10px] text-[var(--text-sub)] line-clamp-2">${escapeHtml(log.details || '')}</div>
-            <div class="text-[9px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5">by ${escapeHtml(log.performedBy || '')}</div>
+  return `
+    <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2.5 ${log.isUndone ? 'opacity-50' : ''} hover:border-[#245b70]/40 transition">
+      <div class="flex items-start gap-2.5 min-w-0 flex-1">
+        <span class="w-2 h-2 rounded-full ${dotColor} mt-1.5 flex-shrink-0 ring-2 ${dotBorder}"></span>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-[var(--text-main)] text-xs truncate">${escapeHtml(log.action)}</div>
+          <div class="text-[10px] text-[var(--text-sub)] line-clamp-2">${escapeHtml(log.details || '')}</div>
+          <div class="flex items-center gap-1.5 mt-0.5 truncate">
+            <span class="text-[9px] text-[#245b70] dark:text-cyan-400 font-semibold truncate">by ${escapeHtml(log.performedBy || '')}</span>
+            ${log.performedByEmail ? `<span class="text-[9px] text-[var(--text-sub)] truncate">(${escapeHtml(log.performedByEmail)})</span>` : ''}
           </div>
         </div>
-        ${log.isUndone ? `
-          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 flex-shrink-0">Reverted</span>
-        ` : (isAdmin && log.canUndo ? `
-          <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
-          <button onclick="undoLog('${log._id}', '${escapeHtml(log.action)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition flex-shrink-0">
-            Undo
-          </button>
-        ` : '')}
       </div>
-    `;
-  }).join('');
+      ${log.isUndone ? `
+        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 flex-shrink-0">Reverted</span>
+      ` : (isAdmin && log.canUndo ? `
+        <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
+        <button onclick="undoLog('${log._id}', '${escapeHtml(log.action)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition flex-shrink-0">
+          Undo
+        </button>
+      ` : '')}
+    </div>
+  `;
+}
+
+async function openTeacherAccountLogsModal() {
+  if (!currentUser) return;
+  const modal = document.getElementById('modal-teacher-logs');
+  const list = document.getElementById('teacher-account-logs-list');
+  const titleEl = document.getElementById('teacher-logs-modal-title');
+  const subtitleEl = document.getElementById('teacher-logs-modal-subtitle');
+  if (modal) modal.classList.remove('hidden');
+
+  if (titleEl) titleEl.textContent = `${currentUser.name || 'Teacher'}'s Activity Logs`;
+  if (subtitleEl) subtitleEl.textContent = `Connected with Email: ${currentUser.email || 'None'}`;
+
+  if (list) list.innerHTML = `<div class="flex items-center justify-center py-8"><div class="w-6 h-6 rounded-full border-2 border-[#245b70] border-t-transparent animate-spin"></div></div>`;
+
+  try {
+    const userEmail = (currentUser.email || '').trim().toLowerCase();
+    const res = await API.getLogs(userEmail);
+    const logs = (res && res.data) ? res.data : [];
+
+    const teacherLogs = logs.filter(l => {
+      if (l.performedByEmail && userEmail) {
+        return l.performedByEmail.trim().toLowerCase() === userEmail;
+      }
+      return (l.performedBy || '').trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase();
+    });
+
+    if (teacherLogs.length === 0) {
+      list.innerHTML = `<div class="p-6 text-center text-xs text-[var(--text-sub)]">No actions recorded for account <strong class="text-[var(--text-main)]">${escapeHtml(currentUser.email || currentUser.name)}</strong> yet.</div>`;
+      return;
+    }
+
+    list.innerHTML = teacherLogs.map(log => _renderSingleLogItemHtml(log)).join('');
+  } catch (err) {
+    if (list) list.innerHTML = `<div class="p-4 text-center text-xs text-rose-500">Failed to load logs: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function closeTeacherAccountLogsModal() {
+  const modal = document.getElementById('modal-teacher-logs');
+  if (modal) modal.classList.add('hidden');
 }
 
 async function loadActivityLogs() {
@@ -2766,7 +3129,8 @@ async function updateProfileDashboardKPIs() {
 
     const ttRes = await API.getTimetable('', '', '');
     const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
-    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId));
+    const myEmail = (currentUser && currentUser.email) ? currentUser.email.trim().toLowerCase() : '';
+    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId, myEmail));
 
     const todaySlots = mySlots.filter(s => {
       const d = (s.day || '').trim().toLowerCase();
@@ -3848,7 +4212,7 @@ async function renderTeachersList() {
 
               <!-- Row 2: Timetable + Log buttons -->
               <div class="flex gap-1.5">
-                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}', '${t._id}')"
+                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}', '${t._id}', '${escapeQuotes(t.email || '')}')"
                   class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-bold transition shadow-sm" title="View timetable">
                   <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                   <span>Timetable</span>
@@ -4313,19 +4677,28 @@ async function handleSendMessage(e) {
 // ================= TIMETABLE MODULE =================
 let currentTimetableDay = 'all';
 let timetableViewTeacher = null;     // string: teacher name being viewed
+let timetableViewTeacherEmail = null;// string: teacher email being viewed (strictly prevents name collisions)
 let timetableViewTeacherId = null;   // string: teacher ObjectId if available
 let timetableReadOnly = false;       // true=no add/edit/delete buttons
 let timetableEditingSlotId = null;
 
-// Helper: match slot strictly to teacher name or id (no blank or partial string collisions!)
-function isSlotForTeacher(slot, teacherName, teacherId = null) {
+// Helper: match slot strictly to teacher email, id, or name (email priority avoids name conflicts)
+function isSlotForTeacher(slot, teacherName, teacherId = null, teacherEmail = null) {
   if (!slot) return false;
-  const target = (teacherName || '').trim().toLowerCase();
-  const slotTeacher = (slot.teacher || '').trim().toLowerCase();
+  const targetEmail = (teacherEmail || '').trim().toLowerCase();
+  const slotEmail = (slot.teacherEmail || '').trim().toLowerCase();
 
+  // 1. Primary match: strictly match unique email ID to eliminate name conflicts!
+  if (targetEmail && slotEmail) {
+    return targetEmail === slotEmail;
+  }
+  // 2. Secondary match: user ObjectId
   if (teacherId && slot.teacherId && String(slot.teacherId) === String(teacherId)) {
     return true;
   }
+  // 3. Fallback: match by teacher name only if no email info
+  const target = (teacherName || '').trim().toLowerCase();
+  const slotTeacher = (slot.teacher || '').trim().toLowerCase();
   if (target && slotTeacher && target === slotTeacher) {
     return true;
   }
@@ -4336,6 +4709,7 @@ function isSlotForTeacher(slot, teacherName, teacherId = null) {
 async function openMyTimetable() {
   if (!currentUser) return;
   timetableViewTeacher = (currentUser.name || '').trim();
+  timetableViewTeacherEmail = (currentUser.email || '').trim().toLowerCase();
   timetableViewTeacherId = currentUser._id || currentUser.id || null;
   timetableReadOnly = false; // Always editable for the user's own profile!
   await openTimetableModal();
@@ -4344,14 +4718,17 @@ async function openMyTimetable() {
 // Open timetable for a specific teacher (from Teachers tab)
 // USER DIRECTIVE:
 // "In teachers tab.... When click time of a teacher ....show that teacher time table only which he seted in his account from profile tab...."
-// "In teacher tab....Also gave admin to edit and delete and and slot to time table of every teacher....."
-async function openTeacherTimetable(teacherName, teacherId = null) {
+// "Time table connect with account names is make conflicts with similar names ...so make connect with account email id ...."
+async function openTeacherTimetable(teacherName, teacherId = null, teacherEmail = null) {
   const isAdmin = currentUser && currentUser.role === 'admin';
+  const myEmail = (currentUser && currentUser.email ? currentUser.email : '').trim().toLowerCase();
   const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
+  const targetEmail = (teacherEmail || '').trim().toLowerCase();
   const targetTeacher = (teacherName || '').trim();
-  const isMe = myName && myName === targetTeacher.toLowerCase();
+  const isMe = (myEmail && targetEmail && myEmail === targetEmail) || (myName && myName === targetTeacher.toLowerCase());
 
   timetableViewTeacher = targetTeacher;
+  timetableViewTeacherEmail = targetEmail;
   timetableViewTeacherId = teacherId || null;
   // Editable for admin AND the teacher themselves!
   timetableReadOnly = !(isAdmin || isMe);
@@ -4372,13 +4749,16 @@ async function openTimetableModal() {
   // Fallback: If timetableViewTeacher was not set, default to currentUser
   if (!timetableViewTeacher && currentUser) {
     timetableViewTeacher = (currentUser.name || '').trim();
+    timetableViewTeacherEmail = (currentUser.email || '').trim().toLowerCase();
     timetableViewTeacherId = currentUser._id || currentUser.id || null;
   }
 
   const isAdminTT = currentUser && currentUser.role === 'admin';
+  const myEmail = (currentUser && currentUser.email ? currentUser.email : '').trim().toLowerCase();
   const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
   const targetLower = (timetableViewTeacher || '').toLowerCase();
-  const isMe = myName && myName === targetLower;
+  const targetEmail = (timetableViewTeacherEmail || '').toLowerCase();
+  const isMe = (myEmail && targetEmail && myEmail === targetEmail) || (myName && myName === targetLower);
 
   // Show/hide Add button:
   // Admin can add a slot to ANY teacher's timetable (or their own);
@@ -4403,7 +4783,7 @@ async function openTimetableModal() {
     if (isMe) {
       ttSubtitleEl.textContent = 'Your personal class schedule & timetable slots';
     } else if (timetableViewTeacher) {
-      ttSubtitleEl.textContent = `Class schedule assigned to ${timetableViewTeacher}`;
+      ttSubtitleEl.textContent = `Schedule assigned to ${timetableViewTeacher}${timetableViewTeacherEmail ? ' (' + timetableViewTeacherEmail + ')' : ''}`;
     }
   }
 
@@ -4417,6 +4797,7 @@ function closeTimetableModal() {
   const modal = document.getElementById('modal-timetable');
   if (modal) modal.classList.add('hidden');
   timetableViewTeacher = null;
+  timetableViewTeacherEmail = null;
   timetableViewTeacherId = null;
   timetableReadOnly = false;
 }
@@ -4448,14 +4829,13 @@ async function renderTimetableSlots() {
 
   try {
     const dayParam = currentTimetableDay === 'all' ? '' : currentTimetableDay;
-    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam, timetableViewTeacher || '');
+    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam, timetableViewTeacher || '', timetableViewTeacherEmail || '');
     let slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
     // USER DIRECTIVE:
-    // "Not mix all time tables.."
-    // Strictly filter by teacher/account
-    if (timetableViewTeacher) {
-      slots = slots.filter(s => isSlotForTeacher(s, timetableViewTeacher, timetableViewTeacherId));
+    // "Not mix all time tables.. strictly filter by teacher/account email"
+    if (timetableViewTeacherEmail || timetableViewTeacher) {
+      slots = slots.filter(s => isSlotForTeacher(s, timetableViewTeacher, timetableViewTeacherId, timetableViewTeacherEmail));
     }
 
     if (slots.length === 0) {
@@ -4583,17 +4963,20 @@ async function openAddTimetableSlotModal(slotId = null) {
       subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
   }
 
-  // Target teacher / account
+  // Target teacher / account (with Email connection to eliminate name collisions!)
   const targetTeacherName = timetableViewTeacher || (currentUser && currentUser.name) || '';
+  const targetTeacherEmail = timetableViewTeacherEmail || (currentUser && currentUser.email) || '';
   const targetTeacherId = timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '';
 
   const teacherInput = document.getElementById('slot-input-teacher');
+  const teacherEmailInput = document.getElementById('slot-input-teacher-email');
   const teacherIdInput = document.getElementById('slot-input-teacher-id');
   const assigneeNameEl = document.getElementById('slot-assignee-name');
 
   if (teacherInput) teacherInput.value = targetTeacherName;
+  if (teacherEmailInput) teacherEmailInput.value = targetTeacherEmail;
   if (teacherIdInput) teacherIdInput.value = targetTeacherId;
-  if (assigneeNameEl) assigneeNameEl.textContent = targetTeacherName;
+  if (assigneeNameEl) assigneeNameEl.textContent = targetTeacherName + (targetTeacherEmail ? ` (${targetTeacherEmail})` : '');
 
   // If editing, pre-fill values
   if (slotId) {
@@ -4613,8 +4996,9 @@ async function openAddTimetableSlotModal(slotId = null) {
         filterTimetableSubjectsByClass();
         if (subjectSelect) subjectSelect.value = slot.subject || '';
         if (teacherInput && slot.teacher) teacherInput.value = slot.teacher;
+        if (teacherEmailInput && slot.teacherEmail) teacherEmailInput.value = slot.teacherEmail;
         if (teacherIdInput && slot.teacherId) teacherIdInput.value = slot.teacherId;
-        if (assigneeNameEl && slot.teacher) assigneeNameEl.textContent = slot.teacher;
+        if (assigneeNameEl && slot.teacher) assigneeNameEl.textContent = slot.teacher + (slot.teacherEmail ? ` (${slot.teacherEmail})` : '');
         const roomInput = document.getElementById('slot-input-room');
         if (roomInput) roomInput.value = slot.room || '';
       }
@@ -4638,6 +5022,7 @@ async function handleSaveTimetableSlot(e) {
   e.preventDefault();
   const slotId = (document.getElementById('slot-edit-id') || {}).value || timetableEditingSlotId;
   const teacherName = ((document.getElementById('slot-input-teacher') || {}).value || timetableViewTeacher || (currentUser && currentUser.name) || '').trim();
+  const teacherEmailVal = ((document.getElementById('slot-input-teacher-email') || {}).value || timetableViewTeacherEmail || (currentUser && currentUser.email) || '').trim().toLowerCase();
   const teacherIdVal = ((document.getElementById('slot-input-teacher-id') || {}).value || timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '').trim();
 
   const daysArr = selectedSlotDays.length > 0
@@ -4651,6 +5036,7 @@ async function handleSaveTimetableSlot(e) {
     class: (document.getElementById('slot-input-class') || {}).value || '',
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
     teacher: teacherName,
+    teacherEmail: teacherEmailVal,
     teacherId: teacherIdVal || null,
     room: (document.getElementById('slot-input-room') || {}).value || '',
   };
@@ -5900,6 +6286,7 @@ async function checkAndTriggerTimetableNotifications() {
     const myAccountKey = String(currentUser._id || currentUser.name || 'user');
     const myName = (currentUser.name || '').trim();
     const myId = currentUser._id || currentUser.id || null;
+    const myEmail = (currentUser.email || '').trim().toLowerCase();
 
     // Fetch all timetable slots
     const res = await API.getTimetable('', '', '');
@@ -5910,7 +6297,7 @@ async function checkAndTriggerTimetableNotifications() {
     // When Notification....only show each teacher account their own time table which he set from the profile tab...
     // Also show admin time table...what he set in his profile tab
     // Not mix all time tables.."
-    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId));
+    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId, myEmail));
 
     const currentHours = now.getHours();
     const summaryNotifKey = `tt_summary_${myAccountKey}_${todayStr}`;

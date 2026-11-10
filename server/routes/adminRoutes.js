@@ -57,6 +57,7 @@ router.put('/settings', async (req, res) => {
       action: 'App & School Settings Updated',
       details: `App Name: ${settings.appName} • School Name: ${settings.schoolName} • Edit/Delete: ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'} • Student Print: ${settings.allowStudentDetailsPrint ? 'Enabled' : 'Disabled'}`,
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -87,6 +88,7 @@ router.put('/student-fields', async (req, res) => {
       action: 'Student Form Fields Layout Updated',
       details: `Customized by Admin ${req.user.name}`,
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -115,6 +117,7 @@ router.put('/toggle-edit-delete-access', async (req, res) => {
       action: `Edit/Delete Button Access ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'}`,
       details: `Access for non-admin edit/delete buttons ${settings.allowNonAdminEditDelete ? 'granted' : 'revoked'} by Admin`,
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -169,6 +172,7 @@ router.post('/teachers', async (req, res) => {
       action: `Teacher Added: ${name}`,
       details: `Email: ${email}`,
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -206,6 +210,7 @@ router.put('/teachers/:id', async (req, res) => {
       action: `Teacher Renamed: ${oldName} -> ${teacher.name}`,
       details: `Updated by Admin ${req.user.name}`,
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -236,6 +241,7 @@ router.put(['/teachers/:id/toggle-admin', '/teachers/:id/make-admin'], async (re
       action: isNowAdmin ? `Account Promoted to Admin: ${teacher.name}` : `Admin Privileges Removed: ${teacher.name}`,
       details: isNowAdmin ? `Promoted by Admin ${req.user.name}` : `Demoted to Teacher by Admin ${req.user.name}`,
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -277,6 +283,7 @@ router.delete('/teachers/:id', async (req, res) => {
       action: `Teacher Account Removed: ${teacher.name}`,
       details: `Email: ${teacher.email} (${teacher.role}) deleted by admin ${req.user ? req.user.name : ''}`,
       performedBy: req.user ? req.user.name : 'Admin',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -301,6 +308,7 @@ router.post('/clear-data', async (req, res) => {
       action: 'Attendance Records Cleared',
       details: 'All class attendance records cleared by Admin (students, classes, subjects preserved)',
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'attendance',
       canUndo: false
@@ -329,6 +337,7 @@ router.put('/toggle-student-print-access', async (req, res) => {
       action: `Student Details Print/Export Access ${settings.allowStudentDetailsPrint ? 'Enabled' : 'Disabled'}`,
       details: `Student Details Print/Export button ${settings.allowStudentDetailsPrint ? 'enabled' : 'disabled'} by Admin`,
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false
@@ -373,6 +382,7 @@ router.post('/reset-app', async (req, res) => {
       action: 'Application Reset Like New',
       details: 'All data (students, teachers, classes, subjects, attendance, messages, timetable) cleared like brand new by Admin',
       performedBy: req.user.name,
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase().trim() : '',
       role: 'admin',
       entityType: 'settings',
       canUndo: false

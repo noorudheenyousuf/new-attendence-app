@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>REGISTERLY - School Management PWA</title>
   <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <meta name="theme-color" content="#245b70">
   <link rel="stylesheet" href="/css/style.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -35,8 +37,8 @@
         <!-- Spinning Ring -->
         <div class="absolute inset-0 rounded-3xl border-4 border-[#245b70]/20 border-t-[#245b70] dark:border-teal-400/20 dark:border-t-teal-400 splash-spin-ring"></div>
         <!-- Inner Pulsing Logo Card -->
-        <div id="splash-icon-letter" class="w-14 h-14 rounded-2xl custom-gradient-header flex items-center justify-center text-white font-black text-2xl shadow-lg splash-icon-pulse">
-          R
+        <div id="splash-icon-letter" class="w-16 h-16 rounded-2xl overflow-hidden shadow-lg splash-icon-pulse border border-white/20 bg-[#245b70]">
+          <img src="/icons/icon-192.png" alt="Registerly" class="w-full h-full object-cover">
         </div>
       </div>
       <h2 id="splash-app-name" class="text-xl font-black text-[var(--text-main)] tracking-wider">REGISTERLY</h2>
@@ -53,9 +55,7 @@
         if (cached && cached.trim()) {
           var name = cached.trim();
           var elName = document.getElementById('splash-app-name');
-          var elIcon = document.getElementById('splash-icon-letter');
           if (elName) elName.textContent = name;
-          if (elIcon) elIcon.textContent = (name[0] || 'R').toUpperCase();
         }
       } catch (e) {}
     })();
@@ -70,8 +70,8 @@
         
         <!-- Brand Title & School Name (Under app name if given, enlarged and fluid) -->
         <div class="flex items-center gap-2.5 min-w-0 flex-1">
-          <div id="header-brand-icon" class="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white font-black text-xl shadow-inner flex-shrink-0">
-            R
+          <div id="header-brand-icon" class="w-10 h-10 rounded-2xl overflow-hidden shadow-inner flex-shrink-0 border border-white/30 bg-[#245b70]">
+            <img src="/icons/icon-192.png" alt="Registerly" class="w-full h-full object-cover">
           </div>
           <div class="min-w-0 flex-1 truncate">
             <div class="font-black text-lg sm:text-xl tracking-wider text-white leading-tight truncate" id="header-app-name">
@@ -434,15 +434,15 @@
               </button>
             </div>
 
-            <!-- 4. Edit Profile Card -->
-            <button type="button" onclick="openProfileEditModal()" class="touch-btn bg-[var(--card-bg)] hover:bg-amber-500/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group text-left" title="Edit your account profile and photo">
+            <!-- 4. Teacher Logs Card (Replaced Edit Profile as requested) -->
+            <button type="button" onclick="openTeacherAccountLogsModal()" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group text-left" title="View activity logs of your teacher account">
               <div class="flex items-center gap-2.5 min-w-0">
-                <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <div class="w-9 h-9 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 </div>
                 <div class="min-w-0">
-                  <div class="text-xs font-black text-[var(--text-main)] truncate">Edit Profile</div>
-                  <div class="text-[10px] text-[var(--text-sub)] truncate">Photo & Name</div>
+                  <div class="text-xs font-black text-[var(--text-main)] truncate">Teacher Logs</div>
+                  <div class="text-[10px] text-[var(--text-sub)] truncate">Live Account History</div>
                 </div>
               </div>
               <svg class="w-3.5 h-3.5 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -1344,6 +1344,35 @@
     </div>
   </div>
 
+  <!-- ================= TEACHER ACCOUNT LOGS MODAL (Connected strictly by account email) ================= -->
+  <div id="modal-teacher-logs" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3.5 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-lg rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] space-y-3.5 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3 flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center font-bold">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-extrabold text-sm sm:text-base text-[var(--text-main)] truncate" id="teacher-logs-modal-title">Teacher Activity Logs</h3>
+            <p class="text-[11px] text-[var(--text-sub)] truncate" id="teacher-logs-modal-subtitle">Connected via Email ID</p>
+          </div>
+        </div>
+        <button onclick="closeTeacherAccountLogsModal()" class="w-8 h-8 rounded-full bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] flex items-center justify-center font-bold transition">✕</button>
+      </div>
+
+      <!-- Logs Container -->
+      <div id="teacher-account-logs-list" class="space-y-2 flex-1 overflow-y-auto pr-1">
+        <!-- Dynamically loaded logs -->
+      </div>
+
+      <div class="pt-2 border-t border-[var(--border-color)] flex justify-end flex-shrink-0">
+        <button onclick="closeTeacherAccountLogsModal()" class="px-4 py-2 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] font-bold text-xs hover:bg-[#245b70] hover:text-white transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= USER PROFILE EDIT MODAL (Click Photo to Update Photo & Name) ================= -->
   <div id="modal-edit-profile" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3.5 hidden no-print">
     <div class="bg-[var(--card-bg)] w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] space-y-4">
@@ -1576,8 +1605,8 @@
       <!-- Top Brand Header -->
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-12 h-12 rounded-2xl custom-gradient-header flex items-center justify-center text-white font-black text-2xl shadow-md flex-shrink-0">
-            R
+          <div class="w-12 h-12 rounded-2xl overflow-hidden shadow-md flex-shrink-0 border border-[var(--border-color)] bg-[#245b70]">
+            <img src="/icons/icon-192.png" alt="Registerly" class="w-full h-full object-cover">
           </div>
           <div>
             <h2 class="text-lg sm:text-xl font-black text-[var(--text-main)] leading-tight tracking-wide">REGISTERLY</h2>
@@ -1863,6 +1892,7 @@
         </div>
         <input type="hidden" id="slot-input-teacher" value="">
         <input type="hidden" id="slot-input-teacher-id" value="">
+        <input type="hidden" id="slot-input-teacher-email" value="">
 
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Room / Lab / Note (Optional)</label>

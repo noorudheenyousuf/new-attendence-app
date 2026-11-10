@@ -13,6 +13,12 @@ const activityLogSchema = new mongoose.Schema({
     type: String,
     default: 'Teacher'
   },
+  performedByEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
   role: {
     type: String,
     enum: ['admin', 'teacher'],

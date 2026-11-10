@@ -30,6 +30,12 @@ const timetableSchema = new mongoose.Schema({
     default: '',
     trim: true
   },
+  teacherEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
