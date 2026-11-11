@@ -403,12 +403,13 @@ const API = {
   },
 
   // Timetable API
-  async getTimetable(className, day, teacher) {
+  async getTimetable(className, day, teacher, teacherEmail) {
     let url = '/timetable';
     const params = new URLSearchParams();
     if (className && className !== 'all') params.append('class', className);
     if (day && day !== 'all') params.append('day', day);
     if (teacher && teacher !== 'all') params.append('teacher', teacher);
+    if (teacherEmail && teacherEmail !== 'all') params.append('teacherEmail', teacherEmail);
     const qs = params.toString();
     return this.request(qs ? `${url}?${qs}` : url);
   },

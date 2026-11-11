@@ -399,6 +399,38 @@ function toggleDarkMode() {
   renderGoogleButton();
 }
 
+function updateDeviceIcons(logoUrl) {
+  const ts = Date.now();
+  const effectiveUrl = logoUrl ? logoUrl : '/manifest-icon-192.png';
+  const cacheBustUrl = effectiveUrl + (effectiveUrl.includes('?') ? '&' : '?') + 'v=' + ts;
+
+  // 1. Live Refresh Favicon by replacing element to force browser to update
+  const existingFavs = document.querySelectorAll("link[rel*='icon']");
+  existingFavs.forEach(el => el.parentNode && el.parentNode.removeChild(el));
+
+  const newFav = document.createElement('link');
+  newFav.id = 'dynamic-favicon';
+  newFav.rel = 'icon';
+  newFav.href = cacheBustUrl;
+  document.head.appendChild(newFav);
+
+  // 2. Live Refresh Apple Touch Icon for mobile home screens
+  const existingApples = document.querySelectorAll("link[rel='apple-touch-icon']");
+  existingApples.forEach(el => el.parentNode && el.parentNode.removeChild(el));
+
+  const newApple = document.createElement('link');
+  newApple.id = 'dynamic-apple-icon';
+  newApple.rel = 'apple-touch-icon';
+  newApple.href = cacheBustUrl;
+  document.head.appendChild(newApple);
+
+  // 3. Update PWA Manifest link so mobile devices re-query the manifest
+  const manifestLink = document.querySelector("link[rel='manifest']");
+  if (manifestLink) {
+    manifestLink.href = '/manifest.json?v=' + ts;
+  }
+}
+
 // ================= APP SETTINGS (App Name & School Name & App Logo) =================
 function updateAdminLogoPreview(logoUrl, letter = 'R') {
   const box = document.getElementById('admin-logo-preview-box');
@@ -459,12 +491,8 @@ function updateHeaderBranding(appName, schoolName, appLogo) {
     }
   }
 
-  // 4. Place 3: Mobile & Devices App Icon (Favicon & Apple Touch Icon)
-  const favIcon = document.getElementById('dynamic-favicon');
-  const appleIcon = document.getElementById('dynamic-apple-icon');
-  const effectiveIconUrl = rawLogo || '/icons/icon-192.png';
-  if (favIcon) favIcon.href = effectiveIconUrl;
-  if (appleIcon) appleIcon.href = effectiveIconUrl;
+  // 4. Place 3: Mobile & Devices App Icon (Favicon & Apple Touch Icon & PWA Manifest)
+  updateDeviceIcons(rawLogo);
 
   // 5. Update Admin Panel preview if open
   updateAdminLogoPreview(rawLogo, firstLetter);
@@ -750,13 +778,66 @@ function populateClassDropdowns() {
   }
 }
 
-// Drag & Drop Sorting for Classes
+// Drag & Drop Sorting for Classes (Only active after long press / hold)
 let draggedClassIndex = null;
 let touchDraggedClassIndex = null;
 let touchClassElement = null;
 let recentlyPlacedClassId = null;
+let classHoldTimer = null;
+let classHoldActive = false;
+let classHoldStartX = 0;
+let classHoldStartY = 0;
+
+function handleClassPointerDown(e, index) {
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+  const card = e.currentTarget;
+  classHoldActive = false;
+  classHoldStartX = e.clientX || 0;
+  classHoldStartY = e.clientY || 0;
+
+  if (classHoldTimer) clearTimeout(classHoldTimer);
+  classHoldTimer = setTimeout(() => {
+    classHoldActive = true;
+    card.setAttribute('draggable', 'true');
+    card.classList.add('drag-activated');
+    triggerNavHaptic('medium');
+  }, 250);
+}
+
+function handleClassPointerMove(e) {
+  if (!classHoldTimer && !classHoldActive) return;
+  const currentX = e.clientX || 0;
+  const currentY = e.clientY || 0;
+  const diffX = Math.abs(currentX - classHoldStartX);
+  const diffY = Math.abs(currentY - classHoldStartY);
+
+  if (!classHoldActive && (diffX > 8 || diffY > 8)) {
+    if (classHoldTimer) {
+      clearTimeout(classHoldTimer);
+      classHoldTimer = null;
+    }
+  }
+}
+
+function handleClassPointerUp(e) {
+  if (classHoldTimer) {
+    clearTimeout(classHoldTimer);
+    classHoldTimer = null;
+  }
+  classHoldActive = false;
+  const card = e.currentTarget;
+  if (card) {
+    card.classList.remove('drag-activated');
+    card.setAttribute('draggable', 'false');
+  }
+}
 
 function handleClassDragStart(e, index) {
+  const fromHandle = Boolean(e.target.closest('.drag-handle'));
+  if (!classHoldActive && !fromHandle) {
+    e.preventDefault();
+    return;
+  }
   draggedClassIndex = index;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', String(index));
@@ -784,9 +865,15 @@ function handleClassDragLeave(e) {
 }
 
 function handleClassDragEnd(e) {
+  if (classHoldTimer) {
+    clearTimeout(classHoldTimer);
+    classHoldTimer = null;
+  }
+  classHoldActive = false;
   draggedClassIndex = null;
   document.querySelectorAll('#class-cards-container .drag-item').forEach(el => {
-    el.classList.remove('dragging', 'drag-over');
+    el.classList.remove('dragging', 'drag-over', 'drag-activated');
+    el.setAttribute('draggable', 'false');
   });
 }
 
@@ -811,10 +898,12 @@ async function handleClassDrop(e, targetIndex) {
   classesList.splice(targetIndex, 0, movedClass);
 
   recentlyPlacedClassId = movedClass._id;
-  triggerNavHaptic('medium');
+  triggerNavHaptic('strong');
 
   renderClassesList();
   populateClassDropdowns();
+  renderStudentsDirectory();
+  renderSubjectsList();
 
   setTimeout(() => {
     if (recentlyPlacedClassId === movedClass._id) {
@@ -846,18 +935,44 @@ function handleClassContainerDrop(e) {
   handleClassDrop(e, Math.max(0, classesList.length - 1));
 }
 
-// Touch Support for Classes on Mobile & Tablets
+// Mobile & Tablet Touch Long-Press Hold-to-Drag for Classes
 function handleClassTouchStart(e, index) {
-  if (e.target.closest('button')) return;
-  touchDraggedClassIndex = index;
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+  const touch = e.touches[0];
+  classHoldStartX = touch.clientX;
+  classHoldStartY = touch.clientY;
+  classHoldActive = false;
+  touchDraggedClassIndex = null;
   touchClassElement = e.currentTarget;
-  touchClassElement.classList.add('dragging');
-  triggerNavHaptic('light');
+
+  if (classHoldTimer) clearTimeout(classHoldTimer);
+  classHoldTimer = setTimeout(() => {
+    classHoldActive = true;
+    touchDraggedClassIndex = index;
+    if (touchClassElement) {
+      touchClassElement.classList.add('drag-activated', 'dragging');
+    }
+    triggerNavHaptic('medium');
+  }, 250);
 }
 
 function handleClassTouchMove(e) {
-  if (touchDraggedClassIndex === null) return;
   const touch = e.touches[0];
+  const diffX = Math.abs(touch.clientX - classHoldStartX);
+  const diffY = Math.abs(touch.clientY - classHoldStartY);
+
+  if (!classHoldActive) {
+    if (diffX > 8 || diffY > 8) {
+      if (classHoldTimer) {
+        clearTimeout(classHoldTimer);
+        classHoldTimer = null;
+      }
+    }
+    return; // Allow native page scroll
+  }
+
+  // Active dragging after hold: prevent page scroll
+  e.preventDefault();
   const target = document.elementFromPoint(touch.clientX, touch.clientY);
   const card = target ? target.closest('#class-cards-container .drag-item') : null;
 
@@ -868,17 +983,35 @@ function handleClassTouchMove(e) {
 }
 
 async function handleClassTouchEnd(e) {
-  if (touchDraggedClassIndex === null) return;
+  if (classHoldTimer) {
+    clearTimeout(classHoldTimer);
+    classHoldTimer = null;
+  }
+
+  if (!classHoldActive || touchDraggedClassIndex === null) {
+    classHoldActive = false;
+    touchDraggedClassIndex = null;
+    if (touchClassElement) {
+      touchClassElement.classList.remove('drag-activated', 'dragging');
+      touchClassElement = null;
+    }
+    return;
+  }
+
+  classHoldActive = false;
   const touch = e.changedTouches[0];
   const target = document.elementFromPoint(touch.clientX, touch.clientY);
   const card = target ? target.closest('#class-cards-container .drag-item') : null;
 
   const sourceIndex = touchDraggedClassIndex;
   touchDraggedClassIndex = null;
-  touchClassElement = null;
+  if (touchClassElement) {
+    touchClassElement.classList.remove('drag-activated', 'dragging');
+    touchClassElement = null;
+  }
 
   document.querySelectorAll('#class-cards-container .drag-item').forEach(el => {
-    el.classList.remove('dragging', 'drag-over');
+    el.classList.remove('dragging', 'drag-over', 'drag-activated');
   });
 
   if (card) {
@@ -893,6 +1026,8 @@ async function handleClassTouchEnd(e) {
 
       renderClassesList();
       populateClassDropdowns();
+      renderStudentsDirectory();
+      renderSubjectsList();
 
       setTimeout(() => {
         if (recentlyPlacedClassId === movedClass._id) {
@@ -945,17 +1080,22 @@ function renderClassesList() {
     <div class="drag-item rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden hover:shadow-md transition-all${placedClass}"
          data-index="${index}"
          data-id="${c._id}"
-         draggable="true"
+         draggable="false"
+         onmousedown="handleClassPointerDown(event, ${index})"
+         onmousemove="handleClassPointerMove(event)"
+         onmouseup="handleClassPointerUp(event)"
+         onmouseleave="handleClassPointerUp(event)"
+         ontouchstart="handleClassTouchStart(event, ${index})"
+         ontouchmove="handleClassTouchMove(event)"
+         ontouchend="handleClassTouchEnd(event)"
+         ontouchcancel="handleClassTouchEnd(event)"
          ondragstart="handleClassDragStart(event, ${index})"
          ondragover="handleClassDragOver(event, ${index})"
          ondragleave="handleClassDragLeave(event)"
          ondragend="handleClassDragEnd(event)"
-         ondrop="handleClassDrop(event, ${index})"
-         ontouchstart="handleClassTouchStart(event, ${index})"
-         ontouchmove="handleClassTouchMove(event)"
-         ontouchend="handleClassTouchEnd(event)">
+         ondrop="handleClassDrop(event, ${index})">
       <div class="custom-gradient-header px-3.5 py-3 flex items-center gap-2.5">
-        <div class="drag-handle text-white/60 hover:text-white flex-shrink-0" title="Drag to reorder">
+        <div class="drag-handle text-white/60 hover:text-white flex-shrink-0 cursor-grab active:cursor-grabbing" title="Hold card or drag handle to reorder">
           <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
         </div>
         <div class="min-w-0 flex-1">
@@ -1175,13 +1315,66 @@ function populateSubjectDropdowns() {
   updateReportSubjectsDropdown(repClassEl ? repClassEl.value : '');
 }
 
-// Drag & Drop Sorting for Subjects
+// Drag & Drop Sorting for Subjects (Only active after long press / hold)
 let draggedSubjectIndex = null;
 let touchDraggedSubjectIndex = null;
 let touchSubjectElement = null;
 let recentlyPlacedSubjectId = null;
+let subjectHoldTimer = null;
+let subjectHoldActive = false;
+let subjectHoldStartX = 0;
+let subjectHoldStartY = 0;
+
+function handleSubjectPointerDown(e, index) {
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+  const card = e.currentTarget;
+  subjectHoldActive = false;
+  subjectHoldStartX = e.clientX || 0;
+  subjectHoldStartY = e.clientY || 0;
+
+  if (subjectHoldTimer) clearTimeout(subjectHoldTimer);
+  subjectHoldTimer = setTimeout(() => {
+    subjectHoldActive = true;
+    card.setAttribute('draggable', 'true');
+    card.classList.add('drag-activated');
+    triggerNavHaptic('medium');
+  }, 250);
+}
+
+function handleSubjectPointerMove(e) {
+  if (!subjectHoldTimer && !subjectHoldActive) return;
+  const currentX = e.clientX || 0;
+  const currentY = e.clientY || 0;
+  const diffX = Math.abs(currentX - subjectHoldStartX);
+  const diffY = Math.abs(currentY - subjectHoldStartY);
+
+  if (!subjectHoldActive && (diffX > 8 || diffY > 8)) {
+    if (subjectHoldTimer) {
+      clearTimeout(subjectHoldTimer);
+      subjectHoldTimer = null;
+    }
+  }
+}
+
+function handleSubjectPointerUp(e) {
+  if (subjectHoldTimer) {
+    clearTimeout(subjectHoldTimer);
+    subjectHoldTimer = null;
+  }
+  subjectHoldActive = false;
+  const card = e.currentTarget;
+  if (card) {
+    card.classList.remove('drag-activated');
+    card.setAttribute('draggable', 'false');
+  }
+}
 
 function handleSubjectDragStart(e, index) {
+  const fromHandle = Boolean(e.target.closest('.drag-handle'));
+  if (!subjectHoldActive && !fromHandle) {
+    e.preventDefault();
+    return;
+  }
   draggedSubjectIndex = index;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', String(index));
@@ -1209,9 +1402,15 @@ function handleSubjectDragLeave(e) {
 }
 
 function handleSubjectDragEnd(e) {
+  if (subjectHoldTimer) {
+    clearTimeout(subjectHoldTimer);
+    subjectHoldTimer = null;
+  }
+  subjectHoldActive = false;
   draggedSubjectIndex = null;
   document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => {
-    el.classList.remove('dragging', 'drag-over');
+    el.classList.remove('dragging', 'drag-over', 'drag-activated');
+    el.setAttribute('draggable', 'false');
   });
 }
 
@@ -1273,16 +1472,42 @@ function handleSubjectContainerDrop(e) {
 
 // Touch Support for Subjects on Mobile & Tablets
 function handleSubjectTouchStart(e, index) {
-  if (e.target.closest('button')) return;
-  touchDraggedSubjectIndex = index;
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+  const touch = e.touches[0];
+  subjectHoldStartX = touch.clientX;
+  subjectHoldStartY = touch.clientY;
+  subjectHoldActive = false;
+  touchDraggedSubjectIndex = null;
   touchSubjectElement = e.currentTarget;
-  touchSubjectElement.classList.add('dragging');
-  triggerNavHaptic('light');
+
+  if (subjectHoldTimer) clearTimeout(subjectHoldTimer);
+  subjectHoldTimer = setTimeout(() => {
+    subjectHoldActive = true;
+    touchDraggedSubjectIndex = index;
+    if (touchSubjectElement) {
+      touchSubjectElement.classList.add('drag-activated', 'dragging');
+    }
+    triggerNavHaptic('medium');
+  }, 250);
 }
 
 function handleSubjectTouchMove(e) {
-  if (touchDraggedSubjectIndex === null) return;
   const touch = e.touches[0];
+  const diffX = Math.abs(touch.clientX - subjectHoldStartX);
+  const diffY = Math.abs(touch.clientY - subjectHoldStartY);
+
+  if (!subjectHoldActive) {
+    if (diffX > 8 || diffY > 8) {
+      if (subjectHoldTimer) {
+        clearTimeout(subjectHoldTimer);
+        subjectHoldTimer = null;
+      }
+    }
+    return; // Allow native scroll
+  }
+
+  // Active dragging after hold
+  e.preventDefault();
   const target = document.elementFromPoint(touch.clientX, touch.clientY);
   const card = target ? target.closest('#subject-cards-container .drag-item') : null;
 
@@ -1293,17 +1518,35 @@ function handleSubjectTouchMove(e) {
 }
 
 async function handleSubjectTouchEnd(e) {
-  if (touchDraggedSubjectIndex === null) return;
+  if (subjectHoldTimer) {
+    clearTimeout(subjectHoldTimer);
+    subjectHoldTimer = null;
+  }
+
+  if (!subjectHoldActive || touchDraggedSubjectIndex === null) {
+    subjectHoldActive = false;
+    touchDraggedSubjectIndex = null;
+    if (touchSubjectElement) {
+      touchSubjectElement.classList.remove('drag-activated', 'dragging');
+      touchSubjectElement = null;
+    }
+    return;
+  }
+
+  subjectHoldActive = false;
   const touch = e.changedTouches[0];
   const target = document.elementFromPoint(touch.clientX, touch.clientY);
   const card = target ? target.closest('#subject-cards-container .drag-item') : null;
 
   const sourceIndex = touchDraggedSubjectIndex;
   touchDraggedSubjectIndex = null;
-  touchSubjectElement = null;
+  if (touchSubjectElement) {
+    touchSubjectElement.classList.remove('drag-activated');
+    touchSubjectElement = null;
+  }
 
   document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => {
-    el.classList.remove('dragging', 'drag-over');
+    el.classList.remove('dragging', 'drag-over', 'drag-activated');
   });
 
   if (card) {
@@ -1339,6 +1582,60 @@ async function handleSubjectTouchEnd(e) {
   }
 }
 
+function _generateSubjectCardHtml(s, index, categoryContext = '') {
+  const isPlaced = recentlyPlacedSubjectId && String(recentlyPlacedSubjectId) === String(s._id);
+  const placedClass = isPlaced ? ' drag-item-placed' : '';
+
+  return `
+  <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between transition-all${placedClass}"
+       data-index="${index}"
+       data-id="${s._id}"
+       data-category="${escapeHtml(categoryContext)}"
+       draggable="false"
+       onmousedown="handleSubjectPointerDown(event, ${index})"
+       onmousemove="handleSubjectPointerMove(event)"
+       onmouseup="handleSubjectPointerUp(event)"
+       onmouseleave="handleSubjectPointerUp(event)"
+       ontouchstart="handleSubjectTouchStart(event, ${index})"
+       ontouchmove="handleSubjectTouchMove(event)"
+       ontouchend="handleSubjectTouchEnd(event)"
+       ontouchcancel="handleSubjectTouchEnd(event)"
+       ondragstart="handleSubjectDragStart(event, ${index})"
+       ondragover="handleSubjectDragOver(event, ${index})"
+       ondragleave="handleSubjectDragLeave(event)"
+       ondragend="handleSubjectDragEnd(event)"
+       ondrop="handleSubjectDrop(event, ${index})">
+    <div class="flex items-center gap-3">
+      <!-- Drag Handle Icon -->
+      <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] p-1 flex-shrink-0 cursor-grab active:cursor-grabbing" title="Hold card or drag handle to reorder">
+        <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+          <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+          <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h3 class="font-bold text-[var(--text-main)] text-sm select-none">${escapeHtml(s.name)}</h3>
+          <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-400/10 dark:text-cyan-400 select-none">${escapeHtml(s.subjectCode)}</span>
+        </div>
+        ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5 select-none">Teacher: ${escapeHtml(s.teacher)}</p>` : ''}
+      </div>
+    </div>
+    ${canUserEditDelete() ? `
+    <div class="flex items-center gap-1.5 flex-shrink-0">
+      <button onclick="openEditSubjectModal('${s._id}', '${escapeQuotes(s.name)}', '${escapeQuotes(s.subjectCode)}', '${escapeQuotes(s.teacher || '')}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      </button>
+      <button onclick="deleteSubject('${s._id}', '${escapeQuotes(s.name)}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+    </div>
+    ` : ''}
+  </div>
+  `;
+}
+
 function renderSubjectsList() {
   const container = document.getElementById('subject-cards-container');
   if (!container) return;
@@ -1348,53 +1645,62 @@ function renderSubjectsList() {
     return;
   }
 
-  container.innerHTML = subjectsList.map((s, index) => {
-    const isPlaced = recentlyPlacedSubjectId && String(recentlyPlacedSubjectId) === String(s._id);
-    const placedClass = isPlaced ? ' drag-item-placed' : '';
+  // Group subjects by class according to classesList order (from Add Class tab)
+  let html = '';
+  const renderedSubjectIds = new Set();
 
-    return `
-    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between transition-all${placedClass}"
-         data-index="${index}"
-         data-id="${s._id}"
-         draggable="true"
-         ondragstart="handleSubjectDragStart(event, ${index})"
-         ondragover="handleSubjectDragOver(event, ${index})"
-         ondragleave="handleSubjectDragLeave(event)"
-         ondragend="handleSubjectDragEnd(event)"
-         ondrop="handleSubjectDrop(event, ${index})"
-         ontouchstart="handleSubjectTouchStart(event, ${index})"
-         ontouchmove="handleSubjectTouchMove(event)"
-         ontouchend="handleSubjectTouchEnd(event)">
-      <div class="flex items-center gap-3">
-        <!-- Drag Handle Icon -->
-        <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] p-1 flex-shrink-0" title="Drag to reorder subject">
-          <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-            <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-          </svg>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h3 class="font-bold text-[var(--text-main)] text-sm select-none">${escapeHtml(s.name)}</h3>
-            <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70] select-none">${escapeHtml(s.subjectCode)}</span>
+  (classesList || []).forEach(cls => {
+    const clsName = (cls.name || cls || '').trim();
+    // Match subjects assigned to this class
+    const classSubs = subjectsList.filter(s => {
+      const inAssignedClasses = Array.isArray(s.assignedClasses) && s.assignedClasses.some(ac => isClassEqual(ac, clsName));
+      const inClassSubjects = Array.isArray(cls.assignedSubjects) && cls.assignedSubjects.some(as => isClassEqual(as, s.name));
+      return inAssignedClasses || inClassSubjects;
+    });
+
+    if (classSubs.length > 0) {
+      classSubs.forEach(s => renderedSubjectIds.add(String(s._id)));
+      html += `
+        <div class="space-y-2 pt-1 pb-1">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
+              ${escapeHtml(clsName)} : <span class="font-bold opacity-90">${classSubs.length}</span>
+            </span>
+            <span class="h-px bg-[#245b70]/20 dark:bg-cyan-400/20 flex-1 ml-3"></span>
           </div>
-          ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5 select-none">Teacher: ${escapeHtml(s.teacher)}</p>` : ''}
+          <div class="space-y-2.5">
+            ${classSubs.map(s => {
+              const globalIndex = subjectsList.findIndex(item => String(item._id) === String(s._id));
+              return _generateSubjectCardHtml(s, globalIndex >= 0 ? globalIndex : 0, clsName);
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+  });
+
+  // Subjects not assigned to any class
+  const unassignedSubs = subjectsList.filter(s => !renderedSubjectIds.has(String(s._id)));
+  if (unassignedSubs.length > 0) {
+    html += `
+      <div class="space-y-2 pt-1 pb-1">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
+            GENERAL / UNASSIGNED : <span class="font-bold opacity-90">${unassignedSubs.length}</span>
+          </span>
+          <span class="h-px bg-[#245b70]/20 dark:bg-cyan-400/20 flex-1 ml-3"></span>
+        </div>
+        <div class="space-y-2.5">
+          ${unassignedSubs.map(s => {
+            const globalIndex = subjectsList.findIndex(item => String(item._id) === String(s._id));
+            return _generateSubjectCardHtml(s, globalIndex >= 0 ? globalIndex : 0, 'unassigned');
+          }).join('')}
         </div>
       </div>
-      ${canUserEditDelete() ? `
-      <div class="flex items-center gap-1.5 flex-shrink-0">
-        <button onclick="openEditSubjectModal('${s._id}', '${escapeQuotes(s.name)}', '${escapeQuotes(s.subjectCode)}', '${escapeQuotes(s.teacher || '')}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        </button>
-        <button onclick="deleteSubject('${s._id}', '${escapeQuotes(s.name)}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
-      </div>
-      ` : ''}
-    </div>
-  `;
-  }).join('');
+    `;
+  }
+
+  container.innerHTML = html || `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No subjects found.</div>`;
 }
 
 // Checkbox helper for Class assigned subjects
@@ -2059,34 +2365,85 @@ async function renderStudentsDirectory() {
       return;
     }
 
-      container.innerHTML = students.map(st => `
-        <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2.5 min-w-0 select-none">
-              <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
-              <div class="truncate">
-                <div class="flex items-center gap-1.5">
-                  <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
-                  <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
-                </div>
-                <p class="text-xs text-[var(--text-sub)] truncate">${st.class} · Roll: ${st.roll}</p>
+    const renderStudentCardItem = (st) => `
+      <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5 min-w-0 select-none">
+            <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
+            <div class="truncate">
+              <div class="flex items-center gap-1.5">
+                <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
+                <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
+              </div>
+              <p class="text-xs text-[var(--text-sub)] truncate">${st.class} · Roll: ${st.roll}</p>
+            </div>
+          </div>
+
+          <!-- Edit and Delete Buttons -->
+          ${canUserEditDelete() ? `
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button onclick="openEditStudentModal('${st._id}')" title="Edit Student (All fields)" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button onclick="confirmDeleteStudent('${st._id}', '${st.name.replace(/'/g, "\\'")}', ${st.studentId})" title="Delete Student" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    // USER DIRECTIVE:
+    // Categorize students with class when filter is 'all classes'.
+    // Class name with bold theme font: "PLUS ONE : 13", followed by student cards.
+    // Order strictly follows the order of classes in Add Class tab (classesList).
+    // If a specific class is selected, show without category headers.
+    if (filterClass === 'all') {
+      const groupsHtml = [];
+      const accountedFor = new Set();
+
+      classesList.forEach(cls => {
+        const clsName = cls.name || cls;
+        const clsStudents = students.filter(s => isClassEqual(s.class, clsName));
+        if (clsStudents.length > 0) {
+          clsStudents.forEach(s => accountedFor.add(String(s._id || s.studentId)));
+          groupsHtml.push(`
+            <div class="class-student-group space-y-2">
+              <div class="flex items-center justify-between px-1 border-b border-[var(--border-color)] pb-1.5 pt-2">
+                <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
+                  ${clsName} : ${clsStudents.length}
+                </span>
+              </div>
+              <div class="space-y-2">
+                ${clsStudents.map(st => renderStudentCardItem(st)).join('')}
               </div>
             </div>
+          `);
+        }
+      });
 
-            <!-- Edit and Delete Buttons -->
-            ${canUserEditDelete() ? `
-            <div class="flex items-center gap-1 flex-shrink-0">
-              <button onclick="openEditStudentModal('${st._id}')" title="Edit Student (All fields)" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-              </button>
-              <button onclick="confirmDeleteStudent('${st._id}', '${st.name.replace(/'/g, "\\'")}', ${st.studentId})" title="Delete Student" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
+      // Any students whose class is not in classesList
+      const remainingStudents = students.filter(s => !accountedFor.has(String(s._id || s.studentId)));
+      if (remainingStudents.length > 0) {
+        groupsHtml.push(`
+          <div class="class-student-group space-y-2">
+            <div class="flex items-center justify-between px-1 border-b border-[var(--border-color)] pb-1.5 pt-2">
+              <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
+                OTHER / UNASSIGNED : ${remainingStudents.length}
+              </span>
             </div>
-            ` : ''}
+            <div class="space-y-2">
+              ${remainingStudents.map(st => renderStudentCardItem(st)).join('')}
+            </div>
           </div>
-        </div>
-      `).join('');
+        `);
+      }
+
+      container.innerHTML = groupsHtml.length > 0 ? groupsHtml.join('') : students.map(st => renderStudentCardItem(st)).join('');
+    } else {
+      container.innerHTML = students.map(st => renderStudentCardItem(st)).join('');
+    }
   } catch (error) {
     console.log('[Students Directory Load]', error);
   }
@@ -3143,9 +3500,10 @@ async function updateProfileDashboardKPIs() {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayName = dayNames[now.getDay()].toLowerCase();
 
+    const myEmail = (currentUser.email || '').trim().toLowerCase();
     const ttRes = await API.getTimetable('', '', '');
     const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
-    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId));
+    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId, myEmail));
 
     const todaySlots = mySlots.filter(s => {
       const d = (s.day || '').trim().toLowerCase();
@@ -4232,7 +4590,7 @@ async function renderTeachersList() {
 
               <!-- Row 2: Timetable + Log buttons -->
               <div class="flex gap-1.5">
-                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}', '${t._id}')"
+                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}', '${t._id}', '${escapeQuotes(t.email || '')}')"
                   class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-bold transition shadow-sm" title="View timetable">
                   <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                   <span>Timetable</span>
@@ -4698,18 +5056,23 @@ async function handleSendMessage(e) {
 let currentTimetableDay = 'all';
 let timetableViewTeacher = null;     // string: teacher name being viewed
 let timetableViewTeacherId = null;   // string: teacher ObjectId if available
+let timetableViewTeacherEmail = null;// string: teacher email being viewed
 let timetableReadOnly = false;       // true=no add/edit/delete buttons
 let timetableEditingSlotId = null;
 
-// Helper: match slot strictly to teacher name or id (no blank or partial string collisions!)
-function isSlotForTeacher(slot, teacherName, teacherId = null) {
+// Helper: match slot strictly to teacher email, name, or id (no blank or partial string collisions!)
+function isSlotForTeacher(slot, teacherName, teacherId = null, teacherEmail = null) {
   if (!slot) return false;
-  const target = (teacherName || '').trim().toLowerCase();
-  const slotTeacher = (slot.teacher || '').trim().toLowerCase();
-
+  const targetEmail = (teacherEmail || '').trim().toLowerCase();
+  const slotEmail = (slot.teacherEmail || '').trim().toLowerCase();
+  if (targetEmail && slotEmail) {
+    return targetEmail === slotEmail;
+  }
   if (teacherId && slot.teacherId && String(slot.teacherId) === String(teacherId)) {
     return true;
   }
+  const target = (teacherName || '').trim().toLowerCase();
+  const slotTeacher = (slot.teacher || '').trim().toLowerCase();
   if (target && slotTeacher && target === slotTeacher) {
     return true;
   }
@@ -4721,22 +5084,27 @@ async function openMyTimetable() {
   if (!currentUser) return;
   timetableViewTeacher = (currentUser.name || '').trim();
   timetableViewTeacherId = currentUser._id || currentUser.id || null;
+  timetableViewTeacherEmail = (currentUser.email || '').trim().toLowerCase();
   timetableReadOnly = false; // Always editable for the user's own profile!
   await openTimetableModal();
 }
 
 // Open timetable for a specific teacher (from Teachers tab)
 // USER DIRECTIVE:
+// "connecting time table to account names makineg naming conflicts ....so connect it to the email id of appropriate teacher"
 // "In teachers tab.... When click time of a teacher ....show that teacher time table only which he seted in his account from profile tab...."
 // "In teacher tab....Also gave admin to edit and delete and and slot to time table of every teacher....."
-async function openTeacherTimetable(teacherName, teacherId = null) {
+async function openTeacherTimetable(teacherName, teacherId = null, teacherEmail = null) {
   const isAdmin = currentUser && currentUser.role === 'admin';
+  const myEmail = (currentUser && currentUser.email ? currentUser.email : '').trim().toLowerCase();
+  const targetEmail = (teacherEmail || '').trim().toLowerCase();
   const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
   const targetTeacher = (teacherName || '').trim();
-  const isMe = myName && myName === targetTeacher.toLowerCase();
+  const isMe = (myEmail && targetEmail && myEmail === targetEmail) || (myName && myName === targetTeacher.toLowerCase());
 
   timetableViewTeacher = targetTeacher;
   timetableViewTeacherId = teacherId || null;
+  timetableViewTeacherEmail = targetEmail || null;
   // Editable for admin AND the teacher themselves!
   timetableReadOnly = !(isAdmin || isMe);
   await openTimetableModal();
@@ -4757,12 +5125,14 @@ async function openTimetableModal() {
   if (!timetableViewTeacher && currentUser) {
     timetableViewTeacher = (currentUser.name || '').trim();
     timetableViewTeacherId = currentUser._id || currentUser.id || null;
+    timetableViewTeacherEmail = (currentUser.email || '').trim().toLowerCase();
   }
 
   const isAdminTT = currentUser && currentUser.role === 'admin';
+  const myEmail = (currentUser && currentUser.email ? currentUser.email : '').trim().toLowerCase();
   const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
   const targetLower = (timetableViewTeacher || '').toLowerCase();
-  const isMe = myName && myName === targetLower;
+  const isMe = (myEmail && timetableViewTeacherEmail && myEmail === timetableViewTeacherEmail) || (myName && myName === targetLower);
 
   // Show/hide Add button:
   // Admin can add a slot to ANY teacher's timetable (or their own);
@@ -4787,7 +5157,7 @@ async function openTimetableModal() {
     if (isMe) {
       ttSubtitleEl.textContent = 'Your personal class schedule & timetable slots';
     } else if (timetableViewTeacher) {
-      ttSubtitleEl.textContent = `Class schedule assigned to ${timetableViewTeacher}`;
+      ttSubtitleEl.textContent = `Class schedule assigned to ${timetableViewTeacher}${timetableViewTeacherEmail ? ' (' + timetableViewTeacherEmail + ')' : ''}`;
     }
   }
 
@@ -4802,6 +5172,7 @@ function closeTimetableModal() {
   if (modal) modal.classList.add('hidden');
   timetableViewTeacher = null;
   timetableViewTeacherId = null;
+  timetableViewTeacherEmail = null;
   timetableReadOnly = false;
 }
 
@@ -4832,14 +5203,14 @@ async function renderTimetableSlots() {
 
   try {
     const dayParam = currentTimetableDay === 'all' ? '' : currentTimetableDay;
-    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam, timetableViewTeacher || '');
+    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam, timetableViewTeacher || '', timetableViewTeacherEmail || '');
     let slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
     // USER DIRECTIVE:
-    // "Not mix all time tables.."
-    // Strictly filter by teacher/account
-    if (timetableViewTeacher) {
-      slots = slots.filter(s => isSlotForTeacher(s, timetableViewTeacher, timetableViewTeacherId));
+    // "connecting time table to account names makineg naming conflicts ....so connect it to the email id of appropriate teacher"
+    // Strictly filter by teacher email / id / account
+    if (timetableViewTeacher || timetableViewTeacherEmail) {
+      slots = slots.filter(s => isSlotForTeacher(s, timetableViewTeacher, timetableViewTeacherId, timetableViewTeacherEmail));
     }
 
     if (slots.length === 0) {
@@ -4970,19 +5341,22 @@ async function openAddTimetableSlotModal(slotId = null) {
   // Target teacher / account
   const targetTeacherName = timetableViewTeacher || (currentUser && currentUser.name) || '';
   const targetTeacherId = timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '';
+  const targetTeacherEmail = timetableViewTeacherEmail || (currentUser && currentUser.email) || '';
 
   const teacherInput = document.getElementById('slot-input-teacher');
   const teacherIdInput = document.getElementById('slot-input-teacher-id');
+  const teacherEmailInput = document.getElementById('slot-input-teacher-email');
   const assigneeNameEl = document.getElementById('slot-assignee-name');
 
   if (teacherInput) teacherInput.value = targetTeacherName;
   if (teacherIdInput) teacherIdInput.value = targetTeacherId;
-  if (assigneeNameEl) assigneeNameEl.textContent = targetTeacherName;
+  if (teacherEmailInput) teacherEmailInput.value = targetTeacherEmail;
+  if (assigneeNameEl) assigneeNameEl.textContent = targetTeacherEmail ? `${targetTeacherName} (${targetTeacherEmail})` : targetTeacherName;
 
   // If editing, pre-fill values
   if (slotId) {
     try {
-      const res = await API.getTimetable('', '', '');
+      const res = await API.getTimetable('', '', '', '');
       const slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
       const slot = slots.find(s => String(s._id) === String(slotId));
       if (slot) {
@@ -4998,7 +5372,11 @@ async function openAddTimetableSlotModal(slotId = null) {
         if (subjectSelect) subjectSelect.value = slot.subject || '';
         if (teacherInput && slot.teacher) teacherInput.value = slot.teacher;
         if (teacherIdInput && slot.teacherId) teacherIdInput.value = slot.teacherId;
-        if (assigneeNameEl && slot.teacher) assigneeNameEl.textContent = slot.teacher;
+        const currentSlotEmail = slot.teacherEmail || targetTeacherEmail;
+        if (teacherEmailInput && currentSlotEmail) teacherEmailInput.value = currentSlotEmail;
+        if (assigneeNameEl) {
+          assigneeNameEl.textContent = currentSlotEmail ? `${slot.teacher || targetTeacherName} (${currentSlotEmail})` : (slot.teacher || targetTeacherName);
+        }
         const roomInput = document.getElementById('slot-input-room');
         if (roomInput) roomInput.value = slot.room || '';
       }
@@ -5023,6 +5401,7 @@ async function handleSaveTimetableSlot(e) {
   const slotId = (document.getElementById('slot-edit-id') || {}).value || timetableEditingSlotId;
   const teacherName = ((document.getElementById('slot-input-teacher') || {}).value || timetableViewTeacher || (currentUser && currentUser.name) || '').trim();
   const teacherIdVal = ((document.getElementById('slot-input-teacher-id') || {}).value || timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '').trim();
+  const teacherEmailVal = ((document.getElementById('slot-input-teacher-email') || {}).value || timetableViewTeacherEmail || (currentUser && currentUser.email) || '').trim().toLowerCase();
 
   const daysArr = selectedSlotDays.length > 0
     ? selectedSlotDays
@@ -5036,6 +5415,7 @@ async function handleSaveTimetableSlot(e) {
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
     teacher: teacherName,
     teacherId: teacherIdVal || null,
+    teacherEmail: teacherEmailVal,
     room: (document.getElementById('slot-input-room') || {}).value || '',
   };
 
@@ -5312,6 +5692,7 @@ function _generateTimetableSlotsHtml(slots) {
   const isAdminUser = currentUser && currentUser.role === 'admin';
   const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
   const myId = currentUser ? String(currentUser._id || currentUser.id || '') : '';
+  const myEmail = currentUser && currentUser.email ? currentUser.email.trim().toLowerCase() : '';
 
   const now = new Date();
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -5321,7 +5702,8 @@ function _generateTimetableSlotsHtml(slots) {
 
   return slots.map(slot => {
     const slotTeacher = (slot.teacher || '').trim().toLowerCase();
-    const isOwnSlot = (myName && slotTeacher === myName) || (myId && slot.teacherId && String(slot.teacherId) === myId);
+    const slotEmail = (slot.teacherEmail || '').trim().toLowerCase();
+    const isOwnSlot = (myEmail && slotEmail && slotEmail === myEmail) || (myName && slotTeacher === myName) || (myId && slot.teacherId && String(slot.teacherId) === myId);
 
     // USER DIRECTIVE:
     // "Also add edit, delete button to time table window in admin and all users..."

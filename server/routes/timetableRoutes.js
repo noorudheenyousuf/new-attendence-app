@@ -9,7 +9,7 @@ const { caseInsensitiveRegex } = require('../utils/caseHelper');
 // @desc    Get timetable slots, optionally filtered by class, day, teacher, or mine
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { class: className, day, teacher, teacherId, mine } = req.query;
+    const { class: className, day, teacher, teacherId, teacherEmail, email, mine } = req.query;
     const andConditions = [];
 
     if (className && className !== 'all') {
@@ -28,15 +28,21 @@ router.get('/', authMiddleware, async (req, res) => {
       });
     }
 
+    const targetEmail = (teacherEmail || email || '').trim().toLowerCase();
+
     if (mine === 'true') {
+      const myEmail = (req.user && req.user.email) ? req.user.email.trim().toLowerCase() : '';
       const myName = (req.user && req.user.name) ? req.user.name.trim() : '';
       const myId = req.user ? req.user._id : null;
       const orClauses = [];
+      if (myEmail) orClauses.push({ teacherEmail: myEmail });
       if (myId) orClauses.push({ teacherId: myId });
       if (myName) orClauses.push({ teacher: caseInsensitiveRegex(myName) });
       if (orClauses.length > 0) {
         andConditions.push({ $or: orClauses });
       }
+    } else if (targetEmail) {
+      andConditions.push({ teacherEmail: targetEmail });
     } else if (teacherId) {
       andConditions.push({ teacherId });
     } else if (teacher && teacher !== 'all') {
@@ -58,7 +64,7 @@ router.get('/', authMiddleware, async (req, res) => {
 // @desc    Create a timetable slot
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    let { day, days, timeSlot, class: className, subject, teacher, teacherId, room } = req.body;
+    let { day, days, timeSlot, class: className, subject, teacher, teacherId, teacherEmail, room } = req.body;
     if (Array.isArray(days) && days.length > 0) {
       if (!day) day = days.join(', ');
     } else if (day && (!days || days.length === 0)) {
@@ -68,23 +74,35 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Day, time slot, class, and subject are required' });
     }
 
-    // Determine teacher and teacherId
+    // Determine teacher, teacherId, and teacherEmail (connects via email to avoid naming conflicts)
     let finalTeacher = (teacher || '').trim();
     let finalTeacherId = teacherId || null;
+    let finalTeacherEmail = (teacherEmail || '').trim().toLowerCase();
 
-    if (!finalTeacher) {
-      finalTeacher = (req.user && req.user.name) ? req.user.name.trim() : '';
-      finalTeacherId = req.user ? req.user._id : null;
-    } else if (!finalTeacherId) {
-      if (req.user && req.user.name && req.user.name.trim().toLowerCase() === finalTeacher.toLowerCase()) {
-        finalTeacherId = req.user._id;
-      } else {
-        const foundTeacher = await User.findOne({ name: caseInsensitiveRegex(finalTeacher) }).select('_id name').lean();
-        if (foundTeacher) {
-          finalTeacherId = foundTeacher._id;
-          finalTeacher = foundTeacher.name;
-        }
+    if (finalTeacherEmail) {
+      const foundByEmail = await User.findOne({ email: finalTeacherEmail }).select('_id name email').lean();
+      if (foundByEmail) {
+        finalTeacherId = foundByEmail._id;
+        finalTeacher = foundByEmail.name;
+        finalTeacherEmail = foundByEmail.email;
       }
+    } else if (finalTeacherId) {
+      const foundById = await User.findById(finalTeacherId).select('_id name email').lean();
+      if (foundById) {
+        finalTeacher = foundById.name;
+        finalTeacherEmail = foundById.email || '';
+      }
+    } else if (finalTeacher) {
+      const foundTeacher = await User.findOne({ name: caseInsensitiveRegex(finalTeacher) }).select('_id name email').lean();
+      if (foundTeacher) {
+        finalTeacherId = foundTeacher._id;
+        finalTeacher = foundTeacher.name;
+        finalTeacherEmail = foundTeacher.email || '';
+      }
+    } else if (req.user) {
+      finalTeacher = (req.user.name || '').trim();
+      finalTeacherId = req.user._id || null;
+      finalTeacherEmail = (req.user.email || '').trim().toLowerCase();
     }
 
     const lastSlot = await Timetable.findOne().sort({ order: -1 }).select('order').lean();
@@ -98,6 +116,7 @@ router.post('/', authMiddleware, async (req, res) => {
       subject: subject.trim(),
       teacher: finalTeacher,
       teacherId: finalTeacherId,
+      teacherEmail: finalTeacherEmail,
       createdBy: req.user ? req.user._id : null,
       room: (room || '').trim(),
       order: nextOrder
@@ -142,15 +161,17 @@ router.put('/:id', authMiddleware, async (req, res) => {
     // Permission check: Admin can update any slot; non-admin can only update their own
     const isAdmin = req.user && req.user.role === 'admin';
     const myName = (req.user && req.user.name) ? req.user.name.trim().toLowerCase() : '';
+    const myEmail = (req.user && req.user.email) ? req.user.email.trim().toLowerCase() : '';
     const myId = req.user ? String(req.user._id) : '';
-    const isOwner = (myId && slot.teacherId && String(slot.teacherId) === myId) ||
+    const isOwner = (myEmail && slot.teacherEmail && slot.teacherEmail.trim().toLowerCase() === myEmail) ||
+                    (myId && slot.teacherId && String(slot.teacherId) === myId) ||
                     (myName && slot.teacher && slot.teacher.trim().toLowerCase() === myName);
 
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ success: false, message: 'Not authorized to edit this timetable slot' });
     }
 
-    let { day, days, timeSlot, class: className, subject, teacher, teacherId, room } = req.body;
+    let { day, days, timeSlot, class: className, subject, teacher, teacherId, teacherEmail, room } = req.body;
     if (Array.isArray(days) && days.length > 0) {
       if (!day) day = days.join(', ');
     } else if (day && (!days || days.length === 0)) {
@@ -165,15 +186,26 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (room !== undefined) slot.room = room.trim();
 
     // Teacher assignment
-    if (teacher !== undefined) {
+    if (teacherEmail !== undefined) {
+      slot.teacherEmail = (teacherEmail || '').trim().toLowerCase();
+      if (slot.teacherEmail) {
+        const found = await User.findOne({ email: slot.teacherEmail }).select('_id name email').lean();
+        if (found) {
+          slot.teacherId = found._id;
+          slot.teacher = found.name;
+        }
+      }
+    }
+    if (teacher !== undefined && !slot.teacherEmail) {
       slot.teacher = teacher.trim();
       if (teacherId) {
         slot.teacherId = teacherId;
       } else if (slot.teacher) {
-        const foundTeacher = await User.findOne({ name: caseInsensitiveRegex(slot.teacher) }).select('_id name').lean();
+        const foundTeacher = await User.findOne({ name: caseInsensitiveRegex(slot.teacher) }).select('_id name email').lean();
         if (foundTeacher) {
           slot.teacherId = foundTeacher._id;
           slot.teacher = foundTeacher.name;
+          slot.teacherEmail = foundTeacher.email || '';
         }
       }
     }
@@ -197,8 +229,10 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     // Permission check: Admin can delete any slot; non-admin can only delete their own
     const isAdmin = req.user && req.user.role === 'admin';
     const myName = (req.user && req.user.name) ? req.user.name.trim().toLowerCase() : '';
+    const myEmail = (req.user && req.user.email) ? req.user.email.trim().toLowerCase() : '';
     const myId = req.user ? String(req.user._id) : '';
-    const isOwner = (myId && slot.teacherId && String(slot.teacherId) === myId) ||
+    const isOwner = (myEmail && slot.teacherEmail && slot.teacherEmail.trim().toLowerCase() === myEmail) ||
+                    (myId && slot.teacherId && String(slot.teacherId) === myId) ||
                     (myName && slot.teacher && slot.teacher.trim().toLowerCase() === myName);
 
     if (!isAdmin && !isOwner) {

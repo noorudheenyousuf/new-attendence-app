@@ -28,6 +28,27 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve static frontend files and uploaded media
 app.use('/uploads', express.static(uploadsDir));
 
+// Serve dynamic PWA and Device Icons (for mobile homescreens, desktop PWAs, and favicons)
+app.get(['/manifest-icon-192.png', '/manifest-icon-512.png', '/api/app-icon', '/favicon.ico'], async (req, res) => {
+  try {
+    const AppSettings = require('./models/AppSettings');
+    const settings = await AppSettings.findOne();
+    if (settings && settings.appLogo) {
+      const logo = settings.appLogo.trim();
+      if (logo.startsWith('/uploads/')) {
+        const localPath = path.join(__dirname, '..', 'public', logo);
+        if (fs.existsSync(localPath)) {
+          res.setHeader('Cache-Control', 'public, max-age=60');
+          return res.sendFile(localPath);
+        }
+      } else if (logo.startsWith('http://') || logo.startsWith('https://')) {
+        return res.redirect(logo);
+      }
+    }
+  } catch (err) {}
+  res.sendFile(path.join(__dirname, '../public/icons/icon-192.png'));
+});
+
 // Dynamic Web App Manifest reflecting custom App Name & App Logo for devices
 app.get('/manifest.json', async (req, res) => {
   try {
@@ -43,24 +64,38 @@ app.get('/manifest.json', async (req, res) => {
         manifestData.name = settings.appName;
         manifestData.short_name = settings.appName;
       }
-      if (settings.appLogo) {
-        manifestData.icons = [
-          {
-            src: settings.appLogo,
-            sizes: "192x192",
-            type: "image/png",
-            purpose: "any maskable"
-          },
-          {
-            src: settings.appLogo,
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "any maskable"
-          }
-        ];
-      }
+      const iconUrl = settings.appLogo ? settings.appLogo : '/icons/icon-192.png';
+      const iconExt = path.extname(iconUrl.split('?')[0]).toLowerCase();
+      const mime = iconExt === '.png' ? 'image/png' : (iconExt === '.webp' ? 'image/webp' : (iconExt === '.svg' ? 'image/svg+xml' : 'image/jpeg'));
+      manifestData.icons = [
+        {
+          src: iconUrl,
+          sizes: "192x192",
+          type: mime,
+          purpose: "any"
+        },
+        {
+          src: iconUrl,
+          sizes: "512x512",
+          type: mime,
+          purpose: "any"
+        },
+        {
+          src: iconUrl,
+          sizes: "192x192",
+          type: mime,
+          purpose: "maskable"
+        },
+        {
+          src: iconUrl,
+          sizes: "512x512",
+          type: mime,
+          purpose: "maskable"
+        }
+      ];
     }
-    res.setHeader('Content-Type', 'application/manifest+json');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
     res.json(manifestData);
   } catch (err) {
     res.sendFile(path.join(__dirname, '../public/manifest.json'));

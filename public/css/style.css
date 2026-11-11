@@ -139,6 +139,15 @@ body.dark-mode #auth-modal input {
   cursor: grabbing;
 }
 
+/* Card held / activated ready to drag after long press */
+.drag-item.drag-activated {
+  transform: scale(1.02) !important;
+  box-shadow: 0 8px 24px -4px rgba(36, 91, 112, 0.35) !important;
+  border-color: #245b70 !important;
+  cursor: grabbing !important;
+  z-index: 30;
+}
+
 /* While dragging effect */
 .drag-item.dragging {
   opacity: 0.45 !important;
