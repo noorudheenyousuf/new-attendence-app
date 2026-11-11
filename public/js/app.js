@@ -623,42 +623,78 @@ function populateClassDropdowns() {
 
 // Drag & Drop Sorting for Classes
 let draggedClassIndex = null;
+let touchDraggedClassIndex = null;
+let touchClassElement = null;
+let recentlyPlacedClassId = null;
 
 function handleClassDragStart(e, index) {
   draggedClassIndex = index;
   e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(index));
+  try {
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'class', index }));
+  } catch (_) {}
   e.currentTarget.classList.add('dragging');
+  triggerNavHaptic('light');
 }
 
 function handleClassDragOver(e, index) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   const item = e.currentTarget;
-  if (!item.classList.contains('drag-over')) {
+  if (!item.classList.contains('drag-over') && draggedClassIndex !== index) {
     item.classList.add('drag-over');
   }
 }
 
 function handleClassDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
+  const item = e.currentTarget;
+  if (!item.contains(e.relatedTarget)) {
+    item.classList.remove('drag-over');
+  }
 }
 
 function handleClassDragEnd(e) {
-  e.currentTarget.classList.remove('dragging');
-  document.querySelectorAll('#class-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+  draggedClassIndex = null;
+  document.querySelectorAll('#class-cards-container .drag-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
 }
 
 async function handleClassDrop(e, targetIndex) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
-  if (draggedClassIndex === null || draggedClassIndex === targetIndex) return;
 
-  const movedClass = classesList.splice(draggedClassIndex, 1)[0];
+  let sourceIndex = draggedClassIndex;
+  if (sourceIndex === null) {
+    const rawData = e.dataTransfer ? e.dataTransfer.getData('text/plain') : null;
+    if (rawData !== null && rawData !== '') {
+      sourceIndex = parseInt(rawData, 10);
+    }
+  }
+
+  handleClassDragEnd(e);
+
+  if (sourceIndex === null || isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+
+  const movedClass = classesList.splice(sourceIndex, 1)[0];
+  if (!movedClass) return;
   classesList.splice(targetIndex, 0, movedClass);
-  draggedClassIndex = null;
+
+  recentlyPlacedClassId = movedClass._id;
+  triggerNavHaptic('medium');
 
   renderClassesList();
   populateClassDropdowns();
+
+  setTimeout(() => {
+    if (recentlyPlacedClassId === movedClass._id) {
+      recentlyPlacedClassId = null;
+      document.querySelectorAll('#class-cards-container .drag-item-placed').forEach(el => {
+        el.classList.remove('drag-item-placed');
+      });
+    }
+  }, 600);
 
   try {
     const orderedIds = classesList.map(c => c._id);
@@ -666,6 +702,86 @@ async function handleClassDrop(e, targetIndex) {
     showToast('Class order updated!');
   } catch (err) {
     console.error('[Reorder Classes Error]', err);
+  }
+}
+
+function handleClassContainerDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function handleClassContainerDrop(e) {
+  if (e.target.closest('.drag-item')) return;
+  e.preventDefault();
+  if (draggedClassIndex === null) return;
+  handleClassDrop(e, Math.max(0, classesList.length - 1));
+}
+
+// Touch Support for Classes on Mobile & Tablets
+function handleClassTouchStart(e, index) {
+  if (e.target.closest('button')) return;
+  touchDraggedClassIndex = index;
+  touchClassElement = e.currentTarget;
+  touchClassElement.classList.add('dragging');
+  triggerNavHaptic('light');
+}
+
+function handleClassTouchMove(e) {
+  if (touchDraggedClassIndex === null) return;
+  const touch = e.touches[0];
+  const target = document.elementFromPoint(touch.clientX, touch.clientY);
+  const card = target ? target.closest('#class-cards-container .drag-item') : null;
+
+  document.querySelectorAll('#class-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+  if (card && card !== touchClassElement) {
+    card.classList.add('drag-over');
+  }
+}
+
+async function handleClassTouchEnd(e) {
+  if (touchDraggedClassIndex === null) return;
+  const touch = e.changedTouches[0];
+  const target = document.elementFromPoint(touch.clientX, touch.clientY);
+  const card = target ? target.closest('#class-cards-container .drag-item') : null;
+
+  const sourceIndex = touchDraggedClassIndex;
+  touchDraggedClassIndex = null;
+  touchClassElement = null;
+
+  document.querySelectorAll('#class-cards-container .drag-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
+
+  if (card) {
+    const targetIdx = parseInt(card.getAttribute('data-index'), 10);
+    if (!isNaN(targetIdx) && targetIdx !== sourceIndex) {
+      const movedClass = classesList.splice(sourceIndex, 1)[0];
+      if (!movedClass) return;
+      classesList.splice(targetIdx, 0, movedClass);
+
+      recentlyPlacedClassId = movedClass._id;
+      triggerNavHaptic('strong');
+
+      renderClassesList();
+      populateClassDropdowns();
+
+      setTimeout(() => {
+        if (recentlyPlacedClassId === movedClass._id) {
+          recentlyPlacedClassId = null;
+          document.querySelectorAll('#class-cards-container .drag-item-placed').forEach(el => {
+            el.classList.remove('drag-item-placed');
+          });
+        }
+      }, 600);
+
+      try {
+        const orderedIds = classesList.map(c => c._id);
+        await API.reorderClasses(orderedIds);
+        showToast('Class order updated!');
+      } catch (err) {
+        console.error('[Reorder Classes Error]', err);
+      }
+    }
   }
 }
 
@@ -679,6 +795,9 @@ function renderClassesList() {
   }
 
   container.innerHTML = classesList.map((c, index) => {
+    const isPlaced = recentlyPlacedClassId && String(recentlyPlacedClassId) === String(c._id);
+    const placedClass = isPlaced ? ' drag-item-placed' : '';
+
     const subjectPills = (c.assignedSubjects && c.assignedSubjects.length > 0)
       ? c.assignedSubjects.map(sub => `<span class="subject-chip" title="${escapeHtml(sub)}"><span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-teal-400 flex-shrink-0"></span><span>${escapeHtml(sub)}</span></span>`).join('')
       : `<span class="text-xs text-[var(--text-sub)] italic">No subjects assigned</span>`;
@@ -694,25 +813,30 @@ function renderClassesList() {
       </div>` : '';
 
     return `
-    <div class="drag-item rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+    <div class="drag-item rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden hover:shadow-md transition-all${placedClass}"
+         data-index="${index}"
+         data-id="${c._id}"
          draggable="true"
          ondragstart="handleClassDragStart(event, ${index})"
          ondragover="handleClassDragOver(event, ${index})"
          ondragleave="handleClassDragLeave(event)"
          ondragend="handleClassDragEnd(event)"
-         ondrop="handleClassDrop(event, ${index})">
+         ondrop="handleClassDrop(event, ${index})"
+         ontouchstart="handleClassTouchStart(event, ${index})"
+         ontouchmove="handleClassTouchMove(event)"
+         ontouchend="handleClassTouchEnd(event)">
       <div class="custom-gradient-header px-3.5 py-3 flex items-center gap-2.5">
-        <div class="text-white/50 hover:text-white cursor-grab active:cursor-grabbing flex-shrink-0" title="Drag to reorder">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        <div class="drag-handle text-white/60 hover:text-white flex-shrink-0" title="Drag to reorder">
+          <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
         </div>
         <div class="min-w-0 flex-1">
-          <h3 class="font-black text-white text-sm leading-tight truncate">${escapeHtml(c.name)}</h3>
-          <p class="text-white/70 text-[11px] font-semibold truncate mt-0.5">Class Teacher: <span class="text-white/90">${escapeHtml(c.classTeacher || 'Not assigned')}</span></p>
+          <h3 class="font-black text-white text-sm leading-tight truncate select-none">${escapeHtml(c.name)}</h3>
+          <p class="text-white/70 text-[11px] font-semibold truncate mt-0.5 select-none">Class Teacher: <span class="text-white/90">${escapeHtml(c.classTeacher || 'Not assigned')}</span></p>
         </div>
         ${actionBtns}
       </div>
       <div class="bg-[var(--card-bg)] px-3.5 py-2.5">
-        <p class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Assigned Subjects</p>
+        <p class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider mb-1.5 select-none">Assigned Subjects</p>
         <div class="flex flex-wrap gap-1.5">${subjectPills}</div>
       </div>
     </div>`;
@@ -924,42 +1048,78 @@ function populateSubjectDropdowns() {
 
 // Drag & Drop Sorting for Subjects
 let draggedSubjectIndex = null;
+let touchDraggedSubjectIndex = null;
+let touchSubjectElement = null;
+let recentlyPlacedSubjectId = null;
 
 function handleSubjectDragStart(e, index) {
   draggedSubjectIndex = index;
   e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(index));
+  try {
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'subject', index }));
+  } catch (_) {}
   e.currentTarget.classList.add('dragging');
+  triggerNavHaptic('light');
 }
 
 function handleSubjectDragOver(e, index) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   const item = e.currentTarget;
-  if (!item.classList.contains('drag-over')) {
+  if (!item.classList.contains('drag-over') && draggedSubjectIndex !== index) {
     item.classList.add('drag-over');
   }
 }
 
 function handleSubjectDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
+  const item = e.currentTarget;
+  if (!item.contains(e.relatedTarget)) {
+    item.classList.remove('drag-over');
+  }
 }
 
 function handleSubjectDragEnd(e) {
-  e.currentTarget.classList.remove('dragging');
-  document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+  draggedSubjectIndex = null;
+  document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
 }
 
 async function handleSubjectDrop(e, targetIndex) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
-  if (draggedSubjectIndex === null || draggedSubjectIndex === targetIndex) return;
 
-  const movedSubject = subjectsList.splice(draggedSubjectIndex, 1)[0];
+  let sourceIndex = draggedSubjectIndex;
+  if (sourceIndex === null) {
+    const rawData = e.dataTransfer ? e.dataTransfer.getData('text/plain') : null;
+    if (rawData !== null && rawData !== '') {
+      sourceIndex = parseInt(rawData, 10);
+    }
+  }
+
+  handleSubjectDragEnd(e);
+
+  if (sourceIndex === null || isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+
+  const movedSubject = subjectsList.splice(sourceIndex, 1)[0];
+  if (!movedSubject) return;
   subjectsList.splice(targetIndex, 0, movedSubject);
-  draggedSubjectIndex = null;
+
+  recentlyPlacedSubjectId = movedSubject._id;
+  triggerNavHaptic('medium');
 
   renderSubjectsList();
   populateSubjectDropdowns();
+
+  setTimeout(() => {
+    if (recentlyPlacedSubjectId === movedSubject._id) {
+      recentlyPlacedSubjectId = null;
+      document.querySelectorAll('#subject-cards-container .drag-item-placed').forEach(el => {
+        el.classList.remove('drag-item-placed');
+      });
+    }
+  }, 600);
 
   try {
     const orderedIds = subjectsList.map(s => s._id);
@@ -967,6 +1127,86 @@ async function handleSubjectDrop(e, targetIndex) {
     showToast('Subject order updated!');
   } catch (err) {
     console.error('[Reorder Subjects Error]', err);
+  }
+}
+
+function handleSubjectContainerDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function handleSubjectContainerDrop(e) {
+  if (e.target.closest('.drag-item')) return;
+  e.preventDefault();
+  if (draggedSubjectIndex === null) return;
+  handleSubjectDrop(e, Math.max(0, subjectsList.length - 1));
+}
+
+// Touch Support for Subjects on Mobile & Tablets
+function handleSubjectTouchStart(e, index) {
+  if (e.target.closest('button')) return;
+  touchDraggedSubjectIndex = index;
+  touchSubjectElement = e.currentTarget;
+  touchSubjectElement.classList.add('dragging');
+  triggerNavHaptic('light');
+}
+
+function handleSubjectTouchMove(e) {
+  if (touchDraggedSubjectIndex === null) return;
+  const touch = e.touches[0];
+  const target = document.elementFromPoint(touch.clientX, touch.clientY);
+  const card = target ? target.closest('#subject-cards-container .drag-item') : null;
+
+  document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+  if (card && card !== touchSubjectElement) {
+    card.classList.add('drag-over');
+  }
+}
+
+async function handleSubjectTouchEnd(e) {
+  if (touchDraggedSubjectIndex === null) return;
+  const touch = e.changedTouches[0];
+  const target = document.elementFromPoint(touch.clientX, touch.clientY);
+  const card = target ? target.closest('#subject-cards-container .drag-item') : null;
+
+  const sourceIndex = touchDraggedSubjectIndex;
+  touchDraggedSubjectIndex = null;
+  touchSubjectElement = null;
+
+  document.querySelectorAll('#subject-cards-container .drag-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
+
+  if (card) {
+    const targetIdx = parseInt(card.getAttribute('data-index'), 10);
+    if (!isNaN(targetIdx) && targetIdx !== sourceIndex) {
+      const movedSubject = subjectsList.splice(sourceIndex, 1)[0];
+      if (!movedSubject) return;
+      subjectsList.splice(targetIdx, 0, movedSubject);
+
+      recentlyPlacedSubjectId = movedSubject._id;
+      triggerNavHaptic('strong');
+
+      renderSubjectsList();
+      populateSubjectDropdowns();
+
+      setTimeout(() => {
+        if (recentlyPlacedSubjectId === movedSubject._id) {
+          recentlyPlacedSubjectId = null;
+          document.querySelectorAll('#subject-cards-container .drag-item-placed').forEach(el => {
+            el.classList.remove('drag-item-placed');
+          });
+        }
+      }, 600);
+
+      try {
+        const orderedIds = subjectsList.map(s => s._id);
+        await API.reorderSubjects(orderedIds);
+        showToast('Subject order updated!');
+      } catch (err) {
+        console.error('[Reorder Subjects Error]', err);
+      }
+    }
   }
 }
 
@@ -979,18 +1219,27 @@ function renderSubjectsList() {
     return;
   }
 
-  container.innerHTML = subjectsList.map((s, index) => `
-    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between"
+  container.innerHTML = subjectsList.map((s, index) => {
+    const isPlaced = recentlyPlacedSubjectId && String(recentlyPlacedSubjectId) === String(s._id);
+    const placedClass = isPlaced ? ' drag-item-placed' : '';
+
+    return `
+    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between transition-all${placedClass}"
+         data-index="${index}"
+         data-id="${s._id}"
          draggable="true"
          ondragstart="handleSubjectDragStart(event, ${index})"
          ondragover="handleSubjectDragOver(event, ${index})"
          ondragleave="handleSubjectDragLeave(event)"
          ondragend="handleSubjectDragEnd(event)"
-         ondrop="handleSubjectDrop(event, ${index})">
+         ondrop="handleSubjectDrop(event, ${index})"
+         ontouchstart="handleSubjectTouchStart(event, ${index})"
+         ontouchmove="handleSubjectTouchMove(event)"
+         ontouchend="handleSubjectTouchEnd(event)">
       <div class="flex items-center gap-3">
         <!-- Drag Handle Icon -->
-        <div class="text-[var(--text-sub)] hover:text-[#245b70] cursor-grab active:cursor-grabbing p-1" title="Drag to reorder subject">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+        <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] p-1 flex-shrink-0" title="Drag to reorder subject">
+          <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
             <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
             <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
@@ -998,24 +1247,25 @@ function renderSubjectsList() {
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h3 class="font-bold text-[var(--text-main)] text-sm">${s.name}</h3>
-            <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70]">${s.subjectCode}</span>
+            <h3 class="font-bold text-[var(--text-main)] text-sm select-none">${escapeHtml(s.name)}</h3>
+            <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70] select-none">${escapeHtml(s.subjectCode)}</span>
           </div>
-          ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5">Teacher: ${s.teacher}</p>` : ''}
+          ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5 select-none">Teacher: ${escapeHtml(s.teacher)}</p>` : ''}
         </div>
       </div>
       ${canUserEditDelete() ? `
       <div class="flex items-center gap-1.5 flex-shrink-0">
-        <button onclick="openEditSubjectModal('${s._id}', '${s.name}', '${s.subjectCode}', '${s.teacher || ''}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
+        <button onclick="openEditSubjectModal('${s._id}', '${escapeQuotes(s.name)}', '${escapeQuotes(s.subjectCode)}', '${escapeQuotes(s.teacher || '')}')" title="Edit Subject" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteSubject('${s._id}', '${s.name.replace(/'/g, "\\'")}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
+        <button onclick="deleteSubject('${s._id}', '${escapeQuotes(s.name)}')" title="Delete Subject" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
       ` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // Checkbox helper for Class assigned subjects

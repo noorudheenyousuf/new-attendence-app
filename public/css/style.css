@@ -124,23 +124,67 @@ body.dark-mode #auth-modal input {
   border-color: #334155 !important;
 }
 
-/* Drag and drop sorting styles */
+/* Drag and drop sorting styles & animations */
 .drag-item {
   cursor: grab;
   user-select: none;
-  transition: transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), 
+              box-shadow 0.2s ease, 
+              opacity 0.2s ease, 
+              border-color 0.2s ease;
 }
 .drag-item:active {
   cursor: grabbing;
 }
+
+/* While dragging effect */
 .drag-item.dragging {
-  opacity: 0.4;
-  transform: scale(0.98);
+  opacity: 0.45 !important;
+  transform: scale(0.97) rotate(-0.5deg) !important;
   border: 2px dashed #245b70 !important;
+  box-shadow: 0 10px 25px -5px rgba(36, 91, 112, 0.25) !important;
 }
+
+/* Hovering over target element */
 .drag-item.drag-over {
+  border-color: #245b70 !important;
   border-top: 3px solid #245b70 !important;
-  transform: translateY(2px);
+  box-shadow: 0 4px 16px -2px rgba(36, 91, 112, 0.2) !important;
+  transform: translateY(3px) scale(1.01) !important;
+}
+
+/* Placing / drop animation effect */
+@keyframes dropPlacedBounce {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 4px rgba(36, 91, 112, 0.35);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 2px rgba(36, 91, 112, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+.drag-item-placed {
+  animation: dropPlacedBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.drag-handle svg,
+.drag-handle circle {
+  pointer-events: none;
 }
 
 input::placeholder, textarea::placeholder {
