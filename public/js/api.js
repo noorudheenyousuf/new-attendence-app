@@ -237,9 +237,15 @@ const API = {
   },
 
   async updateAdminSettings(appName, schoolName, extra = {}) {
+    let payload = {};
+    if (typeof appName === 'object' && appName !== null) {
+      payload = appName;
+    } else {
+      payload = { appName, schoolName, ...extra };
+    }
     return this.request('/admin/settings', {
       method: 'PUT',
-      body: JSON.stringify({ appName, schoolName, ...extra })
+      body: JSON.stringify(payload)
     });
   },
 

@@ -11,6 +11,11 @@ const appSettingsSchema = new mongoose.Schema({
     default: '',
     trim: true
   },
+  appLogo: {
+    type: String,
+    default: '',
+    trim: true
+  },
   allowNonAdminEditDelete: {
     type: Boolean,
     default: false

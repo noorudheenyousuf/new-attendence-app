@@ -36,16 +36,17 @@ router.use(authMiddleware);
 router.use(adminMiddleware);
 
 // @route   PUT /api/admin/settings
-// @desc    Update App Name & School Name & Permissions
+// @desc    Update App Name & School Name & Permissions & App Logo
 router.put('/settings', async (req, res) => {
   try {
-    const { appName, schoolName, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint, studentFormFields } = req.body;
+    const { appName, schoolName, appLogo, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint, studentFormFields } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings();
     }
     if (appName !== undefined) settings.appName = (appName || '').trim();
     if (schoolName !== undefined) settings.schoolName = (schoolName || '').trim();
+    if (appLogo !== undefined) settings.appLogo = (appLogo || '').trim();
     if (allowNonAdminEditDelete !== undefined) settings.allowNonAdminEditDelete = Boolean(allowNonAdminEditDelete);
     if (showTeachersTabToAll !== undefined) settings.showTeachersTabToAll = Boolean(showTeachersTabToAll);
     if (allowStudentDetailsPrint !== undefined) settings.allowStudentDetailsPrint = Boolean(allowStudentDetailsPrint);
@@ -55,7 +56,7 @@ router.put('/settings', async (req, res) => {
 
     await ActivityLog.create({
       action: 'App & School Settings Updated',
-      details: `App Name: ${settings.appName} • School Name: ${settings.schoolName} • Edit/Delete: ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'} • Student Print: ${settings.allowStudentDetailsPrint ? 'Enabled' : 'Disabled'}`,
+      details: `App Name: ${settings.appName} • School Name: ${settings.schoolName} • App Logo: ${settings.appLogo ? 'Custom Photo' : 'Default'} • Edit/Delete: ${settings.allowNonAdminEditDelete ? 'Enabled' : 'Disabled'} • Student Print: ${settings.allowStudentDetailsPrint ? 'Enabled' : 'Disabled'}`,
       performedBy: req.user.name,
       role: 'admin',
       entityType: 'settings',
@@ -363,6 +364,7 @@ router.post('/reset-app', async (req, res) => {
     if (settings) {
       settings.appName = 'REGISTERLY';
       settings.schoolName = '';
+      settings.appLogo = '';
       settings.allowNonAdminEditDelete = false;
       settings.showTeachersTabToAll = true;
       settings.allowStudentDetailsPrint = true;

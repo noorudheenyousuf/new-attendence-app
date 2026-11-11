@@ -27,6 +27,46 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static frontend files and uploaded media
 app.use('/uploads', express.static(uploadsDir));
+
+// Dynamic Web App Manifest reflecting custom App Name & App Logo for devices
+app.get('/manifest.json', async (req, res) => {
+  try {
+    const AppSettings = require('./models/AppSettings');
+    const settings = await AppSettings.findOne();
+    const manifestPath = path.join(__dirname, '../public/manifest.json');
+    let manifestData = {};
+    if (fs.existsSync(manifestPath)) {
+      manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    }
+    if (settings) {
+      if (settings.appName) {
+        manifestData.name = settings.appName;
+        manifestData.short_name = settings.appName;
+      }
+      if (settings.appLogo) {
+        manifestData.icons = [
+          {
+            src: settings.appLogo,
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any maskable"
+          },
+          {
+            src: settings.appLogo,
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable"
+          }
+        ];
+      }
+    }
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.json(manifestData);
+  } catch (err) {
+    res.sendFile(path.join(__dirname, '../public/manifest.json'));
+  }
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 // API Routes

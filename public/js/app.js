@@ -399,24 +399,75 @@ function toggleDarkMode() {
   renderGoogleButton();
 }
 
-// ================= APP SETTINGS (App Name & School Name) =================
-function updateHeaderBranding(appName, schoolName) {
+// ================= APP SETTINGS (App Name & School Name & App Logo) =================
+function updateAdminLogoPreview(logoUrl, letter = 'R') {
+  const box = document.getElementById('admin-logo-preview-box');
+  const resetBtn = document.getElementById('btn-admin-reset-logo');
+  if (!box) return;
+
+  if (logoUrl && logoUrl.trim()) {
+    box.innerHTML = `<img src="${escapeHtml(logoUrl)}" class="w-full h-full object-cover rounded-2xl" alt="App Icon">`;
+    if (resetBtn) resetBtn.classList.remove('hidden');
+  } else {
+    box.innerHTML = `<span id="admin-logo-preview-letter" class="text-[#245b70] dark:text-teal-400 font-black text-2xl">${escapeHtml(letter || 'R')}</span>`;
+    if (resetBtn) resetBtn.classList.add('hidden');
+  }
+}
+
+function updateHeaderBranding(appName, schoolName, appLogo) {
   const appEl = document.getElementById('header-app-name');
   const schoolEl = document.getElementById('school-name-display');
   const rawApp = (appName !== undefined && appName !== null ? String(appName) : '').trim();
   const rawSchool = (schoolName !== undefined && schoolName !== null ? String(schoolName) : '').trim();
+  const rawLogo = (appLogo !== undefined && appLogo !== null ? String(appLogo) : (appSettings && appSettings.appLogo ? appSettings.appLogo : '')).trim();
 
-  // Keep localStorage and splash branding in sync with admin update
+  const firstLetter = (rawApp ? rawApp.trim()[0] : 'R').toUpperCase();
+
+  // 1. Keep localStorage cached for instantaneous launch display
   try {
     localStorage.setItem('registerly_app_name', rawApp || 'REGISTERLY');
-    const splashName = document.getElementById('splash-app-name');
-    const splashLetter = document.getElementById('splash-icon-letter');
-    const brandIcon = document.getElementById('header-brand-icon');
-    const firstLetter = (rawApp ? rawApp.trim()[0] : 'R').toUpperCase();
-    if (splashName) splashName.textContent = rawApp || 'REGISTERLY';
-    if (splashLetter) splashLetter.textContent = firstLetter;
-    if (brandIcon) brandIcon.textContent = firstLetter;
+    if (rawLogo) {
+      localStorage.setItem('registerly_app_logo', rawLogo);
+    } else {
+      localStorage.removeItem('registerly_app_logo');
+    }
   } catch (e) {}
+
+  // 2. Place 1: Top-Left Header Brand Icon
+  const brandIcon = document.getElementById('header-brand-icon');
+  if (brandIcon) {
+    if (rawLogo) {
+      brandIcon.innerHTML = `<img src="${escapeHtml(rawLogo)}" class="w-full h-full object-cover rounded-2xl" alt="App Logo">`;
+      brandIcon.className = "w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white font-black text-xl shadow-inner flex-shrink-0 overflow-hidden";
+    } else {
+      brandIcon.innerHTML = escapeHtml(firstLetter);
+      brandIcon.className = "w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white font-black text-xl shadow-inner flex-shrink-0 overflow-hidden";
+    }
+  }
+
+  // 3. Place 2: Opening App Launch Animation (Splash Screen)
+  const splashName = document.getElementById('splash-app-name');
+  const splashLetter = document.getElementById('splash-icon-letter');
+  if (splashName) splashName.textContent = rawApp || 'REGISTERLY';
+  if (splashLetter) {
+    if (rawLogo) {
+      splashLetter.innerHTML = `<img src="${escapeHtml(rawLogo)}" class="w-full h-full object-cover rounded-2xl" alt="App Logo">`;
+      splashLetter.className = "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg splash-icon-pulse overflow-hidden bg-[var(--card-bg)] border border-[var(--border-color)]";
+    } else {
+      splashLetter.innerHTML = escapeHtml(firstLetter);
+      splashLetter.className = "w-14 h-14 rounded-2xl custom-gradient-header flex items-center justify-center text-white font-black text-2xl shadow-lg splash-icon-pulse overflow-hidden";
+    }
+  }
+
+  // 4. Place 3: Mobile & Devices App Icon (Favicon & Apple Touch Icon)
+  const favIcon = document.getElementById('dynamic-favicon');
+  const appleIcon = document.getElementById('dynamic-apple-icon');
+  const effectiveIconUrl = rawLogo || '/icons/icon-192.png';
+  if (favIcon) favIcon.href = effectiveIconUrl;
+  if (appleIcon) appleIcon.href = effectiveIconUrl;
+
+  // 5. Update Admin Panel preview if open
+  updateAdminLogoPreview(rawLogo, firstLetter);
 
   if (!rawApp && !rawSchool) {
     if (appEl) {
@@ -461,6 +512,83 @@ function updateHeaderBranding(appName, schoolName) {
   }
 }
 
+// Admin App Logo Select & Upload Handler
+async function handleAdminAppLogoSelect(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    showToast('Please select a valid image file (PNG, JPG, WebP)', true);
+    e.target.value = '';
+    return;
+  }
+
+  if (file.size > 15 * 1024 * 1024) {
+    showToast('Image file size must be less than 15MB', true);
+    e.target.value = '';
+    return;
+  }
+
+  const spinner = document.getElementById('admin-logo-upload-spinner');
+  if (spinner) spinner.classList.remove('hidden');
+
+  try {
+    const uploadRes = await API.uploadPhoto(file, 'branding');
+    if (!uploadRes.success || !uploadRes.url) {
+      throw new Error(uploadRes.message || 'Failed to upload photo');
+    }
+
+    const newLogoUrl = uploadRes.url;
+    const saveRes = await API.updateAdminSettings({ appLogo: newLogoUrl });
+    if (!saveRes.success) {
+      throw new Error(saveRes.message || 'Failed to save app logo');
+    }
+
+    if (appSettings) {
+      appSettings.appLogo = newLogoUrl;
+    } else {
+      appSettings = saveRes.data || { appLogo: newLogoUrl };
+    }
+
+    updateHeaderBranding(appSettings.appName, appSettings.schoolName, newLogoUrl);
+    showToast('App icon and photo updated across devices, header & splash!');
+  } catch (err) {
+    console.error('[Admin Logo Upload Error]', err);
+    showToast('Error uploading photo: ' + (err.message || 'Upload failed'), true);
+  } finally {
+    if (spinner) spinner.classList.add('hidden');
+    e.target.value = '';
+  }
+}
+
+// Admin Reset App Logo to Default Handler
+async function handleAdminResetAppLogo() {
+  if (!confirm('Reset app icon and photo to the default icon?')) return;
+
+  const spinner = document.getElementById('admin-logo-upload-spinner');
+  if (spinner) spinner.classList.remove('hidden');
+
+  try {
+    const saveRes = await API.updateAdminSettings({ appLogo: '' });
+    if (!saveRes.success) {
+      throw new Error(saveRes.message || 'Failed to reset app logo');
+    }
+
+    if (appSettings) {
+      appSettings.appLogo = '';
+    }
+
+    updateHeaderBranding(appSettings ? appSettings.appName : '', appSettings ? appSettings.schoolName : '', '');
+    showToast('App icon and photo reset to default!');
+  } catch (err) {
+    console.error('[Admin Reset Logo Error]', err);
+    showToast('Error resetting logo: ' + (err.message || 'Failed'), true);
+  } finally {
+    if (spinner) spinner.classList.add('hidden');
+  }
+}
+
 async function loadAppSettings() {
   try {
     const res = await API.getAdminSettings();
@@ -468,7 +596,8 @@ async function loadAppSettings() {
       appSettings = res.data;
       const appName = res.data.appName !== undefined ? res.data.appName : '';
       const schoolName = res.data.schoolName !== undefined ? res.data.schoolName : '';
-      updateHeaderBranding(appName, schoolName);
+      const appLogo = res.data.appLogo !== undefined ? res.data.appLogo : '';
+      updateHeaderBranding(appName, schoolName, appLogo);
 
       const adminAppInput = document.getElementById('admin-input-app-name');
       const adminSchoolInput = document.getElementById('admin-input-school-name');
@@ -3115,6 +3244,11 @@ function handleAdminToggleNotifVibrate(enabled) {
 function openAdminPanel() {
   document.getElementById('modal-admin-panel').classList.remove('hidden');
   loadAdminTeachersList();
+
+  // Sync logo preview in Admin Panel
+  const appLogo = appSettings ? appSettings.appLogo : '';
+  const firstLetter = (appSettings && appSettings.appName ? appSettings.appName.trim()[0] : 'R').toUpperCase();
+  updateAdminLogoPreview(appLogo, firstLetter);
 
   // Sync notification toggles in Admin Panel
   const tMorning = document.getElementById('admin-toggle-notif-morning');
