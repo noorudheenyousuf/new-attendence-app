@@ -519,9 +519,15 @@
 
       <!-- 4. ADD CLASS VIEW -->
       <section id="view-classes" class="hidden space-y-3.5">
-        <div class="flex items-center justify-between">
-          <h2 class="text-base font-bold text-[var(--text-main)]">Classes</h2>
-          <button onclick="openClassModal()" class="touch-btn px-4 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-base font-extrabold text-[var(--text-main)]">Classes</h2>
+            <div id="classes-count-total-container" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm font-semibold select-none text-xs">
+              <span>Total:</span>
+              <span id="classes-count-total" class="font-black text-white">0</span>
+            </div>
+          </div>
+          <button onclick="openClassModal()" class="touch-btn px-3.5 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md flex-shrink-0">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>Add Class</span>
           </button>

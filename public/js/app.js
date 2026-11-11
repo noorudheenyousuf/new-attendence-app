@@ -1053,8 +1053,11 @@ function renderClassesList() {
   const container = document.getElementById('class-cards-container');
   if (!container) return;
 
+  const countEl = document.getElementById('classes-count-total');
+  if (countEl) countEl.innerText = classesList.length;
+
   if (classesList.length === 0) {
-    container.innerHTML = `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No classes added yet. Click "Add Class" to create one.</div>`;
+    container.innerHTML = `<div class="bg-[var(--card-bg)] p-6 rounded-2xl border border-[var(--border-color)] text-center text-xs text-[var(--text-sub)]">No classes added yet. Click "Add Class" above to create one.</div>`;
     return;
   }
 
@@ -1068,16 +1071,16 @@ function renderClassesList() {
 
     const actionBtns = canUserEditDelete() ? `
       <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto pl-2">
-        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-white/20 hover:bg-white hover:text-[#245b70] text-white flex items-center justify-center transition">
+        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/70 hover:bg-rose-600 text-white flex items-center justify-center transition">
+        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition shadow-xs">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>` : '';
 
     return `
-    <div class="drag-item rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden hover:shadow-md transition-all${placedClass}"
+    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all space-y-2.5${placedClass}"
          data-index="${index}"
          data-id="${c._id}"
          draggable="false"
@@ -1094,18 +1097,33 @@ function renderClassesList() {
          ondragleave="handleClassDragLeave(event)"
          ondragend="handleClassDragEnd(event)"
          ondrop="handleClassDrop(event, ${index})">
-      <div class="custom-gradient-header px-3.5 py-3 flex items-center gap-2.5">
-        <div class="drag-handle text-white/60 hover:text-white flex-shrink-0 cursor-grab active:cursor-grabbing" title="Hold card or drag handle to reorder">
-          <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
-        </div>
-        <div class="min-w-0 flex-1">
-          <h3 class="font-black text-white text-sm leading-tight truncate select-none">${escapeHtml(c.name)}</h3>
-          <p class="text-white/70 text-[11px] font-semibold truncate mt-0.5 select-none">Class Teacher: <span class="text-white/90">${escapeHtml(c.classTeacher || 'Not assigned')}</span></p>
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] p-1 flex-shrink-0 cursor-grab active:cursor-grabbing" title="Hold card or drag handle to reorder">
+            <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-extrabold text-[var(--text-main)] text-sm leading-tight truncate select-none">${escapeHtml(c.name)}</h3>
+              ${c.classTeacher ? `
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-400/10 dark:text-cyan-400 select-none truncate">
+                  Teacher: ${escapeHtml(c.classTeacher)}
+                </span>
+              ` : `
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] select-none">
+                  No Teacher
+                </span>
+              `}
+            </div>
+          </div>
         </div>
         ${actionBtns}
       </div>
-      <div class="bg-[var(--card-bg)] px-3.5 py-2.5">
-        <p class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider mb-1.5 select-none">Assigned Subjects</p>
+
+      <div class="pt-2 border-t border-[var(--border-color)]/70">
+        <p class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider mb-1.5 select-none">Assigned Subjects (${c.assignedSubjects ? c.assignedSubjects.length : 0})</p>
         <div class="flex flex-wrap gap-1.5">${subjectPills}</div>
       </div>
     </div>`;
