@@ -1731,8 +1731,19 @@ function renderSubjectCheckboxesForClass(containerId, selectedSubjects = []) {
     return;
   }
 
-  container.innerHTML = subjectsList.map(s => {
-    const isChecked = selectedSubjects.includes(s.name);
+  // Deduplicate by name so the checkbox list only shows unique subject names
+  const uniqueSubjects = [];
+  const seen = new Set();
+  (subjectsList || []).forEach(s => {
+    const n = (s.name || '').trim();
+    if (n && !seen.has(n.toLowerCase())) {
+      seen.add(n.toLowerCase());
+      uniqueSubjects.push(s);
+    }
+  });
+
+  container.innerHTML = uniqueSubjects.map(s => {
+    const isChecked = selectedSubjects.some(sub => isClassEqual(sub, s.name));
     return `
       <label class="flex items-center gap-1.5 p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs font-bold text-[var(--text-main)] transition shadow-sm select-none">
         <input type="checkbox" name="${containerId}-cb" value="${escapeHtml(s.name)}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-[#245b70] focus:ring-[#245b70] accent-[#245b70] cursor-pointer">
@@ -3474,7 +3485,7 @@ function renderActivityLogsList() {
           <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 flex-shrink-0">Reverted</span>
         ` : (isAdmin && log.canUndo ? `
           <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
-          <button onclick="undoLog('${log._id}', '${escapeHtml(log.action)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition flex-shrink-0">
+          <button onclick="undoLog('${log._id}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition flex-shrink-0">
             Undo
           </button>
         ` : '')}
@@ -3568,11 +3579,13 @@ async function updateProfileDashboardKPIs() {
   } catch (_) {}
 }
 
-async function undoLog(logId, actionName) {
+async function undoLog(logId) {
+  const targetLog = (cachedActivityLogs || []).find(l => String(l._id) === String(logId));
+  const actionName = targetLog ? targetLog.action : 'Action';
   try {
     const res = await API.undoLog(logId);
     if (res.success) {
-      showToast(`Reverted: "${actionName}"`);
+      showToast(res.message || `Reverted: "${actionName}"`);
       await loadActivityLogs();
       await loadAttendanceRoster();
       await loadClasses();
@@ -3580,7 +3593,7 @@ async function undoLog(logId, actionName) {
       await renderStudentsDirectory();
     }
   } catch (error) {
-    showToast(error.message, true);
+    showToast(error.message || 'Failed to undo action', true);
   }
 }
 

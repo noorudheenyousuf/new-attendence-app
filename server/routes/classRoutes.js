@@ -65,6 +65,23 @@ router.post('/', authMiddleware, async (req, res) => {
       assignedSubjects: subjectsArray
     });
 
+    // Ensure this class has its own dedicated Subject document for each assigned subject
+    for (const subName of subjectsArray) {
+      const existing = await Subject.findOne({
+        name: caseInsensitiveRegex(subName),
+        assignedClasses: cleanName
+      });
+      if (!existing) {
+        const template = await Subject.findOne({ name: caseInsensitiveRegex(subName) });
+        await Subject.create({
+          name: subName,
+          subjectCode: template ? template.subjectCode : '',
+          teacher: template ? template.teacher : '',
+          assignedClasses: [cleanName]
+        });
+      }
+    }
+
     // Log action
     await ActivityLog.create({
       action: `Class Added: ${cleanName}`,
@@ -113,9 +130,45 @@ router.put('/:id', authMiddleware, async (req, res) => {
     };
 
     if (assignedSubjects !== undefined) {
-      updatePayload.assignedSubjects = Array.isArray(assignedSubjects)
+      const oldSubjects = Array.isArray(oldClass.assignedSubjects) ? oldClass.assignedSubjects : [];
+      const newSubjects = Array.isArray(assignedSubjects)
         ? assignedSubjects.map(s => String(s).trim()).filter(Boolean)
         : [];
+      updatePayload.assignedSubjects = newSubjects;
+
+      // 1. Ensure this class has its own dedicated Subject document for each assigned subject
+      for (const subName of newSubjects) {
+        const existing = await Subject.findOne({
+          name: caseInsensitiveRegex(subName),
+          assignedClasses: cleanName
+        });
+        if (!existing) {
+          const template = await Subject.findOne({ name: caseInsensitiveRegex(subName) });
+          await Subject.create({
+            name: subName,
+            subjectCode: template ? template.subjectCode : '',
+            teacher: template ? template.teacher : '',
+            assignedClasses: [cleanName]
+          });
+        }
+      }
+
+      // 2. For removed subjects, unbind from this class
+      const removedSubjects = oldSubjects.filter(os => !newSubjects.some(ns => ns.toLowerCase() === os.toLowerCase()));
+      for (const remSub of removedSubjects) {
+        const subDoc = await Subject.findOne({
+          name: caseInsensitiveRegex(remSub),
+          assignedClasses: oldName
+        });
+        if (subDoc) {
+          if (subDoc.assignedClasses.length <= 1) {
+            await Subject.findByIdAndDelete(subDoc._id);
+          } else {
+            subDoc.assignedClasses = subDoc.assignedClasses.filter(c => c !== oldName && c !== cleanName);
+            await subDoc.save();
+          }
+        }
+      }
     }
 
     const updated = await Class.findByIdAndUpdate(
@@ -204,6 +257,17 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
     await Class.findByIdAndDelete(req.params.id);
 
+    // Clean up subjects that belonged exclusively to this class
+    const classSubjects = await Subject.find({ assignedClasses: cls.name });
+    for (const sub of classSubjects) {
+      if (sub.assignedClasses.length <= 1) {
+        await Subject.findByIdAndDelete(sub._id);
+      } else {
+        sub.assignedClasses = sub.assignedClasses.filter(c => c !== cls.name);
+        await sub.save();
+      }
+    }
+
     await ActivityLog.create({
       action: `Class Deleted: ${cls.name}`,
       details: `Teacher: ${cls.classTeacher}`,
@@ -212,7 +276,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       entityType: 'class',
       entityId: req.params.id,
       canUndo: true,
-      previousState: { name: cls.name, classTeacher: cls.classTeacher }
+      previousState: cls.toObject()
     });
 
     res.json({ success: true, message: 'Class deleted successfully' });

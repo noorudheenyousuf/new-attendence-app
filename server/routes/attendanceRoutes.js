@@ -56,6 +56,9 @@ router.post('/', authMiddleware, async (req, res) => {
       subject: caseInsensitiveRegex(targetSubject)
     });
 
+    // Capture previous state snapshot BEFORE mutating document
+    const previousSnapshot = previousDoc ? previousDoc.toObject() : null;
+
     let updatedAttendance;
     if (previousDoc) {
       previousDoc.class = cleanClass;
@@ -86,7 +89,7 @@ router.post('/', authMiddleware, async (req, res) => {
       entityType: 'attendance',
       entityId: updatedAttendance._id.toString(),
       canUndo: true,
-      previousState: previousDoc ? previousDoc.toObject() : null
+      previousState: previousSnapshot
     });
 
     res.json({ success: true, data: updatedAttendance });

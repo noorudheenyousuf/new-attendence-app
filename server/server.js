@@ -16,8 +16,10 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Connect to MongoDB
-connectDB().then(() => {
-  seedInitialData();
+connectDB().then(async () => {
+  await seedInitialData();
+  const { ensureSubjectsPerClass } = require('./routes/subjectRoutes');
+  await ensureSubjectsPerClass();
 });
 
 // Middleware
