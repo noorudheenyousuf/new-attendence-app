@@ -28,6 +28,14 @@ const appSettingsSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  showAnnouncementsOnDashboard: {
+    type: Boolean,
+    default: true
+  },
+  showEventsOnDashboard: {
+    type: Boolean,
+    default: true
+  },
   studentFormFields: {
     type: Array,
     default: []

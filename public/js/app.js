@@ -8,6 +8,7 @@ let isDarkMode = false;
 let classesList = [];
 let subjectsList = [];
 let studentsList = [];
+let cachedAllStudents = [];
 let attendanceRecords = []; // [{ studentId, status, note }]
 function formatLocalDate(d = new Date()) {
   const dateObj = (d instanceof Date && !isNaN(d)) ? d : new Date();
@@ -650,6 +651,7 @@ async function loadAppSettings() {
         printToggle.checked = res.data.allowStudentDetailsPrint !== false;
       }
       _applyStudentPrintButtonVisibility();
+      applyDashboardSectionVisibility();
 
       if (Array.isArray(res.data.studentFormFields) && res.data.studentFormFields.length > 0) {
         appStudentFormFields = res.data.studentFormFields;
@@ -1060,7 +1062,7 @@ async function handleClassTouchEnd(e) {
   }
 }
 
-function renderClassesList() {
+async function renderClassesList() {
   const container = document.getElementById('class-cards-container');
   if (!container) return;
 
@@ -1072,26 +1074,54 @@ function renderClassesList() {
     return;
   }
 
+  // Load students for count if not already cached
+  if (!cachedAllStudents || cachedAllStudents.length === 0) {
+    try {
+      const stRes = await API.getStudents('all');
+      if (stRes && stRes.success && Array.isArray(stRes.data)) {
+        cachedAllStudents = stRes.data;
+      }
+    } catch (_) {}
+  }
+
+  const palette = [
+    { bg: 'bg-teal-500/10 dark:bg-teal-400/15', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-500/25', dot: 'bg-teal-500' },
+    { bg: 'bg-indigo-500/10 dark:bg-indigo-400/15', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-500/25', dot: 'bg-indigo-500' },
+    { bg: 'bg-blue-500/10 dark:bg-blue-400/15', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-500/25', dot: 'bg-blue-500' },
+    { bg: 'bg-cyan-500/10 dark:bg-cyan-400/15', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-500/25', dot: 'bg-cyan-500' },
+    { bg: 'bg-amber-500/10 dark:bg-amber-400/15', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-500/25', dot: 'bg-amber-500' },
+    { bg: 'bg-emerald-500/10 dark:bg-emerald-400/15', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-500/25', dot: 'bg-emerald-500' }
+  ];
+
   container.innerHTML = classesList.map((c, index) => {
     const isPlaced = recentlyPlacedClassId && String(recentlyPlacedClassId) === String(c._id);
     const placedClass = isPlaced ? ' drag-item-placed' : '';
 
-    const subjectPills = (c.assignedSubjects && c.assignedSubjects.length > 0)
-      ? c.assignedSubjects.map(sub => `<span class="subject-chip" title="${escapeHtml(sub)}"><span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-teal-400 flex-shrink-0"></span><span>${escapeHtml(sub)}</span></span>`).join('')
+    const studentCount = (cachedAllStudents || []).filter(s => isClassEqual(s.class, c.name)).length;
+    const subjectCount = (c.assignedSubjects && Array.isArray(c.assignedSubjects)) ? c.assignedSubjects.length : 0;
+
+    const subjectPills = subjectCount > 0
+      ? c.assignedSubjects.map((sub, sIdx) => {
+          const col = palette[sIdx % palette.length];
+          return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${col.bg} ${col.text} border ${col.border} shadow-2xs select-none transition hover:scale-105" title="${escapeHtml(sub)}">
+            <span class="w-1.5 h-1.5 rounded-full ${col.dot} flex-shrink-0"></span>
+            <span>${escapeHtml(sub)}</span>
+          </span>`;
+        }).join('')
       : `<span class="text-xs text-[var(--text-sub)] italic">No subjects assigned</span>`;
 
     const actionBtns = canUserEditDelete() ? `
       <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto pl-2">
-        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--bg-page)] text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs">
+        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--card-bg)] text-[#245b70] dark:text-cyan-400 border border-[var(--border-color)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl btn-delete flex items-center justify-center transition shadow-xs">
+        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-600 hover:text-white flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>` : '';
 
     return `
-    <div class="drag-item bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all space-y-2.5${placedClass}"
+    <div class="drag-item bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col ${placedClass}"
          data-index="${index}"
          data-id="${c._id}"
          draggable="false"
@@ -1108,34 +1138,49 @@ function renderClassesList() {
          ondragleave="handleClassDragLeave(event)"
          ondragend="handleClassDragEnd(event)"
          ondrop="handleClassDrop(event, ${index})">
-      <div class="flex items-center justify-between gap-2">
+
+      <!-- Heading Div with distinct lite tint color background -->
+      <div class="bg-gradient-to-r from-[#245b70]/10 via-[#245b70]/5 to-teal-500/10 dark:from-[#245b70]/25 dark:via-cyan-950/20 dark:to-transparent p-3 sm:p-3.5 border-b border-[var(--border-color)] flex items-center justify-between gap-2.5">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] p-1 flex-shrink-0 cursor-grab active:cursor-grabbing" title="Hold card or drag handle to reorder">
+          <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] dark:hover:text-cyan-400 p-1 flex-shrink-0 cursor-grab active:cursor-grabbing" title="Hold card or drag handle to reorder">
             <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
             </svg>
           </div>
           <div class="min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <h3 class="font-extrabold text-[var(--text-main)] text-sm leading-tight truncate select-none">${escapeHtml(c.name)}</h3>
-              ${c.classTeacher ? `
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-400/10 dark:text-cyan-400 select-none truncate">
-                  Teacher: ${escapeHtml(c.classTeacher)}
-                </span>
-              ` : `
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] select-none">
-                  No Teacher
-                </span>
-              `}
+            <h3 class="font-black text-[var(--text-main)] text-sm sm:text-base leading-tight truncate select-none tracking-tight">${escapeHtml(c.name)}</h3>
+            <div class="text-[11px] font-semibold text-[#245b70] dark:text-cyan-400 flex items-center gap-1.5 mt-0.5 truncate select-none">
+              <svg class="w-3.5 h-3.5 opacity-80 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-[var(--text-sub)] font-normal italic">No Teacher Assigned</span>'}</span>
             </div>
           </div>
         </div>
         ${actionBtns}
       </div>
 
-      <div class="pt-2 border-t border-[var(--border-color)]/70">
-        <p class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider mb-1.5 select-none">Assigned Subjects (${c.assignedSubjects ? c.assignedSubjects.length : 0})</p>
-        <div class="flex flex-wrap gap-1.5">${subjectPills}</div>
+      <!-- Stats Row & Assigned Subjects Div -->
+      <div class="p-3 sm:p-3.5 bg-[var(--card-bg)] space-y-3">
+        <!-- Total Students & Subjects Row -->
+        <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-500/10 dark:bg-blue-400/15 border border-blue-500/20 text-xs font-bold text-blue-700 dark:text-blue-300 select-none shadow-2xs">
+            <span class="text-sm">👨‍🎓</span>
+            <span><strong class="font-black">${studentCount}</strong> Students</span>
+          </div>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-500/10 dark:bg-indigo-400/15 border border-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300 select-none shadow-2xs">
+            <span class="text-sm">📚</span>
+            <span><strong class="font-black">${subjectCount}</strong> Subjects</span>
+          </div>
+        </div>
+
+        <!-- Assigned Subjects Div -->
+        <div class="pt-2 border-t border-[var(--border-color)]/70 space-y-1.5">
+          <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] select-none">
+            ASSIGNED SUBJECTS
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            ${subjectPills}
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -3725,6 +3770,12 @@ function openAdminPanel() {
   if (tMorning) tMorning.checked = localStorage.getItem('admin_notif_morning') !== 'false';
   if (tPreclass) tPreclass.checked = localStorage.getItem('admin_notif_preclass') !== 'false';
   if (tVibrate) tVibrate.checked = localStorage.getItem('admin_notif_vibrate') !== 'false';
+
+  // Sync dashboard display toggles in Admin Panel
+  const tAnn = document.getElementById('admin-toggle-dash-announcements');
+  const tEv = document.getElementById('admin-toggle-dash-events');
+  if (tAnn) tAnn.checked = appSettings ? appSettings.showAnnouncementsOnDashboard !== false : true;
+  if (tEv) tEv.checked = appSettings ? appSettings.showEventsOnDashboard !== false : true;
 }
 
 function closeAdminPanel() {
@@ -4024,7 +4075,48 @@ function selectBottomTab(tab) {
 }
 
 // ================= HOME / SCHOOL DASHBOARD MODULE =================
+function applyDashboardSectionVisibility() {
+  const annSection = document.getElementById('dash-section-announcements');
+  const evSection = document.getElementById('dash-section-events');
+
+  const showAnn = appSettings ? appSettings.showAnnouncementsOnDashboard !== false : true;
+  const showEv = appSettings ? appSettings.showEventsOnDashboard !== false : true;
+
+  if (annSection) annSection.style.display = showAnn ? '' : 'none';
+  if (evSection) evSection.style.display = showEv ? '' : 'none';
+
+  const tAnn = document.getElementById('admin-toggle-dash-announcements');
+  const tEv = document.getElementById('admin-toggle-dash-events');
+  if (tAnn) tAnn.checked = showAnn;
+  if (tEv) tEv.checked = showEv;
+}
+
+async function handleAdminToggleDashAnnouncements(enabled) {
+  try {
+    if (!appSettings) appSettings = {};
+    appSettings.showAnnouncementsOnDashboard = Boolean(enabled);
+    applyDashboardSectionVisibility();
+    await API.updateAdminSettings({ showAnnouncementsOnDashboard: Boolean(enabled) });
+    showToast(enabled ? 'Announcements enabled on Dashboard' : 'Announcements hidden from Dashboard');
+  } catch (err) {
+    showToast(err.message || 'Failed to update setting', true);
+  }
+}
+
+async function handleAdminToggleDashEvents(enabled) {
+  try {
+    if (!appSettings) appSettings = {};
+    appSettings.showEventsOnDashboard = Boolean(enabled);
+    applyDashboardSectionVisibility();
+    await API.updateAdminSettings({ showEventsOnDashboard: Boolean(enabled) });
+    showToast(enabled ? 'Events enabled on Dashboard' : 'Events hidden from Dashboard');
+  } catch (err) {
+    showToast(err.message || 'Failed to update setting', true);
+  }
+}
+
 async function loadHomeDashboard() {
+  applyDashboardSectionVisibility();
   updateWelcomeGreeting();
   populateQuickAttendanceDropdowns();
   await Promise.allSettled([
@@ -4193,8 +4285,8 @@ async function loadDashboardTimetable() {
 
     if (todaySlots.length === 0) {
       container.innerHTML = `
-        <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-page)]">
-          <svg class="w-8 h-8 mx-auto text-[var(--text-sub)] opacity-50 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[#245b70]/30 bg-white/70 dark:bg-slate-900/50 shadow-xs">
+          <svg class="w-8 h-8 mx-auto text-[#245b70]/60 dark:text-cyan-400/60 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           <div class="text-xs font-bold text-[var(--text-main)]">No classes scheduled for today</div>
           <p class="text-[10px] text-[var(--text-sub)] mt-0.5">Enjoy your free time or prepare for upcoming classes</p>
         </div>`;
@@ -4229,13 +4321,13 @@ async function loadDashboardTimetable() {
 
       if (isLive) {
         statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white shadow-sm animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-white"></span>Live Now</span>`;
-        cardStyle = `bg-[#245b70]/10 dark:bg-cyan-900/25 border-2 border-[#245b70] dark:border-cyan-400 shadow-md`;
+        cardStyle = `bg-white dark:bg-slate-900 border-2 border-[#245b70] dark:border-cyan-400 shadow-md ring-2 ring-[#245b70]/15`;
       } else if (isCompleted) {
         statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">✓ Completed</span>`;
-        cardStyle = `bg-[var(--bg-page)]/70 border border-[var(--border-color)] opacity-75`;
+        cardStyle = `bg-white/60 dark:bg-slate-900/40 border border-[#245b70]/15 opacity-75`;
       } else {
         statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Upcoming</span>`;
-        cardStyle = `bg-[var(--bg-page)] border border-[var(--border-color)] hover:border-[#245b70]/40 transition`;
+        cardStyle = `bg-white/95 dark:bg-slate-900/85 border border-[#245b70]/20 hover:border-[#245b70]/50 shadow-xs`;
       }
 
       return `
