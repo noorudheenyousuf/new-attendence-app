@@ -388,9 +388,9 @@ function updateUserUI() {
     const isAdmin = currentUser.role === 'admin';
     settingsRole.innerText = isAdmin ? 'Administrator' : 'Teacher';
     if (isAdmin) {
-      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 mx-auto sm:mx-0";
+      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30";
     } else {
-      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20 mx-auto sm:mx-0";
+      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20";
     }
     settingsRole.classList.remove('hidden');
   }
@@ -2675,6 +2675,11 @@ async function openProfileEditPage(targetUserId = null) {
     return;
   }
 
+  // Switch to Edit Profile page immediately
+  selectTab('edit-profile');
+  const mainViewport = document.querySelector('main');
+  if (mainViewport) mainViewport.scrollTop = 0;
+
   // Ensure subjects list is loaded for checkboxes
   if (!subjectsList || subjectsList.length === 0) {
     try {
@@ -2790,10 +2795,6 @@ async function openProfileEditPage(targetUserId = null) {
     };
   }
 
-  selectTab('edit-profile');
-
-  const mainViewport = document.querySelector('main');
-  if (mainViewport) mainViewport.scrollTop = 0;
 }
 
 // Aliases for backward compatibility
@@ -4371,6 +4372,17 @@ function selectTab(tab) {
     loadAdminTeachersList();
     if (typeof loadAdminAnnouncementsList === 'function') loadAdminAnnouncementsList();
     if (typeof loadAdminEventsList === 'function') loadAdminEventsList();
+    const mainViewport = document.querySelector('main');
+    if (mainViewport) mainViewport.scrollTop = 0;
+  } else if (tab === 'timetable') {
+    if (typeof renderTimetableSlots === 'function') renderTimetableSlots();
+    const mainViewport = document.querySelector('main');
+    if (mainViewport) mainViewport.scrollTop = 0;
+  } else if (tab === 'messages') {
+    if (typeof loadMessages === 'function') loadMessages();
+    const mainViewport = document.querySelector('main');
+    if (mainViewport) mainViewport.scrollTop = 0;
+  } else if (tab === 'teacher-log' || tab === 'edit-profile') {
     const mainViewport = document.querySelector('main');
     if (mainViewport) mainViewport.scrollTop = 0;
   }
@@ -6151,8 +6163,9 @@ async function handleDeleteTeacher(id, name) {
 // USER DIRECTIVE: "also a 'log' button for how many class attended in which days in which class also how many sessions"
 // =========================================================================
 async function openTeacherLogModal(teacherId) {
-  const modal = document.getElementById('modal-teacher-log');
-  if (modal) modal.classList.remove('hidden');
+  selectTab('teacher-log');
+  const mainViewport = document.querySelector('main');
+  if (mainViewport) mainViewport.scrollTop = 0;
 
   // Loading placeholders
   const nameEl = document.getElementById('tlog-name');
@@ -6299,10 +6312,9 @@ function renderTeacherLogSessionsList() {
 }
 
 function closeTeacherLogModal() {
-  const modal = document.getElementById('modal-teacher-log');
-  if (modal) modal.classList.add('hidden');
   currentTeacherLogData = null;
   currentTeacherSessions = [];
+  goBackFromSubPage('settings');
 }
 
 
@@ -6348,8 +6360,9 @@ async function checkUnreadMessages() {
 }
 
 async function openMessagesModal() {
-  const modal = document.getElementById('modal-messages');
-  if (modal) modal.classList.remove('hidden');
+  selectTab('messages');
+  const mainViewport = document.querySelector('main');
+  if (mainViewport) mainViewport.scrollTop = 0;
   await loadMessages();
   try { await API.markMessagesRead(); } catch(_) {}
   const badge = document.getElementById('unread-msg-badge');
@@ -6357,8 +6370,7 @@ async function openMessagesModal() {
 }
 
 function closeMessagesModal() {
-  const modal = document.getElementById('modal-messages');
-  if (modal) modal.classList.add('hidden');
+  goBackFromSubPage('home');
 }
 
 async function loadMessages() {
@@ -6481,8 +6493,9 @@ async function openTeacherTimetable(teacherEmail, teacherName = '', teacherId = 
 }
 
 async function openTimetableModal() {
-  const modal = document.getElementById('modal-timetable');
-  if (modal) modal.classList.remove('hidden');
+  selectTab('timetable');
+  const mainViewport = document.querySelector('main');
+  if (mainViewport) mainViewport.scrollTop = 0;
 
   // Populate class filter
   const classFilter = document.getElementById('timetable-filter-class');
@@ -6537,8 +6550,7 @@ async function openTimetableModal() {
 }
 
 function closeTimetableModal() {
-  const modal = document.getElementById('modal-timetable');
-  if (modal) modal.classList.add('hidden');
+  goBackFromSubPage('home');
   timetableViewTeacherEmail = null;
   timetableViewTeacherName = null;
   timetableReadOnly = false;

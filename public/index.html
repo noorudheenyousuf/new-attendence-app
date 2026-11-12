@@ -678,13 +678,16 @@
             </div>
 
             <!-- User Information -->
-            <div class="flex-1 min-w-0 space-y-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="font-black text-base sm:text-lg text-[var(--text-main)] truncate" id="settings-name-display">Teacher</h3>
+            <div class="flex-1 min-w-0 flex flex-col justify-center space-y-1">
+              <!-- Name: starts with photo -->
+              <h3 class="font-black text-base sm:text-lg text-[var(--text-main)] truncate text-left" id="settings-name-display">Teacher</h3>
+              <!-- Role Badge: in the middle of name and email, perfectly aligned at the start with both -->
+              <div class="flex items-center py-0.5">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20" id="settings-role-badge">Teacher</span>
               </div>
-              <p class="text-xs text-[var(--text-sub)] font-medium truncate" id="settings-email-display">email@example.com</p>
-              <p class="text-xs text-[var(--text-sub)] font-semibold truncate hidden" id="settings-phone-display"></p>
+              <!-- Email: starts with photo -->
+              <p class="text-xs text-[var(--text-sub)] font-medium truncate text-left" id="settings-email-display">email@example.com</p>
+              <p class="text-xs text-[var(--text-sub)] font-semibold truncate text-left hidden" id="settings-phone-display"></p>
             </div>
           </div>
         </div>
