@@ -1112,10 +1112,10 @@ async function renderClassesList() {
 
     const actionBtns = canUserEditDelete() ? `
       <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto pl-2">
-        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-[var(--card-bg)] text-[#245b70] dark:text-cyan-400 border border-[var(--border-color)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs active:scale-95">
+        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-white/15 text-white hover:bg-white hover:text-[#183946] border border-white/20 flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-600 hover:text-white flex items-center justify-center transition shadow-xs active:scale-95">
+        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-200 hover:bg-rose-600 hover:text-white border border-rose-400/30 flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>` : '';
@@ -1139,19 +1139,19 @@ async function renderClassesList() {
          ondragend="handleClassDragEnd(event)"
          ondrop="handleClassDrop(event, ${index})">
 
-      <!-- Heading Div with distinct lite tint color background -->
-      <div class="bg-gradient-to-r from-[#245b70]/10 via-[#245b70]/5 to-teal-500/10 dark:from-[#245b70]/25 dark:via-cyan-950/20 dark:to-transparent p-3 sm:p-3.5 border-b border-[var(--border-color)] flex items-center justify-between gap-2.5">
+      <!-- Heading Div with dark green / dark gray distinct color background -->
+      <div class="bg-gradient-to-r from-[#183946] via-[#1f4757] to-[#183946] text-white p-3 sm:p-3.5 border-b border-white/10 flex items-center justify-between gap-2.5">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] dark:hover:text-cyan-400 p-1 flex-shrink-0 cursor-grab active:cursor-grabbing" title="Hold card or drag handle to reorder">
+          <div class="drag-handle text-white/60 hover:text-white p-1 flex-shrink-0 cursor-grab active:cursor-grabbing transition" title="Hold card or drag handle to reorder">
             <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
             </svg>
           </div>
           <div class="min-w-0">
-            <h3 class="font-black text-[var(--text-main)] text-sm sm:text-base leading-tight truncate select-none tracking-tight">${escapeHtml(c.name)}</h3>
-            <div class="text-[11px] font-semibold text-[#245b70] dark:text-cyan-400 flex items-center gap-1.5 mt-0.5 truncate select-none">
-              <svg class="w-3.5 h-3.5 opacity-80 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-[var(--text-sub)] font-normal italic">No Teacher Assigned</span>'}</span>
+            <h3 class="font-black text-white text-sm sm:text-base leading-tight truncate select-none tracking-tight">${escapeHtml(c.name)}</h3>
+            <div class="text-[11px] font-semibold text-teal-200 dark:text-teal-300 flex items-center gap-1.5 mt-0.5 truncate select-none">
+              <svg class="w-3.5 h-3.5 opacity-90 flex-shrink-0 text-teal-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-white/60 font-normal italic">No Teacher Assigned</span>'}</span>
             </div>
           </div>
         </div>
@@ -1160,22 +1160,23 @@ async function renderClassesList() {
 
       <!-- Stats Row & Assigned Subjects Div -->
       <div class="p-3 sm:p-3.5 bg-[var(--card-bg)] space-y-3">
-        <!-- Total Students & Subjects Row -->
+        <!-- Total Students & Subjects Row with modern standard SVGs (no emojis) -->
         <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-500/10 dark:bg-blue-400/15 border border-blue-500/20 text-xs font-bold text-blue-700 dark:text-blue-300 select-none shadow-2xs">
-            <span class="text-sm">👨‍🎓</span>
+            <svg class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
             <span><strong class="font-black">${studentCount}</strong> Students</span>
           </div>
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-500/10 dark:bg-indigo-400/15 border border-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300 select-none shadow-2xs">
-            <span class="text-sm">📚</span>
+            <svg class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
             <span><strong class="font-black">${subjectCount}</strong> Subjects</span>
           </div>
         </div>
 
         <!-- Assigned Subjects Div -->
         <div class="pt-2 border-t border-[var(--border-color)]/70 space-y-1.5">
-          <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] select-none">
-            ASSIGNED SUBJECTS
+          <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] select-none flex items-center gap-1">
+            <svg class="w-3 h-3 text-[var(--text-sub)] opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+            <span>ASSIGNED SUBJECTS</span>
           </div>
           <div class="flex flex-wrap gap-1.5">
             ${subjectPills}
@@ -3571,17 +3572,17 @@ async function loadActivityLogs() {
   }
 }
 
-// Teacher Daily Summary & Today's Status (Unified Profile Dashboard Card)
+// Teacher Daily Summary & Today's Status (Profile Card & Merged Dashboard Card)
 async function updateProfileDashboardKPIs() {
   if (!currentUser) return;
 
-  const todayClassesEl = document.getElementById('kpi-today-classes');
-  const markedEl = document.getElementById('kpi-attendance-marked');
-  const liveSubEl = document.getElementById('status-live-subject');
-  const liveMetaEl = document.getElementById('status-live-meta');
-  const nextSubEl = document.getElementById('status-next-subject');
-  const nextMetaEl = document.getElementById('status-next-meta');
-  if (!todayClassesEl && !markedEl && !liveSubEl && !nextSubEl) return;
+  const todayClassesEls = [document.getElementById('kpi-today-classes'), document.getElementById('dash-kpi-today-classes')].filter(Boolean);
+  const markedEls = [document.getElementById('kpi-attendance-marked'), document.getElementById('dash-kpi-attendance-marked')].filter(Boolean);
+  const liveSubEls = [document.getElementById('status-live-subject'), document.getElementById('dash-status-live-subject')].filter(Boolean);
+  const liveMetaEls = [document.getElementById('status-live-meta'), document.getElementById('dash-status-live-meta')].filter(Boolean);
+  const nextSubEls = [document.getElementById('status-next-subject'), document.getElementById('dash-status-next-subject')].filter(Boolean);
+  const nextMetaEls = [document.getElementById('status-next-meta'), document.getElementById('dash-status-next-meta')].filter(Boolean);
+  if (todayClassesEls.length === 0 && markedEls.length === 0 && liveSubEls.length === 0 && nextSubEls.length === 0) return;
 
   const myName = (currentUser.name || '').trim().toLowerCase();
   const myId = currentUser._id || currentUser.id || null;
@@ -3608,7 +3609,7 @@ async function updateProfileDashboardKPIs() {
       return d === todayName || d === 'all days' || splitDays.includes(todayName) || days.includes(todayName) || days.includes('all days');
     });
 
-    if (todayClassesEl) todayClassesEl.textContent = String(todaySlots.length);
+    todayClassesEls.forEach(el => el.textContent = String(todaySlots.length));
 
     // Calculate Live and Next Subject
     const currentMin = now.getHours() * 60 + now.getMinutes();
@@ -3638,42 +3639,39 @@ async function updateProfileDashboardKPIs() {
       return item.startMin > currentMin;
     });
 
-    if (liveSubEl) {
+    if (liveSubEls.length > 0) {
       if (liveMatch) {
         const s = liveMatch.slot;
-        liveSubEl.textContent = s.subject || 'Class';
-        if (liveMetaEl) {
-          const timeText = s.timeSlot || s.time || '';
-          const classText = s.class ? `Class ${s.class}` : '';
-          liveMetaEl.textContent = [classText, timeText].filter(Boolean).join(' • ') || 'In session';
-        }
+        const timeText = s.timeSlot || s.time || '';
+        const classText = s.class ? `Class ${s.class}` : '';
+        const liveMeta = [classText, timeText].filter(Boolean).join(' • ') || 'In session';
+        liveSubEls.forEach(el => el.textContent = s.subject || 'Class');
+        liveMetaEls.forEach(el => el.textContent = liveMeta);
       } else {
-        liveSubEl.textContent = 'None';
-        if (liveMetaEl) {
-          liveMetaEl.textContent = todaySlots.length === 0 ? 'No classes today' : 'No active session';
-        }
+        const liveMeta = todaySlots.length === 0 ? 'No classes today' : 'No active session';
+        liveSubEls.forEach(el => el.textContent = 'None');
+        liveMetaEls.forEach(el => el.textContent = liveMeta);
       }
     }
 
-    if (nextSubEl) {
+    if (nextSubEls.length > 0) {
       if (nextMatch) {
         const s = nextMatch.slot;
-        nextSubEl.textContent = s.subject || 'Class';
-        if (nextMetaEl) {
-          const diff = nextMatch.startMin - currentMin;
-          const classText = s.class ? `Class ${s.class}` : '';
-          const diffText = diff > 0 ? (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`) : '';
-          const timeText = s.timeSlot || s.time || '';
-          const metaParts = [classText, diffText || timeText].filter(Boolean);
-          nextMetaEl.textContent = metaParts.join(' • ') || 'Upcoming';
-        }
+        const diff = nextMatch.startMin - currentMin;
+        const classText = s.class ? `Class ${s.class}` : '';
+        const diffText = diff > 0 ? (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`) : '';
+        const timeText = s.timeSlot || s.time || '';
+        const metaParts = [classText, diffText || timeText].filter(Boolean);
+        const nextMeta = metaParts.join(' • ') || 'Upcoming';
+        nextSubEls.forEach(el => el.textContent = s.subject || 'Class');
+        nextMetaEls.forEach(el => el.textContent = nextMeta);
       } else {
         if (todaySlots.length > 0) {
-          nextSubEl.textContent = 'Done';
-          if (nextMetaEl) nextMetaEl.textContent = 'All classes completed';
+          nextSubEls.forEach(el => el.textContent = 'Done');
+          nextMetaEls.forEach(el => el.textContent = 'All classes completed');
         } else {
-          nextSubEl.textContent = 'None';
-          if (nextMetaEl) nextMetaEl.textContent = 'No upcoming classes';
+          nextSubEls.forEach(el => el.textContent = 'None');
+          nextMetaEls.forEach(el => el.textContent = 'No upcoming classes');
         }
       }
     }
@@ -3697,7 +3695,7 @@ async function updateProfileDashboardKPIs() {
         }
       }
     });
-    if (markedEl) markedEl.textContent = String(markedTodayCount);
+    markedEls.forEach(el => el.textContent = String(markedTodayCount));
   } catch (_) {}
 }
 
@@ -4119,9 +4117,9 @@ async function loadHomeDashboard() {
   applyDashboardSectionVisibility();
   updateWelcomeGreeting();
   populateQuickAttendanceDropdowns();
+  updateProfileDashboardKPIs();
   await Promise.allSettled([
     loadDashboardStats(),
-    loadDashboardTimetable(),
     loadDashboardAnnouncements(),
     loadDashboardEvents()
   ]);
