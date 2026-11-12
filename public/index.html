@@ -95,7 +95,7 @@
           </div>
         </div>
 
-        <!-- Dark Mode Sun SVG Button + Clean Profile (No circle wrapper around profile) -->
+        <!-- Right Icons: PWA Install + Theme Toggle + Notifications + Profile -->
         <div class="flex items-center gap-2 flex-shrink-0">
           <!-- One-Click PWA Install Button (Chrome / Edge / Android) -->
           <button id="pwa-install-btn" onclick="triggerPwaInstall()" title="Install App to Device" class="hidden px-2.5 h-9 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-black text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition">
@@ -103,6 +103,13 @@
             <span class="hidden sm:inline">Install</span>
           </button>
 
+          <!-- Notifications & Notice Board -->
+          <button onclick="openMessagesModal()" id="header-notif-btn" title="Notice Board & Notifications" class="relative w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition active:scale-95 border border-white/20 backdrop-blur-sm">
+            <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span id="header-unread-msg-badge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-white animate-pulse"></span>
+          </button>
+
+          <!-- Theme Toggle Button -->
           <button onclick="toggleDarkMode()" id="dark-mode-btn" title="Toggle Light/Dark Theme" class="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition active:scale-95 border border-white/20 backdrop-blur-sm">
             <svg id="sun-icon" class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="5"></circle>
@@ -128,31 +135,242 @@
         </div>
 
       </div>
-
-      <!-- ================= TOP THREE TABS (Attendance, Report, Profile - No Overflow) ================= -->
-      <div class="mt-3 bg-black/20 p-1 rounded-2xl flex items-center gap-1 border border-white/20 backdrop-blur-sm">
-        <button onclick="selectTopTab('attendance')" id="top-tab-attendance" class="flex-1 py-2 px-1 sm:px-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1 sm:gap-1.5 bg-white text-[#245b70] shadow-md tab-transition truncate">
-          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#245b70] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><polyline points="9 11 12 14 22 4"></polyline></svg>
-          <span class="truncate">Attendance</span>
-        </button>
-
-        <button onclick="selectTopTab('report')" id="top-tab-report" class="flex-1 py-2 px-1 sm:px-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 text-white/90 hover:text-white tab-transition truncate">
-          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          <span class="truncate">Report</span>
-        </button>
-
-        <button onclick="selectTopTab('settings')" id="top-tab-settings" class="flex-1 py-2 px-1 sm:px-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 text-white/90 hover:text-white tab-transition truncate">
-          <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          <span class="truncate">Profile</span>
-        </button>
-      </div>
     </header>
 
     <!-- ================= MAIN CONTENT VIEWPORT ================= -->
     <main class="flex-1 overflow-y-auto p-3 sm:p-4 bg-[var(--bg-page)] pb-6 transition-colors duration-300">
 
+      <!-- 0. HOME / DASHBOARD VIEW (Default opening page) -->
+      <section id="view-home" class="space-y-4">
+
+        <!-- B. Welcome Section -->
+        <div class="flex items-center justify-between gap-3 bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm">
+          <div class="min-w-0">
+            <h2 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight">
+              <span id="welcome-greeting">Good Morning</span>, <span id="welcome-user-name" class="text-[#245b70] dark:text-cyan-400">Teacher</span> 👋
+            </h2>
+            <p class="text-xs text-[var(--text-sub)] font-medium mt-0.5">Welcome back to your school management portal</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div id="dashboard-current-date-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-main)] shadow-inner">
+              <svg class="w-3.5 h-3.5 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span id="dashboard-date-text">Today</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- C. Quick Attendance (Prominent Feature Card) -->
+        <div class="custom-gradient-header text-white p-4 sm:p-5 rounded-2xl shadow-lg border border-[var(--border-color)]/20 space-y-3.5 relative overflow-hidden">
+          <div class="flex items-center justify-between border-b border-white/15 pb-2.5">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shadow-inner flex-shrink-0">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><polyline points="9 11 12 14 22 4"></polyline></svg>
+              </div>
+              <div>
+                <h3 class="text-xs sm:text-sm font-black tracking-wider uppercase text-white/95 leading-tight">Quick Attendance</h3>
+                <p class="text-[10px] text-white/70 font-medium">Select class & subject to start session</p>
+              </div>
+            </div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 border border-white/20 text-[10px] font-bold text-white shadow-xs">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="quick-att-date-display">Today</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-wider text-white/80 mb-1">Class</label>
+              <select id="quick-att-class" onchange="handleQuickAttendanceClassChange()" class="touch-input w-full bg-black/25 text-white border border-white/20 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-white/40">
+                <option value="" class="text-slate-900 bg-white">-- Select Class --</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-wider text-white/80 mb-1">Subject</label>
+              <select id="quick-att-subject" class="touch-input w-full bg-black/25 text-white border border-white/20 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-white/40">
+                <option value="" class="text-slate-900 bg-white">-- Select Subject --</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="button" onclick="handleStartQuickAttendance()" class="touch-btn w-full py-2.5 bg-white text-[#245b70] hover:bg-slate-100 font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-98 transition">
+            <span>Start Attendance</span>
+            <svg class="w-4 h-4 text-[#245b70]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <!-- D. School Statistics (Three compact clickable cards) -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] px-1">School Overview</div>
+          <div class="grid grid-cols-3 gap-2 sm:gap-2.5">
+            <!-- Total Students -->
+            <button type="button" id="dash-stat-card-students" onclick="selectTab('students')" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm text-left transition active:scale-95 group">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </div>
+                <span class="text-[10px] text-[var(--text-sub)] opacity-40 group-hover:opacity-100 transition">→</span>
+              </div>
+              <div id="dash-stat-students" class="text-lg sm:text-2xl font-black text-[var(--text-main)] leading-none">0</div>
+              <div class="text-[10px] font-bold text-[var(--text-sub)] truncate mt-1">Total Students</div>
+            </button>
+
+            <!-- Total Teachers -->
+            <button type="button" id="dash-stat-card-teachers" onclick="selectTab('teachers')" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm text-left transition active:scale-95 group">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+                <span class="text-[10px] text-[var(--text-sub)] opacity-40 group-hover:opacity-100 transition">→</span>
+              </div>
+              <div id="dash-stat-teachers" class="text-lg sm:text-2xl font-black text-[var(--text-main)] leading-none">0</div>
+              <div class="text-[10px] font-bold text-[var(--text-sub)] truncate mt-1">Total Teachers</div>
+            </button>
+
+            <!-- Total Classes -->
+            <button type="button" id="dash-stat-card-classes" onclick="selectTab('classes')" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm text-left transition active:scale-95 group">
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                </div>
+                <span class="text-[10px] text-[var(--text-sub)] opacity-40 group-hover:opacity-100 transition">→</span>
+              </div>
+              <div id="dash-stat-classes" class="text-lg sm:text-2xl font-black text-[var(--text-main)] leading-none">0</div>
+              <div class="text-[10px] font-bold text-[var(--text-sub)] truncate mt-1">Total Classes</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- E. School Management (2x2 Grid Shortcuts) -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between px-1">
+            <div>
+              <h4 class="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">School Management</h4>
+              <p class="text-[10px] text-[var(--text-sub)]">Manage your school's resources</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <!-- 1. Add Class / Classes -->
+            <button type="button" id="dash-shortcut-classes" onclick="selectTab('classes')" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center gap-3 transition active:scale-98 text-left group">
+              <div class="w-10 h-10 rounded-xl bg-teal-500/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-black text-[var(--text-main)] truncate">Classes</div>
+                <div class="text-[10px] text-[var(--text-sub)] truncate">Add & organize classes</div>
+              </div>
+            </button>
+
+            <!-- 2. Subjects -->
+            <button type="button" id="dash-shortcut-subjects" onclick="selectTab('subjects')" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center gap-3 transition active:scale-98 text-left group">
+              <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-black text-[var(--text-main)] truncate">Subjects</div>
+                <div class="text-[10px] text-[var(--text-sub)] truncate">Curriculum & courses</div>
+              </div>
+            </button>
+
+            <!-- 3. Students -->
+            <button type="button" id="dash-shortcut-students" onclick="selectTab('students')" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center gap-3 transition active:scale-98 text-left group">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-black text-[var(--text-main)] truncate">Students</div>
+                <div class="text-[10px] text-[var(--text-sub)] truncate">Roster & enrollment</div>
+              </div>
+            </button>
+
+            <!-- 4. Teachers -->
+            <button type="button" id="dash-shortcut-teachers" onclick="selectTab('teachers')" class="touch-btn bg-[var(--card-bg)] hover:bg-[#245b70]/5 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center gap-3 transition active:scale-98 text-left group">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-black text-[var(--text-main)] truncate">Teachers</div>
+                <div class="text-[10px] text-[var(--text-sub)] truncate">Faculty & timetables</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- F. My Today's Timetable -->
+        <div class="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center font-bold">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div>
+                <h4 class="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">My Today's Timetable</h4>
+                <p class="text-[10px] text-[var(--text-sub)]">Your scheduled classes for today</p>
+              </div>
+            </div>
+            <button type="button" onclick="openMyTimetable()" class="text-xs font-bold text-[#245b70] dark:text-cyan-400 hover:underline flex items-center gap-1">
+              <span>View Full</span>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+
+          <!-- Dynamic Today Slots List -->
+          <div id="dash-today-timetable-container" class="space-y-2">
+            <!-- Populated via loadHomeDashboard() -->
+          </div>
+        </div>
+
+        <!-- G. Latest Announcements -->
+        <div class="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              </div>
+              <div>
+                <h4 class="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">Latest Announcements</h4>
+                <p class="text-[10px] text-[var(--text-sub)]">School notices & important updates</p>
+              </div>
+            </div>
+            <button type="button" onclick="openAllAnnouncementsModal()" class="text-xs font-bold text-[#245b70] dark:text-cyan-400 hover:underline flex items-center gap-1">
+              <span>View All</span>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+
+          <!-- Dynamic Announcements List -->
+          <div id="dash-announcements-container" class="space-y-2">
+            <!-- Populated via loadHomeDashboard() -->
+          </div>
+        </div>
+
+        <!-- H. Upcoming Events -->
+        <div class="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-teal-500/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center font-bold">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              </div>
+              <div>
+                <h4 class="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">Upcoming Events</h4>
+                <p class="text-[10px] text-[var(--text-sub)]">Calendar & extracurricular activities</p>
+              </div>
+            </div>
+            <button type="button" onclick="openAllEventsModal()" class="text-xs font-bold text-[#245b70] dark:text-cyan-400 hover:underline flex items-center gap-1">
+              <span>View All</span>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+
+          <!-- Dynamic Events List -->
+          <div id="dash-events-container" class="space-y-2">
+            <!-- Populated via loadHomeDashboard() -->
+          </div>
+        </div>
+
+      </section>
+
       <!-- 1. ATTENDANCE VIEW -->
-      <section id="view-attendance" class="space-y-3.5">
+      <section id="view-attendance" class="hidden space-y-3.5">
         <!-- Filters (Only clean main names, NO brackets) -->
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
           <div class="grid grid-cols-2 gap-2.5">
@@ -538,7 +756,55 @@
           </div>
         </div>
 
-        <!-- 5. SESSION & ACCOUNT SECTION -->
+        <!-- 5. ACCOUNT SETTINGS -->
+        <div class="space-y-1.5 pt-1">
+          <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] px-1">Account Settings</div>
+          <div class="bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-sm divide-y divide-[var(--border-color)] overflow-hidden">
+            <!-- Change Password -->
+            <button type="button" onclick="openChangePasswordModal()" class="touch-btn w-full p-3.5 flex items-center justify-between text-left hover:bg-[var(--bg-page)]/50 transition active:scale-98">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-[var(--text-main)]">Change Password</div>
+                  <div class="text-[10px] text-[var(--text-sub)]">Update your account login password</div>
+                </div>
+              </div>
+              <svg class="w-4 h-4 text-[var(--text-sub)] opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+
+            <!-- Notification Settings -->
+            <button type="button" onclick="openNotificationSettingsModal()" class="touch-btn w-full p-3.5 flex items-center justify-between text-left hover:bg-[var(--bg-page)]/50 transition active:scale-98">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-[#245b70] dark:text-teal-300 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-[var(--text-main)]">Notification Settings</div>
+                  <div class="text-[10px] text-[var(--text-sub)]">Configure schedule & alert triggers</div>
+                </div>
+              </div>
+              <svg class="w-4 h-4 text-[var(--text-sub)] opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+
+            <!-- Theme Settings -->
+            <button type="button" onclick="toggleDarkMode()" class="touch-btn w-full p-3.5 flex items-center justify-between text-left hover:bg-[var(--bg-page)]/50 transition active:scale-98">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-[var(--text-main)]">Theme Settings</div>
+                  <div class="text-[10px] text-[var(--text-sub)]">Toggle Light & Dark display mode</div>
+                </div>
+              </div>
+              <span id="theme-status-label" class="text-xs font-bold text-[#245b70] dark:text-cyan-400">Light / Dark</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 6. SESSION CONTROLS & SIGN OUT -->
         <div class="space-y-2 pt-1">
           <!-- Install App Card (Shows if installable in Chrome) -->
           <div id="settings-install-card" class="hidden bg-gradient-to-r from-amber-500/10 to-teal-500/10 p-3.5 rounded-2xl border border-amber-300 dark:border-amber-900/60 shadow-sm flex items-center justify-between gap-3">
@@ -568,6 +834,10 @@
       <section id="view-classes" class="hidden space-y-3.5">
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="selectTab('home')" class="touch-btn px-2.5 py-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[#245b70] hover:border-[#245b70] flex items-center gap-1 transition shadow-xs">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Dashboard</span>
+            </button>
             <h2 class="text-base font-extrabold text-[var(--text-main)]">Classes</h2>
             <div id="classes-count-total-container" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm font-semibold select-none text-xs">
               <span>Total:</span>
@@ -588,7 +858,13 @@
       <!-- 5. SUBJECTS VIEW (With Edit button) -->
       <section id="view-subjects" class="hidden space-y-3.5">
         <div class="flex items-center justify-between">
-          <h2 class="text-base font-bold text-[var(--text-main)]">Subjects</h2>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="selectTab('home')" class="touch-btn px-2.5 py-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[#245b70] hover:border-[#245b70] flex items-center gap-1 transition shadow-xs">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Dashboard</span>
+            </button>
+            <h2 class="text-base font-bold text-[var(--text-main)]">Subjects</h2>
+          </div>
           <button onclick="openSubjectModal()" class="touch-btn px-4 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>Add Subject</span>
@@ -604,6 +880,10 @@
       <section id="view-students" class="hidden space-y-3.5">
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="selectTab('home')" class="touch-btn px-2.5 py-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[#245b70] hover:border-[#245b70] flex items-center gap-1 transition shadow-xs">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Dashboard</span>
+            </button>
             <h2 class="text-base font-extrabold text-[var(--text-main)]">Students</h2>
             <!-- Total & Selected Class Student Counters -->
             <div class="flex items-center gap-1.5 text-xs font-bold">
@@ -649,6 +929,10 @@
       <section id="view-teachers" class="hidden space-y-3.5">
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="selectTab('home')" class="touch-btn px-2.5 py-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[#245b70] hover:border-[#245b70] flex items-center gap-1 transition shadow-xs">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Dashboard</span>
+            </button>
             <h2 class="text-base font-extrabold text-[var(--text-main)]">Teachers</h2>
             <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm font-semibold select-none text-xs">
               <span>Total:</span>
@@ -679,26 +963,26 @@
 
     </main>
 
-    <!-- ================= BOTTOM FOUR TABS (Add Class, Subjects, Students, Teachers - Fixed DOCKED) ================= -->
+    <!-- ================= BOTTOM FOUR TABS (Home, Attendance, Report, Profile - Fixed DOCKED) ================= -->
     <footer class="flex-shrink-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-2 py-1.5 flex items-center justify-around shadow-2xl z-20 no-print">
-      <button onclick="selectBottomTab('classes')" id="bottom-tab-classes" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
-        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-        <span class="text-[11px] font-bold">Add Class</span>
+      <button onclick="selectTab('home')" id="bottom-tab-home" class="flex-1 flex flex-col items-center justify-center py-1 text-[#245b70] dark:text-cyan-400 font-black tab-transition">
+        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <span class="text-[11px] font-bold">Home</span>
       </button>
 
-      <button onclick="selectBottomTab('subjects')" id="bottom-tab-subjects" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
-        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-        <span class="text-[11px] font-bold">Subjects</span>
+      <button onclick="selectTab('attendance')" id="bottom-tab-attendance" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition">
+        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><polyline points="9 11 12 14 22 4"></polyline></svg>
+        <span class="text-[11px] font-bold">Attendance</span>
       </button>
 
-      <button onclick="selectBottomTab('students')" id="bottom-tab-students" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
-        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        <span class="text-[11px] font-bold">Students</span>
+      <button onclick="selectTab('report')" id="bottom-tab-report" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition">
+        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        <span class="text-[11px] font-bold">Report</span>
       </button>
 
-      <button onclick="selectBottomTab('teachers')" id="bottom-tab-teachers" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] tab-transition">
+      <button onclick="selectTab('settings')" id="bottom-tab-settings" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition">
         <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-        <span class="text-[11px] font-bold">Teachers</span>
+        <span class="text-[11px] font-bold">Profile</span>
       </button>
     </footer>
 
@@ -1629,6 +1913,46 @@
         </div>
       </div>
 
+      <!-- Announcements Management (Admin Panel Section) -->
+      <div class="bg-[var(--bg-page)] p-3.5 rounded-2xl border border-[var(--border-color)] space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xs font-black text-[#245b70] uppercase flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              <span>Announcements Management</span>
+            </div>
+            <p class="text-[10px] text-[var(--text-sub)]">Publish, edit, and manage school announcements</p>
+          </div>
+          <button type="button" onclick="openAnnouncementModal()" class="px-2.5 py-1 custom-gradient-btn text-xs font-bold rounded-xl shadow-xs flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ Announcement</span>
+          </button>
+        </div>
+        <div class="space-y-2 text-xs max-h-48 overflow-y-auto pr-1" id="admin-announcements-list">
+          <!-- Populated via loadAdminAnnouncementsList() -->
+        </div>
+      </div>
+
+      <!-- Events Management (Admin Panel Section) -->
+      <div class="bg-[var(--bg-page)] p-3.5 rounded-2xl border border-[var(--border-color)] space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xs font-black text-[#245b70] uppercase flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-teal-600 dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span>Events Management</span>
+            </div>
+            <p class="text-[10px] text-[var(--text-sub)]">Schedule school activities, holidays & events</p>
+          </div>
+          <button type="button" onclick="openEventModal()" class="px-2.5 py-1 custom-gradient-btn text-xs font-bold rounded-xl shadow-xs flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ Event</span>
+          </button>
+        </div>
+        <div class="space-y-2 text-xs max-h-48 overflow-y-auto pr-1" id="admin-events-list">
+          <!-- Populated via loadAdminEventsList() -->
+        </div>
+      </div>
+
       <!-- Admin Backup & Restore -->
       <div class="bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] space-y-2">
         <div class="flex items-center justify-between">
@@ -2387,6 +2711,255 @@
       <button type="button" onclick="dismissPreClassAlert()" class="touch-btn py-2 px-3 rounded-xl bg-[#245b70] hover:bg-[#1b4859] text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition">
         <svg class="w-3.5 h-3.5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
         <span>OK</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= ANNOUNCEMENT ADD / EDIT MODAL ================= -->
+  <div id="modal-announcement-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)]">
+      <div class="flex items-center justify-between mb-3 border-b border-[var(--border-color)] pb-2.5">
+        <h3 id="modal-announcement-title" class="font-extrabold text-base text-[var(--text-main)]">Add Announcement</h3>
+        <button type="button" onclick="closeAnnouncementModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveAnnouncement(event)" class="space-y-3">
+        <input type="hidden" id="announcement-edit-id" value="">
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Announcement Title</label>
+          <input type="text" id="announcement-input-title" required placeholder="e.g. Annual Sports Day Announcement" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Description / Message</label>
+          <textarea id="announcement-input-desc" required rows="3" placeholder="Provide announcement details..." class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl p-2.5 text-xs font-semibold text-[var(--text-main)] resize-none"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Priority</label>
+            <select id="announcement-input-priority" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+              <option value="normal">Normal</option>
+              <option value="important">Important (Urgent)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Status</label>
+            <select id="announcement-input-published" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+              <option value="true">Published</option>
+              <option value="false">Draft / Unpublished</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-2 border-t border-[var(--border-color)]">
+          <button type="button" onclick="closeAnnouncementModal()" class="touch-btn flex-1 bg-[var(--bg-page)] text-[var(--text-sub)] font-bold text-xs rounded-xl hover:text-[var(--text-main)] transition">
+            Cancel
+          </button>
+          <button type="submit" id="btn-save-announcement" class="touch-btn flex-1 custom-gradient-btn text-white font-black text-xs rounded-xl shadow-md active:scale-98 transition">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= ALL ANNOUNCEMENTS MODAL ================= -->
+  <div id="modal-all-announcements" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-lg rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[85vh] flex flex-col space-y-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base text-[var(--text-main)]">All School Announcements</h3>
+            <p class="text-[10px] text-[var(--text-sub)]">Full list of published updates and notices</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAllAnnouncementsModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-2.5 pr-1 min-h-[200px]" id="all-announcements-list-container">
+        <!-- Populated via openAllAnnouncementsModal() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= EVENT ADD / EDIT MODAL ================= -->
+  <div id="modal-event-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)]">
+      <div class="flex items-center justify-between mb-3 border-b border-[var(--border-color)] pb-2.5">
+        <h3 id="modal-event-title" class="font-extrabold text-base text-[var(--text-main)]">Add Event</h3>
+        <button type="button" onclick="closeEventModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveEvent(event)" class="space-y-3">
+        <input type="hidden" id="event-edit-id" value="">
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Event Name</label>
+          <input type="text" id="event-input-name" required placeholder="e.g. Science Exhibition & Fair" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Description (Optional)</label>
+          <textarea id="event-input-desc" rows="2" placeholder="Brief details about the event..." class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl p-2.5 text-xs font-semibold text-[var(--text-main)] resize-none"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Date</label>
+            <input type="date" id="event-input-date" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Time (Optional)</label>
+            <input type="text" id="event-input-time" placeholder="e.g. 10:00 AM" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Location / Venue (Optional)</label>
+            <input type="text" id="event-input-location" placeholder="e.g. Main Auditorium" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Status</label>
+            <select id="event-input-status" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+              <option value="upcoming">Upcoming</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-2 border-t border-[var(--border-color)]">
+          <button type="button" onclick="closeEventModal()" class="touch-btn flex-1 bg-[var(--bg-page)] text-[var(--text-sub)] font-bold text-xs rounded-xl hover:text-[var(--text-main)] transition">
+            Cancel
+          </button>
+          <button type="submit" id="btn-save-event" class="touch-btn flex-1 custom-gradient-btn text-white font-black text-xs rounded-xl shadow-md active:scale-98 transition">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= ALL EVENTS MODAL ================= -->
+  <div id="modal-all-events" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-lg rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto max-h-[85vh] flex flex-col space-y-3">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center font-bold">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base text-[var(--text-main)]">School Calendar & Events</h3>
+            <p class="text-[10px] text-[var(--text-sub)]">Upcoming and scheduled school activities</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAllEventsModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-2.5 pr-1 min-h-[200px]" id="all-events-list-container">
+        <!-- Populated via openAllEventsModal() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CHANGE PASSWORD MODAL ================= -->
+  <div id="modal-change-password" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)]">
+      <div class="flex items-center justify-between mb-3 border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <h3 class="font-extrabold text-base text-[var(--text-main)]">Change Password</h3>
+        </div>
+        <button type="button" onclick="closeChangePasswordModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <form onsubmit="handleChangePassword(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Current Password</label>
+          <input type="password" id="input-current-password" placeholder="Enter current password" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">New Password (min 6 chars)</label>
+          <input type="password" id="input-new-password" required minlength="6" placeholder="Enter new password" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Confirm New Password</label>
+          <input type="password" id="input-confirm-password" required minlength="6" placeholder="Re-enter new password" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+        </div>
+
+        <div class="flex gap-2 pt-2 border-t border-[var(--border-color)]">
+          <button type="button" onclick="closeChangePasswordModal()" class="touch-btn flex-1 bg-[var(--bg-page)] text-[var(--text-sub)] font-bold text-xs rounded-xl hover:text-[var(--text-main)] transition">
+            Cancel
+          </button>
+          <button type="submit" id="btn-save-password" class="touch-btn flex-1 custom-gradient-btn text-white font-black text-xs rounded-xl shadow-md active:scale-98 transition">
+            Update Password
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= NOTIFICATION SETTINGS MODAL ================= -->
+  <div id="modal-notification-settings" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] space-y-3.5">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-teal-500/10 text-[#245b70] dark:text-teal-300 flex items-center justify-center font-bold">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </div>
+          <h3 class="font-extrabold text-base text-[var(--text-main)]">Notification Settings</h3>
+        </div>
+        <button type="button" onclick="closeNotificationSettingsModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <!-- Morning Schedule -->
+        <div class="flex items-center justify-between p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+          <div>
+            <div class="font-black text-[var(--text-main)]">6:00 AM Morning Schedule Alert</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Summary notification for today's classes</div>
+          </div>
+          <label class="switch-label flex-shrink-0">
+            <input type="checkbox" id="user-notif-morning" onchange="localStorage.setItem('admin_notif_morning', this.checked)">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- 5-min preclass -->
+        <div class="flex items-center justify-between p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+          <div>
+            <div class="font-black text-[var(--text-main)]">5-Minute Pre-Class Reminder</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Alert before each scheduled period</div>
+          </div>
+          <label class="switch-label flex-shrink-0">
+            <input type="checkbox" id="user-notif-preclass" onchange="localStorage.setItem('admin_notif_preclass', this.checked)">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Vibrate -->
+        <div class="flex items-center justify-between p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+          <div>
+            <div class="font-black text-[var(--text-main)]">Device Vibration Alert</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Vibrate phone when notifications arrive</div>
+          </div>
+          <label class="switch-label flex-shrink-0">
+            <input type="checkbox" id="user-notif-vibrate" onchange="localStorage.setItem('admin_notif_vibrate', this.checked)">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <button type="button" onclick="closeNotificationSettingsModal()" class="touch-btn w-full py-2.5 custom-gradient-btn text-white font-bold text-xs rounded-xl shadow-md">
+        Done
       </button>
     </div>
   </div>

@@ -120,6 +120,8 @@ app.use('/api/backup', require('./routes/backupRoutes'));
 app.use('/api/logs', require('./routes/logRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/timetable', require('./routes/timetableRoutes'));
+app.use('/api/announcements', require('./routes/announcementRoutes'));
+app.use('/api/events', require('./routes/eventRoutes'));
 
 // Fallback for SPA routing
 app.use((req, res) => {

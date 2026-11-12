@@ -444,5 +444,63 @@ const API = {
     return this.request(`/timetable/${id}`, {
       method: 'DELETE'
     });
+  },
+
+  // Announcements API
+  async getAnnouncements() {
+    return this.request('/announcements');
+  },
+
+  async createAnnouncement(data) {
+    return this.request('/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateAnnouncement(id, data) {
+    return this.request(`/announcements/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async deleteAnnouncement(id) {
+    return this.request(`/announcements/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Events API
+  async getEvents(upcomingOnly = false) {
+    return this.request(`/events${upcomingOnly ? '?upcoming=true' : ''}`);
+  },
+
+  async createEvent(data) {
+    return this.request('/events', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateEvent(id, data) {
+    return this.request(`/events/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async deleteEvent(id) {
+    return this.request(`/events/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Change Password API
+  async changePassword(currentPassword, newPassword) {
+    return this.request('/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
   }
 };

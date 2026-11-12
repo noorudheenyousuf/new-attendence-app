@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   initServiceWorker();
   updateDateDisplay();
-  selectTopTab('attendance');
+  selectTab('home');
   try {
     await initGoogleAuth();
     await loadCurrentUser();
@@ -208,6 +208,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       await checkUnreadMessages();
       _applyTeachersTabVisibility();
       initTimetableNotificationScheduler();
+      await loadHomeDashboard();
+    } else {
+      await loadHomeDashboard();
     }
   } catch (err) {
     console.error('[App Init Error]', err);
@@ -664,11 +667,18 @@ function _applyTeachersTabVisibility() {
   const canSee = canViewTeachersTab();
   const btn = document.getElementById('bottom-tab-teachers');
   if (btn) btn.style.display = (isAdmin || canSee) ? '' : 'none';
-  // If currently on teachers tab but no longer allowed, redirect to classes
+
+  const shortcutTeachers = document.getElementById('dash-shortcut-teachers');
+  if (shortcutTeachers) shortcutTeachers.style.display = (isAdmin || canSee) ? '' : 'none';
+
+  const statTeachers = document.getElementById('dash-stat-card-teachers');
+  if (statTeachers) statTeachers.style.display = (isAdmin || canSee) ? '' : 'none';
+
+  // If currently on teachers tab but no longer allowed, redirect to home
   if (!canSee && !isAdmin) {
     const teacherView = document.getElementById('view-teachers');
     if (teacherView && !teacherView.classList.contains('hidden')) {
-      selectBottomTab('classes');
+      selectTab('home');
     }
   }
 }
@@ -776,6 +786,7 @@ function populateClassDropdowns() {
   if (editSubModal && !editSubModal.classList.contains('hidden')) {
     renderClassCheckboxes('edit-sub-classes-container', getSelectedClassCheckboxes('edit-sub-classes-container'));
   }
+  populateQuickAttendanceDropdowns();
 }
 
 // Drag & Drop Sorting for Classes (Only active after long press / hold)
@@ -3699,6 +3710,8 @@ function handleAdminToggleNotifVibrate(enabled) {
 function openAdminPanel() {
   document.getElementById('modal-admin-panel').classList.remove('hidden');
   loadAdminTeachersList();
+  loadAdminAnnouncementsList();
+  loadAdminEventsList();
 
   // Sync logo preview in Admin Panel
   const appLogo = appSettings ? appSettings.appLogo : '';
@@ -3901,6 +3914,9 @@ async function handleClearDataPrompt() {
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
+      _applyTeachersTabVisibility();
+      await loadHomeDashboard();
+      selectTab('home');
     }
   } catch (error) {
     showToast(error.message, true);
@@ -3935,9 +3951,11 @@ async function handleResetAppPrompt() {
 }
 
 // ================= TAB NAVIGATION =================
-function selectTopTab(tab) {
+function selectTab(tab) {
   triggerNavHaptic('medium');
-  ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
+
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'];
+  allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
   });
@@ -3945,6 +3963,20 @@ function selectTopTab(tab) {
   const activeEl = document.getElementById(`view-${tab}`);
   if (activeEl) activeEl.classList.remove('hidden');
 
+  // Update 4 bottom navigation tabs: home, attendance, report, settings
+  const mainTabs = ['home', 'attendance', 'report', 'settings'];
+  mainTabs.forEach(t => {
+    const btn = document.getElementById(`bottom-tab-${t}`);
+    if (btn) {
+      if (t === tab) {
+        btn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[#245b70] dark:text-cyan-400 font-black tab-transition scale-105";
+      } else {
+        btn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition";
+      }
+    }
+  });
+
+  // Backward compatibility for old top tabs if present
   ['attendance', 'report', 'settings'].forEach(t => {
     const btn = document.getElementById(`top-tab-${t}`);
     if (btn) {
@@ -3956,53 +3988,833 @@ function selectTopTab(tab) {
     }
   });
 
-  ['classes', 'subjects', 'students', 'teachers'].forEach(t => {
-    const btn = document.getElementById(`bottom-tab-${t}`);
-    if (btn) btn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition";
-  });
-
-  if (tab === 'report') {
+  // Subview / Tab loaders
+  if (tab === 'home') {
+    loadHomeDashboard();
+  } else if (tab === 'attendance') {
+    if (currentClass) {
+      loadAttendanceRoster();
+    } else {
+      renderAttendancePlaceholder();
+    }
+  } else if (tab === 'report') {
     if (reportReadyToLoad) loadReport();
     else renderReportPlaceholder();
-  }
-  if (tab === 'settings') {
+  } else if (tab === 'settings') {
     loadActivityLogs();
     updateProfileDashboardKPIs();
+  } else if (tab === 'classes') {
+    renderClassesList();
+  } else if (tab === 'subjects') {
+    renderSubjectsList();
+  } else if (tab === 'students') {
+    renderStudentsDirectory();
+  } else if (tab === 'teachers') {
+    renderTeachersList();
   }
 }
 
+// Backward compatibility aliases
+function selectTopTab(tab) {
+  selectTab(tab);
+}
+
 function selectBottomTab(tab) {
-  triggerNavHaptic('medium');
-  ['attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'].forEach(v => {
-    const el = document.getElementById(`view-${v}`);
-    if (el) el.classList.add('hidden');
+  selectTab(tab);
+}
+
+// ================= HOME / SCHOOL DASHBOARD MODULE =================
+async function loadHomeDashboard() {
+  updateWelcomeGreeting();
+  populateQuickAttendanceDropdowns();
+  await Promise.allSettled([
+    loadDashboardStats(),
+    loadDashboardTimetable(),
+    loadDashboardAnnouncements(),
+    loadDashboardEvents()
+  ]);
+}
+
+function updateWelcomeGreeting() {
+  const greetingEl = document.getElementById('welcome-greeting');
+  const userEl = document.getElementById('welcome-user-name');
+  const dateBadgeEl = document.getElementById('dashboard-date-text');
+  const qaDateEl = document.getElementById('quick-att-date-display');
+
+  const now = new Date();
+  const hour = now.getHours();
+  let greeting = 'Good Morning';
+  if (hour >= 12 && hour < 17) {
+    greeting = 'Good Afternoon';
+  } else if (hour >= 17 || hour < 5) {
+    greeting = 'Good Evening';
+  }
+
+  if (greetingEl) greetingEl.textContent = greeting;
+  if (userEl) userEl.textContent = (currentUser && currentUser.name) ? currentUser.name : 'Teacher';
+
+  const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
+  const formattedDate = now.toLocaleDateString(undefined, dateOpts);
+  if (dateBadgeEl) dateBadgeEl.textContent = formattedDate;
+  if (qaDateEl) qaDateEl.textContent = formattedDate;
+}
+
+function populateQuickAttendanceDropdowns() {
+  const qaClass = document.getElementById('quick-att-class');
+  const qaSubject = document.getElementById('quick-att-subject');
+  if (!qaClass || !qaSubject) return;
+
+  const currentVal = qaClass.value;
+  const validClasses = classesList || [];
+  let html = `<option value="">-- Select Class --</option>`;
+  validClasses.forEach(c => {
+    const isSel = c.name === currentVal ? 'selected' : '';
+    html += `<option value="${escapeHtml(c.name)}" ${isSel}>${escapeHtml(c.name)}</option>`;
   });
+  qaClass.innerHTML = html;
 
-  const activeEl = document.getElementById(`view-${tab}`);
-  if (activeEl) activeEl.classList.remove('hidden');
+  handleQuickAttendanceClassChange();
+}
 
-  ['classes', 'subjects', 'students', 'teachers'].forEach(t => {
-    const btn = document.getElementById(`bottom-tab-${t}`);
-    if (btn) {
-      if (t === tab) {
-        btn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[#245b70] font-black tab-transition scale-105";
-      } else {
-        btn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition";
+function handleQuickAttendanceClassChange() {
+  const qaClass = document.getElementById('quick-att-class');
+  const qaSubject = document.getElementById('quick-att-subject');
+  if (!qaClass || !qaSubject) return;
+
+  const selectedClass = qaClass.value;
+  if (!selectedClass) {
+    qaSubject.innerHTML = `<option value="">-- Select Subject --</option>`;
+    return;
+  }
+
+  const validSubjects = getAppropriateSubjectsForClass(selectedClass);
+  if (validSubjects && validSubjects.length > 0) {
+    qaSubject.innerHTML = validSubjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+  } else {
+    qaSubject.innerHTML = `<option value="General">General</option>`;
+  }
+}
+
+async function handleStartQuickAttendance() {
+  const qaClass = document.getElementById('quick-att-class');
+  const qaSubject = document.getElementById('quick-att-subject');
+  const selectedClass = qaClass ? qaClass.value : '';
+  const selectedSubject = qaSubject ? qaSubject.value : '';
+
+  if (!selectedClass) {
+    showToast('Please select a class first', true);
+    return;
+  }
+
+  const selClass = document.getElementById('sel-class');
+  const selSubject = document.getElementById('sel-subject');
+  if (selClass) selClass.value = selectedClass;
+  currentClass = selectedClass;
+  attendanceReadyToLoad = true;
+
+  updateAttendanceSubjectsDropdown(selectedClass);
+  if (selSubject && selectedSubject) {
+    selSubject.value = selectedSubject;
+    currentSubject = selectedSubject;
+  }
+
+  selectTab('attendance');
+  await loadAttendanceRoster();
+  showToast(`Attendance ready for ${selectedClass} • ${selectedSubject || currentSubject}`);
+}
+
+async function loadDashboardStats() {
+  try {
+    const stEl = document.getElementById('dash-stat-students');
+    const tcEl = document.getElementById('dash-stat-teachers');
+    const clEl = document.getElementById('dash-stat-classes');
+
+    if (clEl) clEl.textContent = String((classesList || []).length);
+    
+    // Total Teachers
+    let teacherCount = (cachedTeachersList || []).length;
+    if (teacherCount === 0) {
+      try {
+        const tRes = await API.getTeachers();
+        if (tRes && tRes.success && Array.isArray(tRes.data)) {
+          cachedTeachersList = tRes.data;
+          teacherCount = tRes.data.length;
+        }
+      } catch (_) {}
+    }
+    if (tcEl) tcEl.textContent = String(teacherCount);
+
+    // Total Students from API
+    try {
+      const res = await API.getStudents('all');
+      if (res && res.success && Array.isArray(res.data)) {
+        if (stEl) stEl.textContent = String(res.data.length);
+      } else if (Array.isArray(res)) {
+        if (stEl) stEl.textContent = String(res.length);
       }
-    }
-  });
+    } catch (_) {}
+  } catch (e) {
+    console.log('[Dashboard Stats Error]', e);
+  }
+}
 
-  ['attendance', 'report', 'settings'].forEach(t => {
-    const btn = document.getElementById(`top-tab-${t}`);
-    if (btn) {
-      btn.className = "flex-1 py-2 px-1 sm:px-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 text-white/90 hover:text-white tab-transition truncate";
-    }
-  });
+async function loadDashboardTimetable() {
+  const container = document.getElementById('dash-today-timetable-container');
+  if (!container) return;
 
-  if (tab === 'classes') renderClassesList();
-  if (tab === 'subjects') renderSubjectsList();
-  if (tab === 'students') renderStudentsDirectory();
-  if (tab === 'teachers') renderTeachersList();
+  if (!currentUser) {
+    container.innerHTML = `
+      <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-page)]">
+        <p class="text-xs text-[var(--text-sub)] font-medium">Please sign in to view your scheduled timetable</p>
+      </div>`;
+    return;
+  }
+
+  try {
+    const myEmail = (currentUser.email || '').trim().toLowerCase();
+    const isAdmin = currentUser.role === 'admin';
+    const now = new Date();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = dayNames[now.getDay()].toLowerCase();
+
+    const ttRes = await API.getTimetable('', '', myEmail);
+    const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
+    let mySlots = allSlots.filter(s => (s.teacherEmail || '').trim().toLowerCase() === myEmail);
+    if (isAdmin && mySlots.length === 0) {
+      mySlots = allSlots;
+    }
+
+    const todaySlots = mySlots.filter(s => {
+      const d = (s.day || '').trim().toLowerCase();
+      const days = Array.isArray(s.days) ? s.days.map(x => x.trim().toLowerCase()) : [];
+      const splitDays = d.split(',').map(x => x.trim().toLowerCase());
+      return d === todayName || d === 'all days' || splitDays.includes(todayName) || days.includes(todayName) || days.includes('all days');
+    });
+
+    if (todaySlots.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-page)]">
+          <svg class="w-8 h-8 mx-auto text-[var(--text-sub)] opacity-50 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <div class="text-xs font-bold text-[var(--text-main)]">No classes scheduled for today</div>
+          <p class="text-[10px] text-[var(--text-sub)] mt-0.5">Enjoy your free time or prepare for upcoming classes</p>
+        </div>`;
+      return;
+    }
+
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+
+    const slotsWithTiming = todaySlots.map(s => {
+      const range = _parseSlotTimeRange(s.timeSlot || s.time);
+      let status = 'upcoming';
+      if (range && range.startMin !== null && range.endMin !== null) {
+        if (currentMin >= range.startMin && currentMin < range.endMin) {
+          status = 'live';
+        } else if (currentMin >= range.endMin) {
+          status = 'completed';
+        } else {
+          status = 'upcoming';
+        }
+      }
+      return { slot: s, range, status, startMin: range ? range.startMin : 9999 };
+    }).sort((a, b) => a.startMin - b.startMin);
+
+    container.innerHTML = slotsWithTiming.map(item => {
+      const s = item.slot;
+      const timeStr = s.timeSlot || s.time || 'Scheduled Time';
+      const isLive = item.status === 'live';
+      const isCompleted = item.status === 'completed';
+
+      let statusBadge = '';
+      let cardStyle = '';
+
+      if (isLive) {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white shadow-sm animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-white"></span>Live Now</span>`;
+        cardStyle = `bg-[#245b70]/10 dark:bg-cyan-900/25 border-2 border-[#245b70] dark:border-cyan-400 shadow-md`;
+      } else if (isCompleted) {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">✓ Completed</span>`;
+        cardStyle = `bg-[var(--bg-page)]/70 border border-[var(--border-color)] opacity-75`;
+      } else {
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Upcoming</span>`;
+        cardStyle = `bg-[var(--bg-page)] border border-[var(--border-color)] hover:border-[#245b70]/40 transition`;
+      }
+
+      return `
+        <div class="p-3 rounded-xl flex items-center justify-between gap-3 ${cardStyle} transition">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl ${isLive ? 'bg-emerald-500 text-white' : 'bg-slate-200/70 dark:bg-slate-700 text-[var(--text-main)]'} flex flex-col items-center justify-center flex-shrink-0 text-center font-bold">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)] truncate">${escapeHtml(s.subject || 'Class')}</h5>
+                ${statusBadge}
+              </div>
+              <div class="text-[11px] text-[var(--text-sub)] flex items-center gap-2 mt-0.5 truncate">
+                <span class="font-bold text-[#245b70] dark:text-cyan-400">${escapeHtml(s.class ? 'Class ' + s.class : '')}</span>
+                <span>•</span>
+                <span>${escapeHtml(timeStr)}</span>
+              </div>
+            </div>
+          </div>
+          ${!isCompleted ? `
+            <button type="button" onclick="startAttendanceFromTimetable('${escapeHtml(s.class || '')}', '${escapeHtml(s.subject || '')}')" class="flex-shrink-0 touch-btn px-2.5 py-1.5 rounded-lg ${isLive ? 'bg-[#245b70] text-white font-black' : 'bg-[var(--card-bg)] text-[#245b70] dark:text-cyan-400 font-bold border border-[var(--border-color)]'} text-[11px] hover:scale-105 active:scale-95 transition">
+              Mark
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.log('[Dashboard Timetable Error]', e);
+    container.innerHTML = `
+      <div class="text-center py-4 px-2 text-xs text-rose-500 font-semibold">
+        Could not load today's timetable.
+      </div>`;
+  }
+}
+
+function startAttendanceFromTimetable(className, subjectName) {
+  if (!className) {
+    showToast('Class is not specified in this timetable slot', true);
+    return;
+  }
+  const selClass = document.getElementById('sel-class');
+  const selSubject = document.getElementById('sel-subject');
+  if (selClass) selClass.value = className;
+  currentClass = className;
+  attendanceReadyToLoad = true;
+
+  updateAttendanceSubjectsDropdown(className);
+  if (selSubject && subjectName) {
+    selSubject.value = subjectName;
+    currentSubject = subjectName;
+  }
+
+  selectTab('attendance');
+  loadAttendanceRoster();
+  showToast(`Attendance ready for ${className} • ${subjectName || currentSubject}`);
+}
+
+let cachedAnnouncements = [];
+
+async function loadDashboardAnnouncements() {
+  const container = document.getElementById('dash-announcements-container');
+  if (!container) return;
+
+  try {
+    const res = await API.getAnnouncements();
+    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+    cachedAnnouncements = list;
+
+    const published = list.filter(a => a.isPublished !== false);
+
+    if (published.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-page)]">
+          <svg class="w-8 h-8 mx-auto text-[var(--text-sub)] opacity-50 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <div class="text-xs font-bold text-[var(--text-main)]">No announcements yet</div>
+          <p class="text-[10px] text-[var(--text-sub)] mt-0.5">Stay tuned for upcoming news and notices</p>
+        </div>`;
+      return;
+    }
+
+    const topItems = published.slice(0, 3);
+    container.innerHTML = topItems.map(a => {
+      const isImportant = a.priority === 'important';
+      const badge = isImportant
+        ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">Important</span>`
+        : `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold text-[var(--text-sub)] bg-slate-500/10 border border-slate-500/20">Notice</span>`;
+      
+      const dateStr = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+      return `
+        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1 hover:border-[#245b70]/30 transition">
+          <div class="flex items-center justify-between gap-2">
+            <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(a.title)}</h5>
+            ${badge}
+          </div>
+          <p class="text-[11px] text-[var(--text-sub)] line-clamp-2 leading-relaxed">${escapeHtml(a.description || '')}</p>
+          ${dateStr ? `<div class="text-[10px] text-[var(--text-sub)] opacity-70 pt-1">${dateStr}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.log('[Dashboard Announcements Error]', e);
+    container.innerHTML = `
+      <div class="text-center py-4 px-2 text-xs text-rose-500 font-semibold">
+        Could not load announcements.
+      </div>`;
+  }
+}
+
+let cachedEvents = [];
+
+async function loadDashboardEvents() {
+  const container = document.getElementById('dash-events-container');
+  if (!container) return;
+
+  try {
+    const res = await API.getEvents(true);
+    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+    cachedEvents = list;
+
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-page)]">
+          <svg class="w-8 h-8 mx-auto text-[var(--text-sub)] opacity-50 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <div class="text-xs font-bold text-[var(--text-main)]">No upcoming events</div>
+          <p class="text-[10px] text-[var(--text-sub)] mt-0.5">Upcoming school events will appear here</p>
+        </div>`;
+      return;
+    }
+
+    const topItems = list.slice(0, 3);
+    container.innerHTML = topItems.map(ev => {
+      const dateStr = ev.date ? new Date(ev.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
+      const metaParts = [dateStr, ev.time, ev.location].filter(Boolean);
+
+      return `
+        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-start gap-3 hover:border-[#245b70]/30 transition">
+          <div class="w-10 h-10 rounded-xl bg-teal-500/10 text-[#245b70] dark:text-cyan-400 flex flex-col items-center justify-center flex-shrink-0 font-black">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(ev.name)}</h5>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-[#245b70] dark:text-cyan-400 border border-teal-500/20 capitalize">${escapeHtml(ev.status || 'Upcoming')}</span>
+            </div>
+            ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)] line-clamp-1 mt-0.5 leading-snug">${escapeHtml(ev.description)}</p>` : ''}
+            <div class="text-[10px] font-semibold text-[var(--text-sub)] flex items-center gap-1.5 mt-1 truncate">
+              <span>📅 ${escapeHtml(metaParts.join(' • '))}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.log('[Dashboard Events Error]', e);
+    container.innerHTML = `
+      <div class="text-center py-4 px-2 text-xs text-rose-500 font-semibold">
+        Could not load upcoming events.
+      </div>`;
+  }
+}
+
+function openAllAnnouncementsModal() {
+  const modal = document.getElementById('modal-all-announcements');
+  const container = document.getElementById('all-announcements-list-container');
+  if (!modal || !container) return;
+  modal.classList.remove('hidden');
+
+  const published = (cachedAnnouncements || []).filter(a => a.isPublished !== false);
+  if (published.length === 0) {
+    container.innerHTML = `<div class="text-center py-8 text-xs text-[var(--text-sub)] font-semibold">No announcements found.</div>`;
+    return;
+  }
+
+  container.innerHTML = published.map(a => {
+    const isImportant = a.priority === 'important';
+    const badge = isImportant
+      ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">Important</span>`
+      : `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold text-[var(--text-sub)] bg-slate-500/10 border border-slate-500/20">Notice</span>`;
+    const dateStr = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+    return `
+      <div class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5 shadow-sm">
+        <div class="flex items-center justify-between gap-2">
+          <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${escapeHtml(a.title)}</h4>
+          ${badge}
+        </div>
+        <p class="text-xs text-[var(--text-sub)] leading-relaxed whitespace-pre-line">${escapeHtml(a.description || '')}</p>
+        ${dateStr ? `<div class="text-[10px] text-[var(--text-sub)] opacity-70 pt-1 border-t border-[var(--border-color)]/50">Posted on ${dateStr}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function closeAllAnnouncementsModal() {
+  const modal = document.getElementById('modal-all-announcements');
+  if (modal) modal.classList.add('hidden');
+}
+
+function openAllEventsModal() {
+  const modal = document.getElementById('modal-all-events');
+  const container = document.getElementById('all-events-list-container');
+  if (!modal || !container) return;
+  modal.classList.remove('hidden');
+
+  if (!cachedEvents || cachedEvents.length === 0) {
+    container.innerHTML = `<div class="text-center py-8 text-xs text-[var(--text-sub)] font-semibold">No events found.</div>`;
+    return;
+  }
+
+  container.innerHTML = cachedEvents.map(ev => {
+    const dateStr = ev.date ? new Date(ev.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    const metaParts = [dateStr, ev.time, ev.location].filter(Boolean);
+
+    return `
+      <div class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5 shadow-sm">
+        <div class="flex items-center justify-between gap-2">
+          <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${escapeHtml(ev.name)}</h4>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-[#245b70] dark:text-cyan-400 border border-teal-500/20 capitalize">${escapeHtml(ev.status || 'Upcoming')}</span>
+        </div>
+        ${ev.description ? `<p class="text-xs text-[var(--text-sub)] leading-relaxed whitespace-pre-line">${escapeHtml(ev.description)}</p>` : ''}
+        <div class="text-[11px] font-semibold text-[var(--text-sub)] pt-1 border-t border-[var(--border-color)]/50">
+          📍 ${escapeHtml(metaParts.join(' • '))}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function closeAllEventsModal() {
+  const modal = document.getElementById('modal-all-events');
+  if (modal) modal.classList.add('hidden');
+}
+
+// Admin Announcements Management
+async function loadAdminAnnouncementsList() {
+  const container = document.getElementById('admin-announcements-list');
+  if (!container) return;
+
+  try {
+    const res = await API.getAnnouncements();
+    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+    cachedAnnouncements = list;
+
+    if (list.length === 0) {
+      container.innerHTML = `<div class="text-center py-4 text-xs text-[var(--text-sub)] font-medium">No announcements created yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = list.map(a => {
+      const isImportant = a.priority === 'important';
+      const isPublished = a.isPublished !== false;
+      return `
+        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(a.title)}</h5>
+              <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${isImportant ? 'bg-rose-500/20 text-rose-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}">${a.priority}</span>
+              ${!isPublished ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-500/20 text-amber-600">Draft</span>` : ''}
+            </div>
+            <p class="text-[10px] text-[var(--text-sub)] truncate mt-0.5">${escapeHtml(a.description || '')}</p>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button type="button" onclick="openAnnouncementModal('${a._id}')" class="p-1.5 rounded-lg bg-[var(--card-bg)] text-[#245b70] dark:text-cyan-400 border border-[var(--border-color)] hover:scale-105 active:scale-95 transition" title="Edit">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button type="button" onclick="deleteAnnouncement('${a._id}')" class="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:scale-105 active:scale-95 transition" title="Delete">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.log('[Admin Announcements Load Error]', e);
+  }
+}
+
+function openAnnouncementModal(id = null) {
+  const modal = document.getElementById('modal-announcement-edit');
+  const titleEl = document.getElementById('modal-announcement-title');
+  const idEl = document.getElementById('announcement-edit-id');
+  const inputTitle = document.getElementById('announcement-input-title');
+  const inputDesc = document.getElementById('announcement-input-desc');
+  const inputPriority = document.getElementById('announcement-input-priority');
+  const inputPublished = document.getElementById('announcement-input-published');
+
+  if (!modal) return;
+
+  if (id) {
+    const item = (cachedAnnouncements || []).find(a => a._id === id);
+    if (!item) return;
+    if (titleEl) titleEl.textContent = 'Edit Announcement';
+    if (idEl) idEl.value = id;
+    if (inputTitle) inputTitle.value = item.title || '';
+    if (inputDesc) inputDesc.value = item.description || '';
+    if (inputPriority) inputPriority.value = item.priority || 'normal';
+    if (inputPublished) inputPublished.value = item.isPublished === false ? 'false' : 'true';
+  } else {
+    if (titleEl) titleEl.textContent = 'Add Announcement';
+    if (idEl) idEl.value = '';
+    if (inputTitle) inputTitle.value = '';
+    if (inputDesc) inputDesc.value = '';
+    if (inputPriority) inputPriority.value = 'normal';
+    if (inputPublished) inputPublished.value = 'true';
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeAnnouncementModal() {
+  const modal = document.getElementById('modal-announcement-edit');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleSaveAnnouncement(e) {
+  e.preventDefault();
+  const idEl = document.getElementById('announcement-edit-id');
+  const inputTitle = document.getElementById('announcement-input-title');
+  const inputDesc = document.getElementById('announcement-input-desc');
+  const inputPriority = document.getElementById('announcement-input-priority');
+  const inputPublished = document.getElementById('announcement-input-published');
+  const btn = document.getElementById('btn-save-announcement');
+
+  const id = idEl ? idEl.value : '';
+  const title = inputTitle ? inputTitle.value.trim() : '';
+  const description = inputDesc ? inputDesc.value.trim() : '';
+  const priority = inputPriority ? inputPriority.value : 'normal';
+  const isPublished = inputPublished ? inputPublished.value === 'true' : true;
+
+  if (!title) {
+    showToast('Please enter an announcement title', true);
+    return;
+  }
+
+  const payload = { title, description, priority, isPublished };
+
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    if (id) {
+      await API.updateAnnouncement(id, payload);
+      showToast('Announcement updated successfully!');
+    } else {
+      await API.createAnnouncement(payload);
+      showToast('Announcement created successfully!');
+    }
+    closeAnnouncementModal();
+    await loadAdminAnnouncementsList();
+    await loadDashboardAnnouncements();
+  } catch (err) {
+    showToast(err.message || 'Failed to save announcement', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+  }
+}
+
+async function deleteAnnouncement(id) {
+  if (!confirm('Are you sure you want to delete this announcement?')) return;
+  try {
+    await API.deleteAnnouncement(id);
+    showToast('Announcement deleted');
+    await loadAdminAnnouncementsList();
+    await loadDashboardAnnouncements();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete announcement', true);
+  }
+}
+
+// Admin Events Management
+async function loadAdminEventsList() {
+  const container = document.getElementById('admin-events-list');
+  if (!container) return;
+
+  try {
+    const res = await API.getEvents(false);
+    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+    cachedEvents = list;
+
+    if (list.length === 0) {
+      container.innerHTML = `<div class="text-center py-4 text-xs text-[var(--text-sub)] font-medium">No events scheduled yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = list.map(ev => {
+      const dateStr = ev.date ? new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+      return `
+        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(ev.name)}</h5>
+              <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-teal-500/20 text-[#245b70] dark:text-cyan-400 capitalize">${ev.status || 'upcoming'}</span>
+            </div>
+            <p class="text-[10px] text-[var(--text-sub)] truncate mt-0.5">${escapeHtml([dateStr, ev.time, ev.location].filter(Boolean).join(' • '))}</p>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button type="button" onclick="openEventModal('${ev._id}')" class="p-1.5 rounded-lg bg-[var(--card-bg)] text-[#245b70] dark:text-cyan-400 border border-[var(--border-color)] hover:scale-105 active:scale-95 transition" title="Edit">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button type="button" onclick="deleteEvent('${ev._id}')" class="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:scale-105 active:scale-95 transition" title="Delete">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.log('[Admin Events Load Error]', e);
+  }
+}
+
+function openEventModal(id = null) {
+  const modal = document.getElementById('modal-event-edit');
+  const titleEl = document.getElementById('modal-event-title');
+  const idEl = document.getElementById('event-edit-id');
+  const inputName = document.getElementById('event-input-name');
+  const inputDesc = document.getElementById('event-input-desc');
+  const inputDate = document.getElementById('event-input-date');
+  const inputTime = document.getElementById('event-input-time');
+  const inputLocation = document.getElementById('event-input-location');
+  const inputStatus = document.getElementById('event-input-status');
+
+  if (!modal) return;
+
+  if (id) {
+    const item = (cachedEvents || []).find(ev => ev._id === id);
+    if (!item) return;
+    if (titleEl) titleEl.textContent = 'Edit Event';
+    if (idEl) idEl.value = id;
+    if (inputName) inputName.value = item.name || '';
+    if (inputDesc) inputDesc.value = item.description || '';
+    if (inputDate) {
+      inputDate.value = item.date ? item.date.split('T')[0] : '';
+    }
+    if (inputTime) inputTime.value = item.time || '';
+    if (inputLocation) inputLocation.value = item.location || '';
+    if (inputStatus) inputStatus.value = item.status || 'upcoming';
+  } else {
+    if (titleEl) titleEl.textContent = 'Add Event';
+    if (idEl) idEl.value = '';
+    if (inputName) inputName.value = '';
+    if (inputDesc) inputDesc.value = '';
+    if (inputDate) inputDate.value = new Date().toISOString().split('T')[0];
+    if (inputTime) inputTime.value = '';
+    if (inputLocation) inputLocation.value = '';
+    if (inputStatus) inputStatus.value = 'upcoming';
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeEventModal() {
+  const modal = document.getElementById('modal-event-edit');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleSaveEvent(e) {
+  e.preventDefault();
+  const idEl = document.getElementById('event-edit-id');
+  const inputName = document.getElementById('event-input-name');
+  const inputDesc = document.getElementById('event-input-desc');
+  const inputDate = document.getElementById('event-input-date');
+  const inputTime = document.getElementById('event-input-time');
+  const inputLocation = document.getElementById('event-input-location');
+  const inputStatus = document.getElementById('event-input-status');
+  const btn = document.getElementById('btn-save-event');
+
+  const id = idEl ? idEl.value : '';
+  const name = inputName ? inputName.value.trim() : '';
+  const description = inputDesc ? inputDesc.value.trim() : '';
+  const date = inputDate ? inputDate.value : '';
+  const time = inputTime ? inputTime.value.trim() : '';
+  const location = inputLocation ? inputLocation.value.trim() : '';
+  const status = inputStatus ? inputStatus.value : 'upcoming';
+
+  if (!name || !date) {
+    showToast('Event name and date are required', true);
+    return;
+  }
+
+  const payload = { name, description, date, time, location, status };
+
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    if (id) {
+      await API.updateEvent(id, payload);
+      showToast('Event updated successfully!');
+    } else {
+      await API.createEvent(payload);
+      showToast('Event created successfully!');
+    }
+    closeEventModal();
+    await loadAdminEventsList();
+    await loadDashboardEvents();
+  } catch (err) {
+    showToast(err.message || 'Failed to save event', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+  }
+}
+
+async function deleteEvent(id) {
+  if (!confirm('Are you sure you want to delete this event?')) return;
+  try {
+    await API.deleteEvent(id);
+    showToast('Event deleted');
+    await loadAdminEventsList();
+    await loadDashboardEvents();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete event', true);
+  }
+}
+
+// Account Settings Handlers
+function openChangePasswordModal() {
+  const modal = document.getElementById('modal-change-password');
+  if (modal) {
+    const cur = document.getElementById('input-current-password');
+    const np = document.getElementById('input-new-password');
+    const cp = document.getElementById('input-confirm-password');
+    if (cur) cur.value = '';
+    if (np) np.value = '';
+    if (cp) cp.value = '';
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeChangePasswordModal() {
+  const modal = document.getElementById('modal-change-password');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleChangePassword(e) {
+  e.preventDefault();
+  const curPass = document.getElementById('input-current-password')?.value;
+  const newPass = document.getElementById('input-new-password')?.value;
+  const confPass = document.getElementById('input-confirm-password')?.value;
+  const btn = document.getElementById('btn-save-password');
+
+  if (!newPass || newPass.length < 6) {
+    showToast('New password must be at least 6 characters', true);
+    return;
+  }
+  if (newPass !== confPass) {
+    showToast('New passwords do not match', true);
+    return;
+  }
+
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+    const res = await API.changePassword(curPass, newPass);
+    if (res.success) {
+      showToast(res.message || 'Password changed successfully!');
+      closeChangePasswordModal();
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to update password', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+  }
+}
+
+function openNotificationSettingsModal() {
+  const modal = document.getElementById('modal-notification-settings');
+  if (modal) {
+    const tMorning = document.getElementById('user-notif-morning');
+    const tPreclass = document.getElementById('user-notif-preclass');
+    const tVibrate = document.getElementById('user-notif-vibrate');
+    if (tMorning) tMorning.checked = localStorage.getItem('admin_notif_morning') !== 'false';
+    if (tPreclass) tPreclass.checked = localStorage.getItem('admin_notif_preclass') !== 'false';
+    if (tVibrate) tVibrate.checked = localStorage.getItem('admin_notif_vibrate') !== 'false';
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeNotificationSettingsModal() {
+  const modal = document.getElementById('modal-notification-settings');
+  if (modal) modal.classList.add('hidden');
 }
 
 // Modal triggers
@@ -4244,6 +5056,9 @@ async function handleGoogleTokenResponse(tokenResponse) {
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
+      _applyTeachersTabVisibility();
+      await loadHomeDashboard();
+      selectTab('home');
     }
   } catch (error) {
     showAuthAlert('Google Authentication Failed: ' + (error.message || 'Verification rejected'), true);
@@ -4273,6 +5088,9 @@ async function handleGoogleCredentialResponse(response) {
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
+      _applyTeachersTabVisibility();
+      await loadHomeDashboard();
+      selectTab('home');
     }
   } catch (error) {
     showAuthAlert('Google Authentication Failed: ' + (error.message || 'Verification rejected'), true);
@@ -4314,6 +5132,9 @@ async function handleEmailLogin(e) {
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
+      _applyTeachersTabVisibility();
+      await loadHomeDashboard();
+      selectTab('home');
     }
   } catch (error) {
     showAuthAlert(error.message || 'Invalid username/email or password', true);
@@ -4375,6 +5196,9 @@ async function handleEmailRegister(e) {
       await loadAttendanceRoster();
       await loadReport();
       await loadActivityLogs();
+      _applyTeachersTabVisibility();
+      await loadHomeDashboard();
+      selectTab('home');
     }
   } catch (error) {
     showAuthAlert(error.message || 'Registration failed', true);
@@ -4393,7 +5217,8 @@ function handleSignout() {
   currentUser = null;
   currentRole = null;
   updateUserUI();
-  selectTopTab('attendance');
+  selectTab('home');
+  loadHomeDashboard();
   const bubbleModal = document.getElementById('notif-bubble-timetable-modal');
   if (bubbleModal) bubbleModal.classList.add('hidden');
   const preclassCard = document.getElementById('notif-preclass-card');
