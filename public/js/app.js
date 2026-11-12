@@ -2657,134 +2657,154 @@ async function handlePhotoUpload(event, mode) {
 }
 
 // ================= ONE CENTRALIZED USER PROFILE EDITING SYSTEM =================
-let currentProfileAvatarUrl = '';
-let initialProfileState = { name: '', avatarUrl: '', phone: '' };
+// ================= ONE CENTRALIZED EDIT PROFILE PAGE =================
+let activeEditProfileUserId = null;
+let editProfileCurrentAvatarUrl = '';
+let editProfileInitialState = {
+  name: '',
+  email: '',
+  phone: '',
+  avatarUrl: '',
+  subjects: []
+};
 
-// Image Cropper State
-let editProfileCropImage = null;
-let editProfileCropScale = 1;
-let editProfileCropOffsetX = 0;
-let editProfileCropOffsetY = 0;
-let editProfileIsDragging = false;
-let editProfileDragStartX = 0;
-let editProfileDragStartY = 0;
-let editProfileCanvasListenersInitialized = false;
-
-function openProfileEditModal() {
+async function openProfileEditPage(targetUserId = null) {
   if (!currentUser) {
     showToast('Please sign in first', true);
     openAuthModal();
     return;
   }
 
-  currentProfileAvatarUrl = currentUser.avatarUrl || '';
-  initialProfileState = {
-    name: (currentUser.name || '').trim(),
-    avatarUrl: currentUser.avatarUrl || '',
-    phone: (currentUser.phone || '').trim()
-  };
+  // Ensure subjects list is loaded for checkboxes
+  if (!subjectsList || subjectsList.length === 0) {
+    try {
+      const sRes = await API.getSubjects();
+      if (sRes.success && sRes.data) subjectsList = sRes.data;
+    } catch (_) {}
+  }
 
-  // Populate Avatar Preview
+  const titleEl = document.getElementById('edit-profile-page-title');
+  const subtitleEl = document.getElementById('edit-profile-page-subtitle');
   const preview = document.getElementById('edit-profile-avatar-preview');
-  if (preview) {
-    preview.src = currentUser.avatarUrl || '/icons/logo.png';
-  }
-
-  // Populate Inputs
-  const nameInput = document.getElementById('edit-profile-name-input');
-  if (nameInput) nameInput.value = currentUser.name || '';
-
-  const emailInput = document.getElementById('edit-profile-email-input');
-  if (emailInput) emailInput.value = currentUser.email || 'No email linked';
-
-  const phoneInput = document.getElementById('edit-profile-phone-input');
-  if (phoneInput) phoneInput.value = currentUser.phone || '';
-
-  // Designation (Read-only)
-  const desigInput = document.getElementById('edit-profile-designation-input');
-  if (desigInput) {
-    if (currentUser.role === 'admin') {
-      desigInput.value = 'Administrator / Principal';
-    } else if (currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0) {
-      desigInput.value = `Ustadh (${currentUser.assignedSubjects.join(', ')})`;
-    } else {
-      desigInput.value = 'Ustadh / Faculty';
-    }
-  }
-
-  // Security & Identity Metadata (Read-only)
-  const roleDisplay = document.getElementById('edit-profile-role-display');
-  if (roleDisplay) {
-    roleDisplay.textContent = currentUser.role === 'admin' ? 'Administrator' : 'Teacher';
-  }
-
-  const memberSinceDisplay = document.getElementById('edit-profile-membersince-display');
-  if (memberSinceDisplay) {
-    if (currentUser.createdAt) {
-      try {
-        const d = new Date(currentUser.createdAt);
-        memberSinceDisplay.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-      } catch (_) {
-        memberSinceDisplay.textContent = 'Active Account';
-      }
-    } else {
-      memberSinceDisplay.textContent = 'Active Account';
-    }
-  }
-
-  // Reset errors and crop panel
+  const nameInput = document.getElementById('edit-profile-name');
+  const emailInput = document.getElementById('edit-profile-email');
+  const emailBadge = document.getElementById('edit-profile-email-badge');
+  const phoneInput = document.getElementById('edit-profile-phone');
   const errorEl = document.getElementById('edit-profile-photo-error');
+
   if (errorEl) {
     errorEl.textContent = '';
     errorEl.classList.add('hidden');
   }
 
-  const nameError = document.getElementById('edit-profile-name-error');
-  if (nameError) nameError.classList.add('hidden');
+  const isEditingOtherTeacher = Boolean(targetUserId && targetUserId !== (currentUser._id || currentUser.id));
 
-  cancelCropPanel();
-
-  // Show "Crop / Position" button if custom image exists
-  const cropBtn = document.getElementById('btn-edit-crop-adjust');
-  if (cropBtn) {
-    if (currentProfileAvatarUrl && !currentProfileAvatarUrl.includes('logo.png')) {
-      cropBtn.classList.remove('hidden');
-    } else {
-      cropBtn.classList.add('hidden');
+  if (isEditingOtherTeacher) {
+    activeEditProfileUserId = targetUserId;
+    let teacher = (cachedTeachersList || []).find(t => t._id === targetUserId);
+    if (!teacher) {
+      try {
+        const res = await API.getTeachers();
+        if (res.success && res.data) {
+          cachedTeachersList = res.data;
+          teacher = cachedTeachersList.find(t => t._id === targetUserId);
+        }
+      } catch (_) {}
     }
+
+    if (!teacher) {
+      showToast('Teacher not found', true);
+      return;
+    }
+
+    if (titleEl) titleEl.textContent = `Edit Teacher: ${teacher.name}`;
+    if (subtitleEl) subtitleEl.textContent = 'Update profile, contact & assigned subjects';
+
+    editProfileCurrentAvatarUrl = teacher.avatarUrl || '';
+    if (preview) {
+      preview.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
+    }
+
+    if (nameInput) nameInput.value = teacher.name || '';
+    if (emailInput) {
+      emailInput.value = teacher.email || '';
+      emailInput.readOnly = false;
+      emailInput.className = "touch-input w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70] focus:border-transparent transition";
+    }
+    if (emailBadge) {
+      emailBadge.textContent = 'Admin Editable';
+      emailBadge.className = 'text-[10px] font-bold text-amber-600 dark:text-amber-400';
+    }
+    if (phoneInput) phoneInput.value = teacher.phone || '';
+
+    renderTeacherSubjectCheckboxes('edit-profile-subjects-container', teacher.assignedSubjects || []);
+
+    editProfileInitialState = {
+      name: (teacher.name || '').trim(),
+      email: (teacher.email || '').trim(),
+      phone: (teacher.phone || '').trim(),
+      avatarUrl: teacher.avatarUrl || '',
+      subjects: [...(teacher.assignedSubjects || [])]
+    };
+  } else {
+    // Editing own profile
+    activeEditProfileUserId = null;
+
+    if (titleEl) titleEl.textContent = 'Edit Profile';
+    if (subtitleEl) subtitleEl.textContent = 'Manage personal details & assigned subjects';
+
+    editProfileCurrentAvatarUrl = currentUser.avatarUrl || '';
+    if (preview) {
+      preview.src = currentUser.avatarUrl || '/icons/logo.png';
+    }
+
+    if (nameInput) nameInput.value = currentUser.name || '';
+    if (emailInput) {
+      emailInput.value = currentUser.email || '';
+      const isAdmin = currentUser.role === 'admin';
+      emailInput.readOnly = !isAdmin;
+      if (isAdmin) {
+        emailInput.className = "touch-input w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70] focus:border-transparent transition";
+        if (emailBadge) {
+          emailBadge.textContent = 'Admin Editable';
+          emailBadge.className = 'text-[10px] font-bold text-amber-600 dark:text-amber-400';
+        }
+      } else {
+        emailInput.className = "w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[var(--bg-page)]/60 border border-[var(--border-color)] text-xs font-medium text-[var(--text-sub)] cursor-not-allowed select-none";
+        if (emailBadge) {
+          emailBadge.textContent = 'Read-only';
+          emailBadge.className = 'text-[10px] font-bold text-slate-400';
+        }
+      }
+    }
+    if (phoneInput) phoneInput.value = currentUser.phone || '';
+
+    renderTeacherSubjectCheckboxes('edit-profile-subjects-container', currentUser.assignedSubjects || []);
+
+    editProfileInitialState = {
+      name: (currentUser.name || '').trim(),
+      email: (currentUser.email || '').trim(),
+      phone: (currentUser.phone || '').trim(),
+      avatarUrl: currentUser.avatarUrl || '',
+      subjects: [...(currentUser.assignedSubjects || [])]
+    };
   }
 
-  const modal = document.getElementById('modal-edit-profile');
-  if (modal) modal.classList.remove('hidden');
+  selectTab('edit-profile');
 
-  initCropCanvasListeners();
+  const mainViewport = document.querySelector('main');
+  if (mainViewport) mainViewport.scrollTop = 0;
 }
 
-function closeProfileEditModal() {
-  const modal = document.getElementById('modal-edit-profile');
-  if (modal) modal.classList.add('hidden');
-  cancelCropPanel();
+// Aliases for backward compatibility
+function openProfileEditModal(targetUserId = null) {
+  openProfileEditPage(targetUserId);
+}
+function openEditTeacherModal(targetUserId) {
+  openProfileEditPage(targetUserId);
 }
 
-function hasUnsavedProfileChanges() {
-  const curName = (document.getElementById('edit-profile-name-input')?.value || '').trim();
-  const curPhone = (document.getElementById('edit-profile-phone-input')?.value || '').trim();
-  const curAvatar = currentProfileAvatarUrl || '';
-
-  return (curName !== initialProfileState.name) ||
-         (curPhone !== initialProfileState.phone) ||
-         (curAvatar !== initialProfileState.avatarUrl);
-}
-
-function handleCloseProfileModalWithCheck() {
-  if (hasUnsavedProfileChanges()) {
-    const discard = confirm('You have unsaved changes. Are you sure you want to discard them?');
-    if (!discard) return;
-  }
-  closeProfileEditModal();
-}
-
-function onProfileImageFileSelected(event) {
+function onProfileImageFileSelectedDirect(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
@@ -2794,275 +2814,164 @@ function onProfileImageFileSelected(event) {
     errorEl.classList.add('hidden');
   }
 
-  // 1. Validate File Type: JPG, JPEG, PNG, WebP
+  // Validate File Type: JPG, JPEG, PNG, WebP
   const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   const ext = file.name.split('.').pop().toLowerCase();
   const validExts = ['jpg', 'jpeg', 'png', 'webp'];
   if (!validTypes.includes(file.type.toLowerCase()) && !validExts.includes(ext)) {
     if (errorEl) {
-      errorEl.textContent = 'Invalid file format. Please upload a JPG, JPEG, PNG, or WebP image.';
+      errorEl.textContent = 'Invalid format. Please upload JPG, PNG, or WebP.';
       errorEl.classList.remove('hidden');
     }
-    showToast('Invalid file format. Please upload JPG, PNG, or WebP.', true);
+    showToast('Invalid format. Please upload JPG, PNG, or WebP.', true);
     event.target.value = '';
     return;
   }
 
-  // 2. Validate File Size: Maximum 5MB
+  // Validate File Size: Max 5MB
   const maxBytes = 5 * 1024 * 1024;
   if (file.size > maxBytes) {
-    const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
     if (errorEl) {
-      errorEl.textContent = `Image file is too large (${sizeMb} MB). Maximum allowed size is 5 MB.`;
+      errorEl.textContent = 'Image is too large. Maximum file size is 5MB.';
       errorEl.classList.remove('hidden');
     }
-    showToast(`File too large (${sizeMb} MB). Max 5 MB.`, true);
+    showToast('File too large. Max 5MB allowed.', true);
     event.target.value = '';
     return;
   }
 
-  // Read File and Load into Image for Cropping
   const reader = new FileReader();
-  const spinner = document.getElementById('edit-profile-photo-loading');
-  if (spinner) spinner.classList.remove('hidden');
-
   reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      if (spinner) spinner.classList.add('hidden');
-      editProfileCropImage = img;
-      editProfileCropScale = 1;
-      editProfileCropOffsetX = 0;
-      editProfileCropOffsetY = 0;
-
-      const slider = document.getElementById('crop-zoom-slider');
-      if (slider) slider.value = 1;
-      const label = document.getElementById('crop-zoom-label');
-      if (label) label.textContent = '1.0x';
-
-      const panel = document.getElementById('edit-profile-crop-panel');
-      if (panel) panel.classList.remove('hidden');
-
-      renderCropCanvas();
-    };
-    img.onerror = function() {
-      if (spinner) spinner.classList.add('hidden');
-      if (errorEl) {
-        errorEl.textContent = 'Unable to read this image file. Please try a different image.';
-        errorEl.classList.remove('hidden');
-      }
-    };
-    img.src = e.target.result;
-  };
-
-  reader.readAsDataURL(file);
-  event.target.value = '';
-}
-
-function openProfileImageCropper() {
-  if (!editProfileCropImage) {
+    const dataUrl = e.target.result;
+    editProfileCurrentAvatarUrl = dataUrl;
     const preview = document.getElementById('edit-profile-avatar-preview');
-    if (preview && preview.src && !preview.src.includes('logo.png')) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = function() {
-        editProfileCropImage = img;
-        editProfileCropScale = 1;
-        editProfileCropOffsetX = 0;
-        editProfileCropOffsetY = 0;
-        const panel = document.getElementById('edit-profile-crop-panel');
-        if (panel) panel.classList.remove('hidden');
-        renderCropCanvas();
-      };
-      img.src = preview.src;
-      return;
-    }
-    showToast('Please select a photo first');
-    return;
+    if (preview) preview.src = dataUrl;
+    showToast('Photo selected! Save Changes to apply.');
+  };
+  reader.onerror = function() {
+    showToast('Error reading image file', true);
+  };
+  reader.readAsDataURL(file);
+}
+
+// Unsaved changes detection
+function hasUnsavedProfileChanges() {
+  const curName = (document.getElementById('edit-profile-name')?.value || '').trim();
+  const curEmail = (document.getElementById('edit-profile-email')?.value || '').trim();
+  const curPhone = (document.getElementById('edit-profile-phone')?.value || '').trim();
+  const curAvatar = editProfileCurrentAvatarUrl || '';
+  const curSubjects = getSelectedTeacherCheckboxes('edit-profile-subjects-container').sort().join(',');
+  const initSubjects = (editProfileInitialState.subjects || []).slice().sort().join(',');
+
+  return (curName !== editProfileInitialState.name) ||
+         (curEmail !== editProfileInitialState.email) ||
+         (curPhone !== editProfileInitialState.phone) ||
+         (curAvatar !== editProfileInitialState.avatarUrl) ||
+         (curSubjects !== initSubjects);
+}
+
+function handleCloseProfilePageWithCheck() {
+  if (hasUnsavedProfileChanges()) {
+    const discard = confirm('You have unsaved changes. Discard them?');
+    if (!discard) return;
   }
-
-  const panel = document.getElementById('edit-profile-crop-panel');
-  if (panel) panel.classList.remove('hidden');
-  renderCropCanvas();
+  const fallback = activeEditProfileUserId ? 'teachers' : 'settings';
+  goBackFromSubPage(fallback);
 }
 
-function cancelCropPanel() {
-  const panel = document.getElementById('edit-profile-crop-panel');
-  if (panel) panel.classList.add('hidden');
+function handleCloseProfileModalWithCheck() {
+  handleCloseProfilePageWithCheck();
 }
-
-function onCropZoomChanged(val) {
-  editProfileCropScale = parseFloat(val) || 1;
-  const label = document.getElementById('crop-zoom-label');
-  if (label) label.textContent = `${editProfileCropScale.toFixed(1)}x`;
-  renderCropCanvas();
-}
-
-function renderCropCanvas() {
-  const canvas = document.getElementById('crop-canvas');
-  if (!canvas || !editProfileCropImage) return;
-
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width;
-  const h = canvas.height;
-
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, w, h);
-
-  const imgW = editProfileCropImage.width;
-  const imgH = editProfileCropImage.height;
-  const baseScale = Math.max(w / imgW, h / imgH);
-  const totalScale = baseScale * editProfileCropScale;
-
-  const drawW = imgW * totalScale;
-  const drawH = imgH * totalScale;
-  const drawX = (w - drawW) / 2 + editProfileCropOffsetX;
-  const drawY = (h - drawH) / 2 + editProfileCropOffsetY;
-
-  ctx.drawImage(editProfileCropImage, drawX, drawY, drawW, drawH);
-}
-
-function initCropCanvasListeners() {
-  if (editProfileCanvasListenersInitialized) return;
-  const wrapper = document.getElementById('crop-canvas-wrapper');
-  if (!wrapper) return;
-
-  function onPointerDown(e) {
-    editProfileIsDragging = true;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    editProfileDragStartX = clientX - editProfileCropOffsetX;
-    editProfileDragStartY = clientY - editProfileCropOffsetY;
-  }
-
-  function onPointerMove(e) {
-    if (!editProfileIsDragging) return;
-    if (e.touches && e.cancelable) e.preventDefault();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    editProfileCropOffsetX = clientX - editProfileDragStartX;
-    editProfileCropOffsetY = clientY - editProfileDragStartY;
-    renderCropCanvas();
-  }
-
-  function onPointerUp() {
-    editProfileIsDragging = false;
-  }
-
-  wrapper.addEventListener('mousedown', onPointerDown);
-  window.addEventListener('mousemove', onPointerMove);
-  window.addEventListener('mouseup', onPointerUp);
-
-  wrapper.addEventListener('touchstart', onPointerDown, { passive: false });
-  window.addEventListener('touchmove', onPointerMove, { passive: false });
-  window.addEventListener('touchend', onPointerUp);
-  window.addEventListener('touchcancel', onPointerUp);
-
-  editProfileCanvasListenersInitialized = true;
-}
-
-function applyCropAndSavePreview() {
-  if (!editProfileCropImage) return;
-
-  // High-res 400x400 offscreen canvas
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = 400;
-  outCanvas.height = 400;
-  const ctx = outCanvas.getContext('2d');
-
-  const factor = 400 / 224;
-  const imgW = editProfileCropImage.width;
-  const imgH = editProfileCropImage.height;
-  const baseScale = Math.max(224 / imgW, 224 / imgH);
-  const totalScale = baseScale * editProfileCropScale * factor;
-
-  const drawW = imgW * totalScale;
-  const drawH = imgH * totalScale;
-  const drawX = (400 - drawW) / 2 + (editProfileCropOffsetX * factor);
-  const drawY = (400 - drawH) / 2 + (editProfileCropOffsetY * factor);
-
-  ctx.drawImage(editProfileCropImage, drawX, drawY, drawW, drawH);
-
-  const croppedDataUrl = outCanvas.toDataURL('image/jpeg', 0.88);
-  currentProfileAvatarUrl = croppedDataUrl;
-
-  const preview = document.getElementById('edit-profile-avatar-preview');
-  if (preview) preview.src = croppedDataUrl;
-
-  const cropBtn = document.getElementById('btn-edit-crop-adjust');
-  if (cropBtn) cropBtn.classList.remove('hidden');
-
-  cancelCropPanel();
-  showToast('Photo cropped and preview updated!');
-}
-
-function handleRemoveProfilePhoto() {
-  currentProfileAvatarUrl = '';
-  editProfileCropImage = null;
-
-  const preview = document.getElementById('edit-profile-avatar-preview');
-  if (preview) preview.src = '/icons/logo.png';
-
-  const cropBtn = document.getElementById('btn-edit-crop-adjust');
-  if (cropBtn) cropBtn.classList.add('hidden');
-
-  cancelCropPanel();
-  showToast('Default photo restored. Save to apply.');
+function closeProfileEditModal() {
+  handleCloseProfilePageWithCheck();
 }
 
 async function handleSaveProfile(event) {
   if (event) event.preventDefault();
 
-  const nameInput = document.getElementById('edit-profile-name-input');
+  const nameInput = document.getElementById('edit-profile-name');
   const name = nameInput ? nameInput.value.trim() : '';
 
-  const nameError = document.getElementById('edit-profile-name-error');
   if (!name) {
-    if (nameError) nameError.classList.remove('hidden');
-    showToast('Please enter your full name', true);
+    showToast('Please enter full name', true);
     if (nameInput) nameInput.focus();
     return;
   }
-  if (nameError) nameError.classList.add('hidden');
 
-  const phoneInput = document.getElementById('edit-profile-phone-input');
+  const emailInput = document.getElementById('edit-profile-email');
+  const email = emailInput ? emailInput.value.trim() : '';
+
+  const phoneInput = document.getElementById('edit-profile-phone');
   const phone = phoneInput ? phoneInput.value.trim() : '';
 
+  const assignedSubjects = getSelectedTeacherCheckboxes('edit-profile-subjects-container');
+
   const saveBtn = document.getElementById('btn-save-profile');
-  const btnText = document.getElementById('btn-save-profile-text');
   const spinner = document.getElementById('btn-save-profile-spinner');
+  const btnText = document.getElementById('btn-save-profile-text');
+
+  if (saveBtn) saveBtn.disabled = true;
+  if (spinner) spinner.classList.remove('hidden');
+  if (btnText) btnText.textContent = 'Saving...';
 
   try {
-    // Prevent duplicate submissions
-    if (saveBtn) saveBtn.disabled = true;
-    if (spinner) spinner.classList.remove('hidden');
-    if (btnText) btnText.textContent = 'Saving Changes...';
+    if (activeEditProfileUserId) {
+      // Admin editing a teacher
+      const res = await API.editTeacher(activeEditProfileUserId, {
+        name,
+        email,
+        phone,
+        avatarUrl: editProfileCurrentAvatarUrl,
+        assignedSubjects
+      });
 
-    const res = await API.updateProfile(name, currentProfileAvatarUrl, phone);
-    if (res && res.success && res.user) {
-      currentUser = res.user;
-
-      // Update state & UI everywhere throughout the app
-      updateUserUI();
-      updateWelcomeGreeting();
-      if (typeof loadDashboardStats === 'function') loadDashboardStats();
-      if (typeof renderTeachersList === 'function') renderTeachersList();
-
-      initialProfileState = {
-        name: (currentUser.name || '').trim(),
-        avatarUrl: currentUser.avatarUrl || '',
-        phone: (currentUser.phone || '').trim()
-      };
-
-      closeProfileEditModal();
-      showToast('Profile updated successfully!');
+      if (res && res.success) {
+        showToast(res.message || `Teacher "${name}" updated!`);
+        await loadTeachersData();
+        await renderTeachersList();
+        selectTab('teachers');
+      } else {
+        throw new Error((res && res.message) || 'Failed to update teacher');
+      }
     } else {
-      throw new Error((res && res.message) || 'Failed to update profile');
+      // User editing own profile
+      const res = await API.updateProfile({
+        name,
+        email,
+        phone,
+        avatarUrl: editProfileCurrentAvatarUrl,
+        assignedSubjects
+      });
+
+      if (res && res.success && res.user) {
+        currentUser.name = res.user.name;
+        if (res.user.email) currentUser.email = res.user.email;
+        currentUser.phone = res.user.phone || '';
+        currentUser.avatarUrl = res.user.avatarUrl || '';
+        currentUser.assignedSubjects = res.user.assignedSubjects || [];
+        localStorage.setItem('user', JSON.stringify(currentUser));
+
+        updateUserUI();
+        updateHeaderAvatar();
+        renderDashboardGreetings();
+
+        editProfileInitialState = {
+          name: (currentUser.name || '').trim(),
+          email: (currentUser.email || '').trim(),
+          phone: (currentUser.phone || '').trim(),
+          avatarUrl: currentUser.avatarUrl || '',
+          subjects: [...(currentUser.assignedSubjects || [])]
+        };
+
+        showToast('Profile updated successfully!');
+        selectTab('settings');
+      } else {
+        throw new Error((res && res.message) || 'Failed to update profile');
+      }
     }
   } catch (error) {
     console.error('[Profile Save Error]', error);
-    showToast(error.message || 'Failed to update profile', true);
+    showToast(error.message || 'Failed to save changes', true);
   } finally {
     if (saveBtn) saveBtn.disabled = false;
     if (spinner) spinner.classList.add('hidden');
@@ -4383,11 +4292,25 @@ async function handleResetAppPrompt() {
   }
 }
 
+let currentActiveTab = 'home';
+let previousAppTab = 'home';
+
+function goBackFromSubPage(fallbackTab = 'settings') {
+  const target = (previousAppTab && previousAppTab !== currentActiveTab && !['edit-profile', 'teacher-log', 'timetable', 'messages'].includes(previousAppTab))
+    ? previousAppTab
+    : fallbackTab;
+  selectTab(target);
+}
+
 // ================= TAB NAVIGATION =================
 function selectTab(tab) {
   triggerNavHaptic('medium');
 
-  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin'];
+  if (currentActiveTab !== tab) {
+    previousAppTab = currentActiveTab;
+    currentActiveTab = tab;
+  }
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages'];
   allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -6035,7 +5958,7 @@ async function renderTeachersList() {
                 </div>
                 ${canUserEditDelete() ? `
                 <div class="flex items-center gap-1 flex-shrink-0">
-                  <button onclick="openEditTeacherModal('${t._id}')" title="Edit Teacher"
+                  <button onclick="openProfileEditPage('${t._id}')" title="Edit Teacher"
                     class="w-7 h-7 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                   </button>

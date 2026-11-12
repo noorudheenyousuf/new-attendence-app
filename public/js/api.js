@@ -76,10 +76,13 @@ const API = {
     return this.request('/auth/me');
   },
 
-  async updateProfile(name, avatarUrl, phone) {
+  async updateProfile(dataOrName, avatarUrl, phone) {
+    const payload = (typeof dataOrName === 'object' && dataOrName !== null)
+      ? dataOrName
+      : { name: dataOrName, avatarUrl, phone };
     return this.request('/auth/profile', {
       method: 'PUT',
-      body: JSON.stringify({ name, avatarUrl, phone })
+      body: JSON.stringify(payload)
     });
   },
 

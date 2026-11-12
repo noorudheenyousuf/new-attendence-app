@@ -318,7 +318,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 // @desc    USER DIRECTIVE: Consolidated Profile Editing for all accounts
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { name, avatarUrl, phone } = req.body;
+    const { name, email, avatarUrl, phone, assignedSubjects } = req.body;
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -335,6 +335,28 @@ router.put('/profile', authMiddleware, async (req, res) => {
     }
     if (typeof phone !== 'undefined') {
       user.phone = String(phone).trim();
+    }
+
+    // Email edit: Admin can edit email; check uniqueness
+    if (typeof email !== 'undefined' && email.trim()) {
+      const normalizedEmail = email.toLowerCase().trim();
+      if (normalizedEmail !== (user.email || '').toLowerCase().trim()) {
+        if (user.role !== 'admin') {
+          return res.status(403).json({ success: false, message: 'Only administrators can change email addresses' });
+        }
+        const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
+        if (existing) {
+          return res.status(400).json({ success: false, message: `Email "${normalizedEmail}" is already in use by another account.` });
+        }
+        user.email = normalizedEmail;
+      }
+    }
+
+    // Assigned Subjects edit
+    if (typeof assignedSubjects !== 'undefined') {
+      user.assignedSubjects = Array.isArray(assignedSubjects)
+        ? assignedSubjects.map(s => String(s).trim()).filter(Boolean)
+        : (typeof assignedSubjects === 'string' && assignedSubjects.trim() ? assignedSubjects.split(',').map(s => s.trim()).filter(Boolean) : []);
     }
 
     await user.save();
