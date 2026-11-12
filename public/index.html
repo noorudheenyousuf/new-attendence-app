@@ -457,8 +457,13 @@
       <section id="view-attendance" class="hidden space-y-3.5">
         <!-- Filters (Only clean main names, NO brackets) -->
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
+          
+          <div>
+    <h2 class="text-sm sm:text-base font-bold text-[var(--text-main)]">ATTENDANCE CORNER</h2>
+  </div>
+
           <div class="grid grid-cols-2 gap-2.5">
-            <div>
+            <div>             
               <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1 uppercase tracking-wide">Class</label>
               <select id="sel-class" onchange="handleClassChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs sm:text-sm font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70]">
                 <!-- Populated via loadClasses() -->
@@ -546,7 +551,7 @@
       <section id="view-report" class="hidden space-y-3.5">
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
           <div class="flex items-center justify-between">
-            <h2 class="text-sm sm:text-base font-bold text-[var(--text-main)]">Whole Class Report</h2>
+            <h3 class="text-sm sm:text-base font-bold text-[var(--text-main)]"> CLASS REPORT</h3>
             <!-- Print Button (Hidden initially until class & subject selected) -->
             <button id="btn-print-report" onclick="printReport()" class="touch-btn px-3.5 btn-print text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition hidden">
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
@@ -984,10 +989,10 @@
               <p class="text-xs text-[var(--text-sub)] font-medium">Institution identity, permissions, notices, data & backup controls</p>
             </div>
           </div>
-          <button onclick="closeAdminPanel()" class="touch-btn px-4 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--card-bg)] hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-[var(--text-main)] transition flex items-center gap-2 shadow-xs">
+          <!-- <button onclick="closeAdminPanel()" class="touch-btn px-4 py-2 rounded-2xl border border-[var(--border-color)] bg-[var(--card-bg)] hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-[var(--text-main)] transition flex items-center gap-2 shadow-xs">
             <span>Back to Profile</span>
             <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </button>
+          </button> -->
         </div>
 
         <!-- Spacious 2-Column Responsive Layout -->
