@@ -4,6 +4,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
+const Attendance = require('../models/Attendance');
+const Subject = require('../models/Subject');
+const Class = require('../models/Class');
+const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 
 const getGoogleClientId = () => {
@@ -292,12 +296,15 @@ router.get('/me', authMiddleware, async (req, res) => {
       success: true,
       user: {
         id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone || '',
         role: user.role,
         avatarUrl: user.avatarUrl,
         assignedClasses: user.assignedClasses || [],
         assignedSubjects: user.assignedSubjects || [],
+        createdAt: user.createdAt,
         googleConnected: Boolean(user.googleId),
         isFirstAccount: user.isFirstAccount
       }
@@ -308,33 +315,66 @@ router.get('/me', authMiddleware, async (req, res) => {
 });
 
 // @route   PUT /api/auth/profile
-// @desc    USER DIRECTIVE: All accounts can change their names and photo by clicking their photo
+// @desc    USER DIRECTIVE: Consolidated Profile Editing for all accounts
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { name, avatarUrl } = req.body;
+    const { name, avatarUrl, phone } = req.body;
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    const oldName = user.name;
+    const nameChanged = Boolean(name && name.trim() && name.trim() !== oldName);
+
     if (name && name.trim()) {
       user.name = name.trim();
     }
-    if (avatarUrl) {
-      user.avatarUrl = avatarUrl;
+    if (typeof avatarUrl !== 'undefined') {
+      user.avatarUrl = String(avatarUrl).trim();
+    }
+    if (typeof phone !== 'undefined') {
+      user.phone = String(phone).trim();
     }
 
     await user.save();
+
+    if (nameChanged) {
+      try {
+        await Attendance.updateMany({ markedBy: oldName }, { markedBy: user.name });
+        await Subject.updateMany({ teacher: oldName }, { teacher: user.name });
+        await Class.updateMany({ classTeacher: oldName }, { classTeacher: user.name });
+      } catch (cascadeErr) {
+        console.error('[Profile Cascade Error]', cascadeErr);
+      }
+    }
+
+    try {
+      await ActivityLog.create({
+        action: `Profile Updated: ${user.name}`,
+        details: `Updated personal details`,
+        performedBy: user.name,
+        role: user.role,
+        entityType: 'settings',
+        canUndo: false
+      });
+    } catch (_) {}
 
     res.json({
       success: true,
       message: 'Profile updated successfully!',
       user: {
         id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone || '',
         role: user.role,
         avatarUrl: user.avatarUrl,
+        assignedClasses: user.assignedClasses || [],
+        assignedSubjects: user.assignedSubjects || [],
+        createdAt: user.createdAt,
+        googleConnected: Boolean(user.googleId),
         isFirstAccount: user.isFirstAccount
       }
     });

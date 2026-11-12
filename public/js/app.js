@@ -323,10 +323,19 @@ function updateUserUI() {
     const settingsEmail = document.getElementById('settings-email-display');
     const settingsRole = document.getElementById('settings-role-badge');
     const settingsAvatar = document.getElementById('settings-avatar-img');
+    const settingsPhone = document.getElementById('settings-phone-display');
+    const settingsMemberSince = document.getElementById('settings-member-since-display');
+
     if (settingsName) settingsName.innerText = 'Not Signed In';
     if (settingsEmail) settingsEmail.innerText = 'Please sign in to manage school';
+    if (settingsPhone) {
+      settingsPhone.innerText = '';
+      settingsPhone.classList.add('hidden');
+    }
+    if (settingsMemberSince) settingsMemberSince.innerText = '';
     if (settingsRole) {
       settingsRole.innerText = 'Guest Mode';
+      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-slate-500/10 text-slate-500 border border-slate-300 dark:border-slate-700 mx-auto sm:mx-0";
       settingsRole.classList.remove('hidden');
     }
     if (settingsAvatar) settingsAvatar.src = DEFAULT_AVATAR;
@@ -341,17 +350,51 @@ function updateUserUI() {
   if (headerRole) headerRole.innerText = currentUser.role === 'admin' ? 'Admin' : 'Teacher';
   if (headerAvatar) headerAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
 
-  // Settings Card
+  // Settings / Profile Card
   const settingsName = document.getElementById('settings-name-display');
   const settingsEmail = document.getElementById('settings-email-display');
   const settingsRole = document.getElementById('settings-role-badge');
   const settingsAvatar = document.getElementById('settings-avatar-img');
+  const settingsPhone = document.getElementById('settings-phone-display');
+  const settingsMemberSince = document.getElementById('settings-member-since-display');
+
   if (settingsName) settingsName.innerText = currentUser.name || 'User';
   if (settingsEmail) settingsEmail.innerText = currentUser.email || 'No email linked';
+
+  if (settingsPhone) {
+    if (currentUser.phone && currentUser.phone.trim()) {
+      settingsPhone.innerText = currentUser.phone.trim();
+      settingsPhone.classList.remove('hidden');
+    } else {
+      settingsPhone.innerText = '';
+      settingsPhone.classList.add('hidden');
+    }
+  }
+
+  if (settingsMemberSince) {
+    if (currentUser.createdAt) {
+      try {
+        const d = new Date(currentUser.createdAt);
+        settingsMemberSince.innerText = 'Member since ' + d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+      } catch (_) {
+        settingsMemberSince.innerText = '';
+      }
+    } else {
+      settingsMemberSince.innerText = '';
+    }
+  }
+
   if (settingsRole) {
-    settingsRole.innerText = currentUser.role === 'admin' ? 'Admin (First Account)' : 'Teacher';
+    const isAdmin = currentUser.role === 'admin';
+    settingsRole.innerText = isAdmin ? 'Administrator' : 'Teacher';
+    if (isAdmin) {
+      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 mx-auto sm:mx-0";
+    } else {
+      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20 mx-auto sm:mx-0";
+    }
     settingsRole.classList.remove('hidden');
   }
+
   if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
 
   // Visibility based on Role:
@@ -441,12 +484,14 @@ function updateAdminLogoPreview(logoUrl, letter = 'R') {
   const resetBtn = document.getElementById('btn-admin-reset-logo');
   if (!box) return;
 
-  if (logoUrl && logoUrl.trim()) {
-    box.innerHTML = `<img src="${escapeHtml(logoUrl)}" class="w-full h-full object-cover rounded-2xl" alt="App Icon">`;
-    if (resetBtn) resetBtn.classList.remove('hidden');
-  } else {
-    box.innerHTML = `<span id="admin-logo-preview-letter" class="text-[#245b70] dark:text-teal-400 font-black text-2xl">${escapeHtml(letter || 'R')}</span>`;
-    if (resetBtn) resetBtn.classList.add('hidden');
+  const activeLogo = (logoUrl && logoUrl.trim()) ? logoUrl.trim() : '/icons/logo.png';
+  box.innerHTML = `<img src="${escapeHtml(activeLogo)}" class="w-full h-full object-cover rounded-2xl" alt="App Icon">`;
+  if (resetBtn) {
+    if (logoUrl && logoUrl.trim() && logoUrl.trim() !== '/icons/logo.png') {
+      resetBtn.classList.remove('hidden');
+    } else {
+      resetBtn.classList.add('hidden');
+    }
   }
 }
 
@@ -458,6 +503,7 @@ function updateHeaderBranding(appName, schoolName, appLogo) {
   const rawLogo = (appLogo !== undefined && appLogo !== null ? String(appLogo) : (appSettings && appSettings.appLogo ? appSettings.appLogo : '')).trim();
 
   const firstLetter = (rawApp ? rawApp.trim()[0] : 'R').toUpperCase();
+  const activeLogo = rawLogo || '/icons/logo.png';
 
   // 1. Keep localStorage cached for instantaneous launch display
   try {
@@ -472,13 +518,8 @@ function updateHeaderBranding(appName, schoolName, appLogo) {
   // 2. Place 1: Top-Left Header Brand Icon
   const brandIcon = document.getElementById('header-brand-icon');
   if (brandIcon) {
-    if (rawLogo) {
-      brandIcon.innerHTML = `<img src="${escapeHtml(rawLogo)}" class="w-full h-full object-cover rounded-2xl" alt="App Logo">`;
-      brandIcon.className = "w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white font-black text-xl shadow-inner flex-shrink-0 overflow-hidden";
-    } else {
-      brandIcon.innerHTML = escapeHtml(firstLetter);
-      brandIcon.className = "w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white font-black text-xl shadow-inner flex-shrink-0 overflow-hidden";
-    }
+    brandIcon.innerHTML = `<img src="${escapeHtml(activeLogo)}" class="w-full h-full object-cover rounded-2xl" alt="App Logo">`;
+    brandIcon.className = "w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white font-black text-xl shadow-inner flex-shrink-0 overflow-hidden";
   }
 
   // 3. Place 2: Opening App Launch Animation (Splash Screen)
@@ -486,17 +527,12 @@ function updateHeaderBranding(appName, schoolName, appLogo) {
   const splashLetter = document.getElementById('splash-icon-letter');
   if (splashName) splashName.textContent = rawApp || 'REGISTERLY';
   if (splashLetter) {
-    if (rawLogo) {
-      splashLetter.innerHTML = `<img src="${escapeHtml(rawLogo)}" class="w-full h-full object-cover rounded-2xl" alt="App Logo">`;
-      splashLetter.className = "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg splash-icon-pulse overflow-hidden bg-[var(--card-bg)] border border-[var(--border-color)]";
-    } else {
-      splashLetter.innerHTML = escapeHtml(firstLetter);
-      splashLetter.className = "w-14 h-14 rounded-2xl custom-gradient-header flex items-center justify-center text-white font-black text-2xl shadow-lg splash-icon-pulse overflow-hidden";
-    }
+    splashLetter.innerHTML = `<img src="${escapeHtml(activeLogo)}" class="w-full h-full object-cover rounded-2xl" alt="App Logo">`;
+    splashLetter.className = "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg splash-icon-pulse overflow-hidden bg-white/10";
   }
 
   // 4. Place 3: Mobile & Devices App Icon (Favicon & Apple Touch Icon & PWA Manifest)
-  updateDeviceIcons(rawLogo);
+  updateDeviceIcons(activeLogo);
 
   // 5. Update Admin Panel preview if open
   updateAdminLogoPreview(rawLogo, firstLetter);
@@ -2620,10 +2656,19 @@ async function handlePhotoUpload(event, mode) {
   }
 }
 
-// ================= USER PROFILE EDIT MODAL =================
-// USER DIRECTIVE: "all accounts can be change their names and photo by clicking their photo"
-let editUserBase64Photo = '';
-let editUserPhotoUrl = '';
+// ================= ONE CENTRALIZED USER PROFILE EDITING SYSTEM =================
+let currentProfileAvatarUrl = '';
+let initialProfileState = { name: '', avatarUrl: '', phone: '' };
+
+// Image Cropper State
+let editProfileCropImage = null;
+let editProfileCropScale = 1;
+let editProfileCropOffsetX = 0;
+let editProfileCropOffsetY = 0;
+let editProfileIsDragging = false;
+let editProfileDragStartX = 0;
+let editProfileDragStartY = 0;
+let editProfileCanvasListenersInitialized = false;
 
 function openProfileEditModal() {
   if (!currentUser) {
@@ -2632,77 +2677,412 @@ function openProfileEditModal() {
     return;
   }
 
-  editUserBase64Photo = currentUser.avatarUrl || '';
-  editUserPhotoUrl = currentUser.avatarUrl || '';
-  const preview = document.getElementById('edit-profile-avatar-preview') || document.getElementById('user-profile-preview');
-  if (preview) preview.src = currentUser.avatarUrl || DEFAULT_AVATAR;
+  currentProfileAvatarUrl = currentUser.avatarUrl || '';
+  initialProfileState = {
+    name: (currentUser.name || '').trim(),
+    avatarUrl: currentUser.avatarUrl || '',
+    phone: (currentUser.phone || '').trim()
+  };
 
-  const nameInput = document.getElementById('edit-profile-name-input') || document.getElementById('user-profile-name');
+  // Populate Avatar Preview
+  const preview = document.getElementById('edit-profile-avatar-preview');
+  if (preview) {
+    preview.src = currentUser.avatarUrl || '/icons/logo.png';
+  }
+
+  // Populate Inputs
+  const nameInput = document.getElementById('edit-profile-name-input');
   if (nameInput) nameInput.value = currentUser.name || '';
 
-  const emailInput = document.getElementById('edit-profile-email-input') || document.getElementById('user-profile-email');
-  if (emailInput) emailInput.value = currentUser.email || '';
+  const emailInput = document.getElementById('edit-profile-email-input');
+  if (emailInput) emailInput.value = currentUser.email || 'No email linked';
+
+  const phoneInput = document.getElementById('edit-profile-phone-input');
+  if (phoneInput) phoneInput.value = currentUser.phone || '';
+
+  // Designation (Read-only)
+  const desigInput = document.getElementById('edit-profile-designation-input');
+  if (desigInput) {
+    if (currentUser.role === 'admin') {
+      desigInput.value = 'Administrator / Principal';
+    } else if (currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0) {
+      desigInput.value = `Ustadh (${currentUser.assignedSubjects.join(', ')})`;
+    } else {
+      desigInput.value = 'Ustadh / Faculty';
+    }
+  }
+
+  // Security & Identity Metadata (Read-only)
+  const roleDisplay = document.getElementById('edit-profile-role-display');
+  if (roleDisplay) {
+    roleDisplay.textContent = currentUser.role === 'admin' ? 'Administrator' : 'Teacher';
+  }
+
+  const memberSinceDisplay = document.getElementById('edit-profile-membersince-display');
+  if (memberSinceDisplay) {
+    if (currentUser.createdAt) {
+      try {
+        const d = new Date(currentUser.createdAt);
+        memberSinceDisplay.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch (_) {
+        memberSinceDisplay.textContent = 'Active Account';
+      }
+    } else {
+      memberSinceDisplay.textContent = 'Active Account';
+    }
+  }
+
+  // Reset errors and crop panel
+  const errorEl = document.getElementById('edit-profile-photo-error');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+
+  const nameError = document.getElementById('edit-profile-name-error');
+  if (nameError) nameError.classList.add('hidden');
+
+  cancelCropPanel();
+
+  // Show "Crop / Position" button if custom image exists
+  const cropBtn = document.getElementById('btn-edit-crop-adjust');
+  if (cropBtn) {
+    if (currentProfileAvatarUrl && !currentProfileAvatarUrl.includes('logo.png')) {
+      cropBtn.classList.remove('hidden');
+    } else {
+      cropBtn.classList.add('hidden');
+    }
+  }
 
   const modal = document.getElementById('modal-edit-profile');
   if (modal) modal.classList.remove('hidden');
+
+  initCropCanvasListeners();
 }
 
 function closeProfileEditModal() {
   const modal = document.getElementById('modal-edit-profile');
   if (modal) modal.classList.add('hidden');
-  editUserBase64Photo = '';
-  editUserPhotoUrl = '';
+  cancelCropPanel();
 }
 
-async function handleUserProfilePhotoUpload(event) {
-  const file = event.target.files[0];
+function hasUnsavedProfileChanges() {
+  const curName = (document.getElementById('edit-profile-name-input')?.value || '').trim();
+  const curPhone = (document.getElementById('edit-profile-phone-input')?.value || '').trim();
+  const curAvatar = currentProfileAvatarUrl || '';
+
+  return (curName !== initialProfileState.name) ||
+         (curPhone !== initialProfileState.phone) ||
+         (curAvatar !== initialProfileState.avatarUrl);
+}
+
+function handleCloseProfileModalWithCheck() {
+  if (hasUnsavedProfileChanges()) {
+    const discard = confirm('You have unsaved changes. Are you sure you want to discard them?');
+    if (!discard) return;
+  }
+  closeProfileEditModal();
+}
+
+function onProfileImageFileSelected(event) {
+  const file = event.target.files && event.target.files[0];
   if (!file) return;
 
-  try {
-    showToast('Processing photo...');
-    const base64 = await compressImage(file, 400, 400, 0.85);
-    editUserBase64Photo = base64;
-    editUserPhotoUrl = base64;
-    const preview = document.getElementById('edit-profile-avatar-preview') || document.getElementById('user-profile-preview');
-    if (preview) preview.src = base64;
-
-    // Upload to External Storage
-    showToast('Saving avatar to storage...');
-    const uploadRes = await API.uploadPhoto(file, 'avatars');
-    if (uploadRes && uploadRes.success && uploadRes.url) {
-      editUserPhotoUrl = uploadRes.url;
-      showToast(`Profile photo saved to ${uploadRes.provider === 'cloudinary' ? 'Cloudinary CDN' : 'storage'}!`);
-    } else {
-      showToast('Photo selected!');
-    }
-  } catch (error) {
-    console.error('[User Photo Upload]', error);
-    showToast('Photo selected!');
+  const errorEl = document.getElementById('edit-profile-photo-error');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
   }
+
+  // 1. Validate File Type: JPG, JPEG, PNG, WebP
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  const validExts = ['jpg', 'jpeg', 'png', 'webp'];
+  if (!validTypes.includes(file.type.toLowerCase()) && !validExts.includes(ext)) {
+    if (errorEl) {
+      errorEl.textContent = 'Invalid file format. Please upload a JPG, JPEG, PNG, or WebP image.';
+      errorEl.classList.remove('hidden');
+    }
+    showToast('Invalid file format. Please upload JPG, PNG, or WebP.', true);
+    event.target.value = '';
+    return;
+  }
+
+  // 2. Validate File Size: Maximum 5MB
+  const maxBytes = 5 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+    if (errorEl) {
+      errorEl.textContent = `Image file is too large (${sizeMb} MB). Maximum allowed size is 5 MB.`;
+      errorEl.classList.remove('hidden');
+    }
+    showToast(`File too large (${sizeMb} MB). Max 5 MB.`, true);
+    event.target.value = '';
+    return;
+  }
+
+  // Read File and Load into Image for Cropping
+  const reader = new FileReader();
+  const spinner = document.getElementById('edit-profile-photo-loading');
+  if (spinner) spinner.classList.remove('hidden');
+
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      if (spinner) spinner.classList.add('hidden');
+      editProfileCropImage = img;
+      editProfileCropScale = 1;
+      editProfileCropOffsetX = 0;
+      editProfileCropOffsetY = 0;
+
+      const slider = document.getElementById('crop-zoom-slider');
+      if (slider) slider.value = 1;
+      const label = document.getElementById('crop-zoom-label');
+      if (label) label.textContent = '1.0x';
+
+      const panel = document.getElementById('edit-profile-crop-panel');
+      if (panel) panel.classList.remove('hidden');
+
+      renderCropCanvas();
+    };
+    img.onerror = function() {
+      if (spinner) spinner.classList.add('hidden');
+      if (errorEl) {
+        errorEl.textContent = 'Unable to read this image file. Please try a different image.';
+        errorEl.classList.remove('hidden');
+      }
+    };
+    img.src = e.target.result;
+  };
+
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function openProfileImageCropper() {
+  if (!editProfileCropImage) {
+    const preview = document.getElementById('edit-profile-avatar-preview');
+    if (preview && preview.src && !preview.src.includes('logo.png')) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function() {
+        editProfileCropImage = img;
+        editProfileCropScale = 1;
+        editProfileCropOffsetX = 0;
+        editProfileCropOffsetY = 0;
+        const panel = document.getElementById('edit-profile-crop-panel');
+        if (panel) panel.classList.remove('hidden');
+        renderCropCanvas();
+      };
+      img.src = preview.src;
+      return;
+    }
+    showToast('Please select a photo first');
+    return;
+  }
+
+  const panel = document.getElementById('edit-profile-crop-panel');
+  if (panel) panel.classList.remove('hidden');
+  renderCropCanvas();
+}
+
+function cancelCropPanel() {
+  const panel = document.getElementById('edit-profile-crop-panel');
+  if (panel) panel.classList.add('hidden');
+}
+
+function onCropZoomChanged(val) {
+  editProfileCropScale = parseFloat(val) || 1;
+  const label = document.getElementById('crop-zoom-label');
+  if (label) label.textContent = `${editProfileCropScale.toFixed(1)}x`;
+  renderCropCanvas();
+}
+
+function renderCropCanvas() {
+  const canvas = document.getElementById('crop-canvas');
+  if (!canvas || !editProfileCropImage) return;
+
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, w, h);
+
+  const imgW = editProfileCropImage.width;
+  const imgH = editProfileCropImage.height;
+  const baseScale = Math.max(w / imgW, h / imgH);
+  const totalScale = baseScale * editProfileCropScale;
+
+  const drawW = imgW * totalScale;
+  const drawH = imgH * totalScale;
+  const drawX = (w - drawW) / 2 + editProfileCropOffsetX;
+  const drawY = (h - drawH) / 2 + editProfileCropOffsetY;
+
+  ctx.drawImage(editProfileCropImage, drawX, drawY, drawW, drawH);
+}
+
+function initCropCanvasListeners() {
+  if (editProfileCanvasListenersInitialized) return;
+  const wrapper = document.getElementById('crop-canvas-wrapper');
+  if (!wrapper) return;
+
+  function onPointerDown(e) {
+    editProfileIsDragging = true;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    editProfileDragStartX = clientX - editProfileCropOffsetX;
+    editProfileDragStartY = clientY - editProfileCropOffsetY;
+  }
+
+  function onPointerMove(e) {
+    if (!editProfileIsDragging) return;
+    if (e.touches && e.cancelable) e.preventDefault();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    editProfileCropOffsetX = clientX - editProfileDragStartX;
+    editProfileCropOffsetY = clientY - editProfileDragStartY;
+    renderCropCanvas();
+  }
+
+  function onPointerUp() {
+    editProfileIsDragging = false;
+  }
+
+  wrapper.addEventListener('mousedown', onPointerDown);
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+
+  wrapper.addEventListener('touchstart', onPointerDown, { passive: false });
+  window.addEventListener('touchmove', onPointerMove, { passive: false });
+  window.addEventListener('touchend', onPointerUp);
+  window.addEventListener('touchcancel', onPointerUp);
+
+  editProfileCanvasListenersInitialized = true;
+}
+
+function applyCropAndSavePreview() {
+  if (!editProfileCropImage) return;
+
+  // High-res 400x400 offscreen canvas
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = 400;
+  outCanvas.height = 400;
+  const ctx = outCanvas.getContext('2d');
+
+  const factor = 400 / 224;
+  const imgW = editProfileCropImage.width;
+  const imgH = editProfileCropImage.height;
+  const baseScale = Math.max(224 / imgW, 224 / imgH);
+  const totalScale = baseScale * editProfileCropScale * factor;
+
+  const drawW = imgW * totalScale;
+  const drawH = imgH * totalScale;
+  const drawX = (400 - drawW) / 2 + (editProfileCropOffsetX * factor);
+  const drawY = (400 - drawH) / 2 + (editProfileCropOffsetY * factor);
+
+  ctx.drawImage(editProfileCropImage, drawX, drawY, drawW, drawH);
+
+  const croppedDataUrl = outCanvas.toDataURL('image/jpeg', 0.88);
+  currentProfileAvatarUrl = croppedDataUrl;
+
+  const preview = document.getElementById('edit-profile-avatar-preview');
+  if (preview) preview.src = croppedDataUrl;
+
+  const cropBtn = document.getElementById('btn-edit-crop-adjust');
+  if (cropBtn) cropBtn.classList.remove('hidden');
+
+  cancelCropPanel();
+  showToast('Photo cropped and preview updated!');
+}
+
+function handleRemoveProfilePhoto() {
+  currentProfileAvatarUrl = '';
+  editProfileCropImage = null;
+
+  const preview = document.getElementById('edit-profile-avatar-preview');
+  if (preview) preview.src = '/icons/logo.png';
+
+  const cropBtn = document.getElementById('btn-edit-crop-adjust');
+  if (cropBtn) cropBtn.classList.add('hidden');
+
+  cancelCropPanel();
+  showToast('Default photo restored. Save to apply.');
 }
 
 async function handleSaveProfile(event) {
   if (event) event.preventDefault();
-  const nameInput = document.getElementById('edit-profile-name-input') || document.getElementById('user-profile-name');
+
+  const nameInput = document.getElementById('edit-profile-name-input');
   const name = nameInput ? nameInput.value.trim() : '';
 
+  const nameError = document.getElementById('edit-profile-name-error');
   if (!name) {
-    showToast('Please enter your name', true);
+    if (nameError) nameError.classList.remove('hidden');
+    showToast('Please enter your full name', true);
+    if (nameInput) nameInput.focus();
     return;
   }
+  if (nameError) nameError.classList.add('hidden');
+
+  const phoneInput = document.getElementById('edit-profile-phone-input');
+  const phone = phoneInput ? phoneInput.value.trim() : '';
+
+  const saveBtn = document.getElementById('btn-save-profile');
+  const btnText = document.getElementById('btn-save-profile-text');
+  const spinner = document.getElementById('btn-save-profile-spinner');
 
   try {
-    const finalAvatarUrl = editUserPhotoUrl || editUserBase64Photo;
-    const res = await API.updateProfile(name, finalAvatarUrl);
-    if (res.success && res.user) {
+    // Prevent duplicate submissions
+    if (saveBtn) saveBtn.disabled = true;
+    if (spinner) spinner.classList.remove('hidden');
+    if (btnText) btnText.textContent = 'Saving Changes...';
+
+    const res = await API.updateProfile(name, currentProfileAvatarUrl, phone);
+    if (res && res.success && res.user) {
       currentUser = res.user;
+
+      // Update state & UI everywhere throughout the app
       updateUserUI();
+      updateWelcomeGreeting();
+      if (typeof loadDashboardStats === 'function') loadDashboardStats();
+      if (typeof renderTeachersList === 'function') renderTeachersList();
+
+      initialProfileState = {
+        name: (currentUser.name || '').trim(),
+        avatarUrl: currentUser.avatarUrl || '',
+        phone: (currentUser.phone || '').trim()
+      };
+
       closeProfileEditModal();
       showToast('Profile updated successfully!');
+    } else {
+      throw new Error((res && res.message) || 'Failed to update profile');
     }
   } catch (error) {
+    console.error('[Profile Save Error]', error);
     showToast(error.message || 'Failed to update profile', true);
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+    if (spinner) spinner.classList.add('hidden');
+    if (btnText) btnText.textContent = 'Save Changes';
   }
+}
+
+// Quick Tools: Open personal attendance & session logs in teacher log modal
+function openCurrentUserLogs() {
+  if (!currentUser) {
+    showToast('Please sign in first', true);
+    openAuthModal();
+    return;
+  }
+  const teacherId = currentUser._id || currentUser.id;
+  if (!teacherId) {
+    showToast('Profile ID not found', true);
+    return;
+  }
+  openTeacherLogModal(teacherId);
 }
 
 // USER DIRECTIVE: "in add students show total students numbers and the no. of students in selected class"
