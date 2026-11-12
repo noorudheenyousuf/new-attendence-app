@@ -6597,9 +6597,14 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
 function snoozeTimetableSummary() {
   const modal = document.getElementById('notif-bubble-timetable-modal');
   if (modal) modal.classList.add('hidden');
-  const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
+  const myKey = currentUser ? (currentUser._id || currentUser.email || currentUser.name || 'user') : 'user';
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const snoozeUntil = Date.now() + 15 * 60 * 1000;
-  try { localStorage.setItem(`tt_summary_snooze_${myKey}`, String(snoozeUntil)); } catch(_) {}
+  try {
+    localStorage.setItem(`tt_summary_snooze_${myKey}`, String(snoozeUntil));
+    localStorage.removeItem(`tt_summary_${myKey}_${todayStr}`);
+  } catch(_) {}
   showToast('Morning timetable snoozed for 15 mins');
 }
 
@@ -6608,7 +6613,7 @@ function dismissTimetableSummary() {
   if (modal) modal.classList.add('hidden');
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
+  const myKey = currentUser ? (currentUser._id || currentUser.email || currentUser.name || 'user') : 'user';
   try {
     localStorage.setItem(`tt_summary_${myKey}_${todayStr}`, 'done');
     localStorage.removeItem(`tt_summary_snooze_${myKey}`);
@@ -6659,9 +6664,14 @@ function snoozePreClassAlert() {
   if (card) card.classList.add('hidden');
   if (activePreClassSlot) {
     const slotKey = activePreClassSlot._id || (activePreClassSlot.day + '_' + activePreClassSlot.timeSlot + '_' + activePreClassSlot.subject);
-    const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
+    const myKey = currentUser ? (currentUser._id || currentUser.email || currentUser.name || 'user') : 'user';
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const snoozeUntil = Date.now() + 2 * 60 * 1000; // Snooze for 2 minutes
-    try { localStorage.setItem(`tt_preclass_snooze_${myKey}_${slotKey}`, String(snoozeUntil)); } catch(_) {}
+    try {
+      localStorage.setItem(`tt_preclass_snooze_${myKey}_${slotKey}`, String(snoozeUntil));
+      localStorage.removeItem(`tt_notif_5m_${myKey}_${slotKey}_${todayStr}`);
+    } catch(_) {}
   }
   showToast('Class reminder snoozed for 2 mins');
 }
@@ -6671,7 +6681,7 @@ function dismissPreClassAlert() {
   if (card) card.classList.add('hidden');
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const myKey = currentUser ? (currentUser._id || currentUser.name || 'user') : 'user';
+  const myKey = currentUser ? (currentUser._id || currentUser.email || currentUser.name || 'user') : 'user';
   if (activePreClassSlot) {
     const slotKey = activePreClassSlot._id || (activePreClassSlot.day + '_' + activePreClassSlot.timeSlot + '_' + activePreClassSlot.subject);
     try {
@@ -6694,20 +6704,20 @@ async function checkAndTriggerTimetableNotifications() {
       ? appSettings.appName.trim()
       : (localStorage.getItem('registerly_app_name') || 'REGISTERLY');
 
-    const myAccountKey = String(currentUser._id || currentUser.name || 'user');
-    const myName = (currentUser.name || '').trim();
-    const myId = currentUser._id || currentUser.id || null;
+    const myAccountKey = String(currentUser._id || currentUser.email || currentUser.name || 'user');
+    const myEmail = (currentUser.email || '').trim().toLowerCase();
 
     // Fetch all timetable slots
     const res = await API.getTimetable('', '', '');
     const allSlots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
     // USER DIRECTIVE:
-    // "In time table notification.....all accounts only show their own notification...
-    // When Notification....only show each teacher account their own time table which he set from the profile tab...
-    // Also show admin time table...what he set in his profile tab
-    // Not mix all time tables.."
-    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId));
+    // "only show in 6.00 am time table notification ....time table that connect with email id ..do not show that connected with teacher names"
+    // Strictly filter timetable slots connected with user's email ID. Do NOT match by teacher names.
+    const mySlots = allSlots.filter(s => {
+      const slotEmail = (s.teacherEmail || '').trim().toLowerCase();
+      return Boolean(myEmail && slotEmail && slotEmail === myEmail);
+    });
 
     const currentHours = now.getHours();
     const summaryNotifKey = `tt_summary_${myAccountKey}_${todayStr}`;
@@ -6716,14 +6726,15 @@ async function checkAndTriggerTimetableNotifications() {
 
     const allowMorning = localStorage.getItem('admin_notif_morning') !== 'false';
     const allowPreclass = localStorage.getItem('admin_notif_preclass') !== 'false';
+    const notifStatus = localStorage.getItem(summaryNotifKey);
 
-    // USER DIRECTIVE:
-    // "If no set the account any time table....show at the morning a message to set time table...with not snooze only ok........"
+    // USER DIRECTIVE: 6.00 AM notification (starts at or after 6:00 AM)
+    const isMorningTime = currentHours >= 6;
+
+    // If no timetable slots connected with this account's email ID
     if (mySlots.length === 0) {
-      if (allowMorning && currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
-        if (!localStorage.getItem(summaryNotifKey)) {
-          localStorage.setItem(summaryNotifKey, 'shown');
-        }
+      if (allowMorning && isMorningTime && notifStatus !== 'done' && notifStatus !== 'shown' && !isSnoozed) {
+        localStorage.setItem(summaryNotifKey, 'shown');
 
         // Phone notification with ONLY "OK" (no snooze) and App Name as headline
         showAppNotification(appName, {
@@ -6759,11 +6770,9 @@ async function checkAndTriggerTimetableNotifications() {
       return (tA.hours * 60 + tA.minutes) - (tB.hours * 60 + tB.minutes);
     });
 
-    // 1. Daily morning summary notification for this account only
-    if (allowMorning && currentHours >= 5 && localStorage.getItem(summaryNotifKey) !== 'done' && !isSnoozed) {
-      if (!localStorage.getItem(summaryNotifKey)) {
-        localStorage.setItem(summaryNotifKey, 'shown');
-      }
+    // 1. Daily 6:00 AM morning summary notification for this email account only
+    if (allowMorning && isMorningTime && notifStatus !== 'done' && notifStatus !== 'shown' && !isSnoozed) {
+      localStorage.setItem(summaryNotifKey, 'shown');
 
       // Format line by line: 9.00 am - 10 am : maths [class name]
       const lines = todaySlots.map(s => {
@@ -6789,7 +6798,7 @@ async function checkAndTriggerTimetableNotifications() {
       renderBubbleTimetableModal(todayName, todaySlots, false);
     }
 
-    // 2. Notification 5 minutes before every class for this account only
+    // 2. Notification 5 minutes before every class for this email account only
     if (allowPreclass) {
       todaySlots.forEach(slot => {
         const timeInfo = _parseSlotStartTime(slot.timeSlot || slot.time);
@@ -6803,10 +6812,12 @@ async function checkAndTriggerTimetableNotifications() {
         if (diffMinutes >= 0 && diffMinutes <= 5.5) {
           const slotKey = slot._id || (slot.day + '_' + slot.timeSlot + '_' + slot.subject);
           const slotDoneKey = `tt_notif_5m_${myAccountKey}_${slotKey}_${todayStr}`;
+          const slotStatus = localStorage.getItem(slotDoneKey);
           const slotSnoozeUntil = parseInt(localStorage.getItem(`tt_preclass_snooze_${myAccountKey}_${slotKey}`) || '0', 10);
           const isSlotSnoozed = Date.now() < slotSnoozeUntil;
 
-          if (localStorage.getItem(slotDoneKey) !== 'done' && !isSlotSnoozed) {
+          if (slotStatus !== 'done' && slotStatus !== 'shown' && !isSlotSnoozed) {
+            localStorage.setItem(slotDoneKey, 'shown');
             const timePart = slot.timeSlot || `${timeInfo.hours}:${String(timeInfo.minutes).padStart(2, '0')}`;
             const body = `Next Subject\n${slot.subject} (${timePart}) [${slot.class}]${slot.room ? ' • Room ' + slot.room : ''}`;
 
