@@ -147,11 +147,30 @@ router.post('/import', async (req, res) => {
       await Message.insertMany(msgDocs, { ordered: false });
     }
 
-    // 7. Restore timetable
+    // 7. Restore timetable (solely mapped to teacherEmail)
     if (Array.isArray(timetable) && timetable.length > 0) {
       await Timetable.deleteMany({});
-      const ttDocs = timetable.map(t => { const { _id, __v, ...d } = t; return d; });
-      await Timetable.insertMany(ttDocs, { ordered: false });
+      const allUsers = await User.find({}).select('_id name email').lean();
+      const ttDocs = timetable.map(t => {
+        const { _id, __v, teacher, ...d } = t;
+        let email = (d.teacherEmail || '').trim().toLowerCase();
+        let tId = d.teacherId || null;
+        if (!email && teacher) {
+          const match = allUsers.find(u => (u.name || '').trim().toLowerCase() === String(teacher).trim().toLowerCase());
+          if (match) {
+            email = (match.email || '').toLowerCase();
+            tId = match._id;
+          }
+        }
+        return {
+          ...d,
+          teacherEmail: email,
+          teacherId: tId
+        };
+      }).filter(d => Boolean(d.teacherEmail));
+      if (ttDocs.length > 0) {
+        await Timetable.insertMany(ttDocs, { ordered: false });
+      }
     }
 
     // 8. Restore activity logs

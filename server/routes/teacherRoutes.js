@@ -359,19 +359,24 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const nameChanged = Boolean(name && name.trim() && name.trim() !== oldName);
     if (name && name.trim()) teacher.name = name.trim();
 
+    const oldEmail = (teacher.email || '').toLowerCase().trim();
+    let emailChanged = false;
+
     if (email !== undefined) {
       const trimmedEmail = (email || '').toLowerCase().trim();
       if (trimmedEmail) {
-        if (trimmedEmail !== (teacher.email || '')) {
+        if (trimmedEmail !== oldEmail) {
           const conflict = await User.findOne({ email: trimmedEmail, _id: { $ne: teacher._id } });
           if (conflict) {
             return res.status(400).json({ success: false, message: `Email "${trimmedEmail}" is already in use by another account.` });
           }
           teacher.email = trimmedEmail;
+          emailChanged = true;
         }
       } else {
         teacher.email = undefined;
         teacher.googleId = null;
+        if (oldEmail) emailChanged = true;
       }
     }
 
@@ -405,10 +410,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
     await teacher.save();
 
     if (nameChanged) {
-      await Timetable.updateMany({ teacher: oldName }, { teacher: teacher.name });
       await Attendance.updateMany({ markedBy: oldName }, { markedBy: teacher.name });
       await Subject.updateMany({ teacher: oldName }, { teacher: teacher.name });
       await Class.updateMany({ classTeacher: oldName }, { classTeacher: teacher.name });
+    }
+
+    if (emailChanged && oldEmail && teacher.email) {
+      await Timetable.updateMany({ teacherEmail: oldEmail }, { teacherEmail: teacher.email });
     }
 
     await ActivityLog.create({
@@ -467,7 +475,9 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     await User.findByIdAndDelete(req.params.id);
 
     // Clean up timetable, subject, and class references to this teacher
-    await Timetable.updateMany({ teacher: teacher.name }, { teacher: '' });
+    if (teacher.email) {
+      await Timetable.deleteMany({ teacherEmail: teacher.email });
+    }
     await Subject.updateMany({ teacher: teacher.name }, { teacher: '' });
     await Class.updateMany({ classTeacher: teacher.name }, { classTeacher: '' });
 

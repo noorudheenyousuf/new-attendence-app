@@ -402,14 +402,19 @@ const API = {
     });
   },
 
-  // Timetable API
-  async getTimetable(className, day, teacher, teacherEmail) {
+  // Timetable API (strictly mapped to teacher email)
+  async getTimetable(className, day, teacherEmail) {
     let url = '/timetable';
     const params = new URLSearchParams();
     if (className && className !== 'all') params.append('class', className);
     if (day && day !== 'all') params.append('day', day);
-    if (teacher && teacher !== 'all') params.append('teacher', teacher);
-    if (teacherEmail && teacherEmail !== 'all') params.append('teacherEmail', teacherEmail);
+    let finalEmail = teacherEmail;
+    if (arguments.length >= 4 && arguments[3]) {
+      finalEmail = arguments[3];
+    }
+    if (finalEmail && finalEmail !== 'all' && finalEmail.includes('@')) {
+      params.append('teacherEmail', finalEmail.trim().toLowerCase());
+    }
     const qs = params.toString();
     return this.request(qs ? `${url}?${qs}` : url);
   },

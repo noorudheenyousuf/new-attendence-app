@@ -3538,9 +3538,9 @@ async function updateProfileDashboardKPIs() {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayName = dayNames[now.getDay()].toLowerCase();
 
-    const ttRes = await API.getTimetable('', '', '');
+    const ttRes = await API.getTimetable('', '', myEmail);
     const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
-    let mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId, myEmail));
+    let mySlots = allSlots.filter(s => (s.teacherEmail || '').trim().toLowerCase() === myEmail);
     if (isAdmin && mySlots.length === 0) {
       mySlots = allSlots;
     }
@@ -4690,7 +4690,7 @@ async function renderTeachersList() {
 
               <!-- Row 2: Timetable + Log buttons -->
               <div class="flex gap-1.5">
-                <button onclick="openTeacherTimetable('${escapeQuotes(t.name)}', '${t._id}', '${escapeQuotes(t.email || '')}')"
+                <button onclick="openTeacherTimetable('${escapeQuotes(t.email || '')}', '${escapeQuotes(t.name || '')}')"
                   class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500 hover:text-white text-xs font-bold transition shadow-sm" title="View timetable">
                   <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                   <span>Timetable</span>
@@ -5152,59 +5152,48 @@ async function handleSendMessage(e) {
   }
 }
 
-// ================= TIMETABLE MODULE =================
+// ================= TIMETABLE MODULE (SOLELY MAPPED TO USER EMAILS) =================
 let currentTimetableDay = 'all';
-let timetableViewTeacher = null;     // string: teacher name being viewed
-let timetableViewTeacherId = null;   // string: teacher ObjectId if available
-let timetableViewTeacherEmail = null;// string: teacher email being viewed
-let timetableReadOnly = false;       // true=no add/edit/delete buttons
+let timetableViewTeacherEmail = null; // string: teacher email solely being viewed
+let timetableViewTeacherName = null;  // string: display label for header
+let timetableReadOnly = false;        // true=no add/edit/delete buttons
 let timetableEditingSlotId = null;
 
-// Helper: match slot strictly to teacher email, name, or id (no blank or partial string collisions!)
-function isSlotForTeacher(slot, teacherName, teacherId = null, teacherEmail = null) {
+// Helper: match slot strictly to teacher email (email-based mapping only, no name dependency)
+function isSlotForTeacher(slot, targetEmail) {
   if (!slot) return false;
-  const targetEmail = (teacherEmail || '').trim().toLowerCase();
+  // Handle flipped legacy signature if called as (slot, name, id, email)
+  const emailCandidate = (arguments.length >= 4 && arguments[3]) ? arguments[3] : targetEmail;
+  const target = (emailCandidate || '').trim().toLowerCase();
   const slotEmail = (slot.teacherEmail || '').trim().toLowerCase();
-  if (targetEmail && slotEmail) {
-    return targetEmail === slotEmail;
-  }
-  if (teacherId && slot.teacherId && String(slot.teacherId) === String(teacherId)) {
-    return true;
-  }
-  const target = (teacherName || '').trim().toLowerCase();
-  const slotTeacher = (slot.teacher || '').trim().toLowerCase();
-  if (target && slotTeacher && target === slotTeacher) {
-    return true;
-  }
-  return false;
+  return Boolean(target && slotEmail && target === slotEmail);
 }
 
 // Open current logged-in account's timetable (from Profile tab)
 async function openMyTimetable() {
   if (!currentUser) return;
-  timetableViewTeacher = (currentUser.name || '').trim();
-  timetableViewTeacherId = currentUser._id || currentUser.id || null;
   timetableViewTeacherEmail = (currentUser.email || '').trim().toLowerCase();
+  timetableViewTeacherName = (currentUser.name || '').trim();
   timetableReadOnly = false; // Always editable for the user's own profile!
   await openTimetableModal();
 }
 
-// Open timetable for a specific teacher (from Teachers tab)
-// USER DIRECTIVE:
-// "connecting time table to account names makineg naming conflicts ....so connect it to the email id of appropriate teacher"
-// "In teachers tab.... When click time of a teacher ....show that teacher time table only which he seted in his account from profile tab...."
-// "In teacher tab....Also gave admin to edit and delete and and slot to time table of every teacher....."
-async function openTeacherTimetable(teacherName, teacherId = null, teacherEmail = null) {
+// Open timetable for a specific teacher (from Teachers tab, mapped solely by email)
+async function openTeacherTimetable(teacherEmail, teacherName = '', teacherId = null) {
+  let targetEmail = (teacherEmail || '').trim().toLowerCase();
+  let targetName = (teacherName || '').trim();
+  // Support legacy call order (name, id, email)
+  if (targetEmail && !targetEmail.includes('@') && arguments[2] && String(arguments[2]).includes('@')) {
+    targetEmail = String(arguments[2]).trim().toLowerCase();
+    targetName = String(teacherEmail).trim();
+  }
+
   const isAdmin = currentUser && currentUser.role === 'admin';
   const myEmail = (currentUser && currentUser.email ? currentUser.email : '').trim().toLowerCase();
-  const targetEmail = (teacherEmail || '').trim().toLowerCase();
-  const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
-  const targetTeacher = (teacherName || '').trim();
-  const isMe = (myEmail && targetEmail && myEmail === targetEmail) || (myName && myName === targetTeacher.toLowerCase());
+  const isMe = Boolean(myEmail && targetEmail && myEmail === targetEmail);
 
-  timetableViewTeacher = targetTeacher;
-  timetableViewTeacherId = teacherId || null;
   timetableViewTeacherEmail = targetEmail || null;
+  timetableViewTeacherName = targetName || targetEmail || null;
   // Editable for admin AND the teacher themselves!
   timetableReadOnly = !(isAdmin || isMe);
   await openTimetableModal();
@@ -5221,18 +5210,15 @@ async function openTimetableModal() {
       classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
   }
 
-  // Fallback: If timetableViewTeacher was not set, default to currentUser
-  if (!timetableViewTeacher && currentUser) {
-    timetableViewTeacher = (currentUser.name || '').trim();
-    timetableViewTeacherId = currentUser._id || currentUser.id || null;
+  // Fallback: If timetableViewTeacherEmail was not set, default to currentUser
+  if (!timetableViewTeacherEmail && currentUser) {
     timetableViewTeacherEmail = (currentUser.email || '').trim().toLowerCase();
+    timetableViewTeacherName = (currentUser.name || '').trim();
   }
 
   const isAdminTT = currentUser && currentUser.role === 'admin';
   const myEmail = (currentUser && currentUser.email ? currentUser.email : '').trim().toLowerCase();
-  const myName = (currentUser && currentUser.name ? currentUser.name : '').trim().toLowerCase();
-  const targetLower = (timetableViewTeacher || '').toLowerCase();
-  const isMe = (myEmail && timetableViewTeacherEmail && myEmail === timetableViewTeacherEmail) || (myName && myName === targetLower);
+  const isMe = Boolean(myEmail && timetableViewTeacherEmail && myEmail === timetableViewTeacherEmail);
 
   // Show/hide Add button:
   // Admin can add a slot to ANY teacher's timetable (or their own);
@@ -5241,23 +5227,25 @@ async function openTimetableModal() {
   const canAddSlot = !timetableReadOnly && (isAdminTT || isMe);
   if (addSlotBtn) addSlotBtn.classList.toggle('hidden', !canAddSlot);
 
-  // Update title & subtitle
+  // Update title & subtitle (tied strictly to account email)
   const ttTitleEl = document.getElementById('timetable-modal-title') || document.querySelector('#modal-timetable h3');
   const ttSubtitleEl = document.getElementById('timetable-modal-subtitle');
   if (ttTitleEl) {
     if (isMe) {
       ttTitleEl.textContent = 'My Timetable';
-    } else if (timetableViewTeacher) {
-      ttTitleEl.textContent = `${timetableViewTeacher}'s Timetable`;
+    } else if (timetableViewTeacherName) {
+      ttTitleEl.textContent = `${timetableViewTeacherName}'s Timetable`;
+    } else if (timetableViewTeacherEmail) {
+      ttTitleEl.textContent = `${timetableViewTeacherEmail}'s Timetable`;
     } else {
       ttTitleEl.textContent = 'Timetable';
     }
   }
   if (ttSubtitleEl) {
     if (isMe) {
-      ttSubtitleEl.textContent = 'Your personal class schedule & timetable slots';
-    } else if (timetableViewTeacher) {
-      ttSubtitleEl.textContent = `Class schedule assigned to ${timetableViewTeacher}${timetableViewTeacherEmail ? ' (' + timetableViewTeacherEmail + ')' : ''}`;
+      ttSubtitleEl.textContent = `Personal schedule linked to ${myEmail}`;
+    } else if (timetableViewTeacherEmail) {
+      ttSubtitleEl.textContent = `Schedule mapped to email: ${timetableViewTeacherEmail}`;
     }
   }
 
@@ -5270,9 +5258,8 @@ async function openTimetableModal() {
 function closeTimetableModal() {
   const modal = document.getElementById('modal-timetable');
   if (modal) modal.classList.add('hidden');
-  timetableViewTeacher = null;
-  timetableViewTeacherId = null;
   timetableViewTeacherEmail = null;
+  timetableViewTeacherName = null;
   timetableReadOnly = false;
 }
 
@@ -5303,19 +5290,17 @@ async function renderTimetableSlots() {
 
   try {
     const dayParam = currentTimetableDay === 'all' ? '' : currentTimetableDay;
-    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam, timetableViewTeacher || '', timetableViewTeacherEmail || '');
+    const res = await API.getTimetable(selectedClass === 'all' ? '' : selectedClass, dayParam, timetableViewTeacherEmail || '');
     let slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
 
-    // USER DIRECTIVE:
-    // "connecting time table to account names makineg naming conflicts ....so connect it to the email id of appropriate teacher"
-    // Strictly filter by teacher email / id / account
-    if (timetableViewTeacher || timetableViewTeacherEmail) {
-      slots = slots.filter(s => isSlotForTeacher(s, timetableViewTeacher, timetableViewTeacherId, timetableViewTeacherEmail));
+    // Filter strictly by teacher email
+    if (timetableViewTeacherEmail) {
+      slots = slots.filter(s => (s.teacherEmail || '').trim().toLowerCase() === timetableViewTeacherEmail);
     }
 
     if (slots.length === 0) {
-      const emptyMsg = timetableViewTeacher
-        ? `No timetable slots scheduled for ${escapeHtml(timetableViewTeacher)} on ${escapeHtml(currentTimetableDay)}.`
+      const emptyMsg = timetableViewTeacherEmail
+        ? `No timetable slots scheduled for ${escapeHtml(timetableViewTeacherEmail)} on ${escapeHtml(currentTimetableDay)}.`
         : `No slots for ${escapeHtml(currentTimetableDay)}${selectedClass !== 'all' ? ' · ' + escapeHtml(selectedClass) : ''}.`;
       container.innerHTML = `
         <div class="text-center py-8 text-xs text-[var(--text-sub)]">
@@ -5438,25 +5423,18 @@ async function openAddTimetableSlotModal(slotId = null) {
       subjectsList.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
   }
 
-  // Target teacher / account
-  const targetTeacherName = timetableViewTeacher || (currentUser && currentUser.name) || '';
-  const targetTeacherId = timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '';
-  const targetTeacherEmail = timetableViewTeacherEmail || (currentUser && currentUser.email) || '';
-
-  const teacherInput = document.getElementById('slot-input-teacher');
-  const teacherIdInput = document.getElementById('slot-input-teacher-id');
+  // Target teacher email solely
+  const targetTeacherEmail = (timetableViewTeacherEmail || (currentUser && currentUser.email) || '').trim().toLowerCase();
   const teacherEmailInput = document.getElementById('slot-input-teacher-email');
   const assigneeNameEl = document.getElementById('slot-assignee-name');
 
-  if (teacherInput) teacherInput.value = targetTeacherName;
-  if (teacherIdInput) teacherIdInput.value = targetTeacherId;
   if (teacherEmailInput) teacherEmailInput.value = targetTeacherEmail;
-  if (assigneeNameEl) assigneeNameEl.textContent = targetTeacherEmail ? `${targetTeacherName} (${targetTeacherEmail})` : targetTeacherName;
+  if (assigneeNameEl) assigneeNameEl.textContent = targetTeacherEmail;
 
   // If editing, pre-fill values
   if (slotId) {
     try {
-      const res = await API.getTimetable('', '', '', '');
+      const res = await API.getTimetable('', '', '');
       const slots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
       const slot = slots.find(s => String(s._id) === String(slotId));
       if (slot) {
@@ -5470,13 +5448,9 @@ async function openAddTimetableSlotModal(slotId = null) {
         if (classSelect) classSelect.value = slot.class || '';
         filterTimetableSubjectsByClass();
         if (subjectSelect) subjectSelect.value = slot.subject || '';
-        if (teacherInput && slot.teacher) teacherInput.value = slot.teacher;
-        if (teacherIdInput && slot.teacherId) teacherIdInput.value = slot.teacherId;
-        const currentSlotEmail = slot.teacherEmail || targetTeacherEmail;
-        if (teacherEmailInput && currentSlotEmail) teacherEmailInput.value = currentSlotEmail;
-        if (assigneeNameEl) {
-          assigneeNameEl.textContent = currentSlotEmail ? `${slot.teacher || targetTeacherName} (${currentSlotEmail})` : (slot.teacher || targetTeacherName);
-        }
+        const currentSlotEmail = (slot.teacherEmail || targetTeacherEmail).trim().toLowerCase();
+        if (teacherEmailInput) teacherEmailInput.value = currentSlotEmail;
+        if (assigneeNameEl) assigneeNameEl.textContent = currentSlotEmail;
         const roomInput = document.getElementById('slot-input-room');
         if (roomInput) roomInput.value = slot.room || '';
       }
@@ -5499,8 +5473,6 @@ function closeAddTimetableSlotModal() {
 async function handleSaveTimetableSlot(e) {
   e.preventDefault();
   const slotId = (document.getElementById('slot-edit-id') || {}).value || timetableEditingSlotId;
-  const teacherName = ((document.getElementById('slot-input-teacher') || {}).value || timetableViewTeacher || (currentUser && currentUser.name) || '').trim();
-  const teacherIdVal = ((document.getElementById('slot-input-teacher-id') || {}).value || timetableViewTeacherId || (currentUser && (currentUser._id || currentUser.id)) || '').trim();
   const teacherEmailVal = ((document.getElementById('slot-input-teacher-email') || {}).value || timetableViewTeacherEmail || (currentUser && currentUser.email) || '').trim().toLowerCase();
 
   const daysArr = selectedSlotDays.length > 0
@@ -5513,8 +5485,6 @@ async function handleSaveTimetableSlot(e) {
     timeSlot: (document.getElementById('slot-input-time') || {}).value || '',
     class: (document.getElementById('slot-input-class') || {}).value || '',
     subject: (document.getElementById('slot-input-subject') || {}).value || '',
-    teacher: teacherName,
-    teacherId: teacherIdVal || null,
     teacherEmail: teacherEmailVal,
     room: (document.getElementById('slot-input-room') || {}).value || '',
   };
@@ -5670,7 +5640,7 @@ function printTimetableSchedule() {
     ? appSettings.appName.trim()
     : (localStorage.getItem('registerly_app_name') || 'REGISTERLY');
 
-  const teacherDisplay = timetableViewTeacher || (currentUser ? currentUser.name : 'Weekly Schedule');
+  const teacherDisplay = timetableViewTeacherEmail || (currentUser ? currentUser.email : 'Weekly Schedule');
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   // Group slots by day
@@ -5790,8 +5760,6 @@ function _generateTimetableSlotsHtml(slots) {
   }
 
   const isAdminUser = currentUser && currentUser.role === 'admin';
-  const myName = currentUser && currentUser.name ? currentUser.name.trim().toLowerCase() : '';
-  const myId = currentUser ? String(currentUser._id || currentUser.id || '') : '';
   const myEmail = currentUser && currentUser.email ? currentUser.email.trim().toLowerCase() : '';
 
   const now = new Date();
@@ -5801,13 +5769,10 @@ function _generateTimetableSlotsHtml(slots) {
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
   return slots.map(slot => {
-    const slotTeacher = (slot.teacher || '').trim().toLowerCase();
     const slotEmail = (slot.teacherEmail || '').trim().toLowerCase();
-    const isOwnSlot = (myEmail && slotEmail && slotEmail === myEmail) || (myName && slotTeacher === myName) || (myId && slot.teacherId && String(slot.teacherId) === myId);
+    const isOwnSlot = Boolean(myEmail && slotEmail && slotEmail === myEmail);
 
-    // USER DIRECTIVE:
-    // "Also add edit, delete button to time table window in admin and all users..."
-    // "In teacher tab....Also gave admin to edit and delete and and slot to time table of every teacher....."
+    // Editable by admin or the assigned teacher account (strictly by email)
     const canEditThisSlot = !timetableReadOnly && (isAdminUser || isOwnSlot);
 
     // Extract day names for clean presentation below subject and class
