@@ -456,12 +456,14 @@
       <!-- 1. ATTENDANCE VIEW -->
       <section id="view-attendance" class="hidden space-y-3.5">
         <!-- Filters (Only clean main names, NO brackets) -->
+         <div class="flex items-center gap-2 mt-4 mb-4 ml-2">
+          <svg class="w-5 h-5 text-[var(--text-main)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><polyline points="9 11 12 14 22 4"></polyline></svg>
+          <h2 class="text-sm sm:text-base font-bold text-[var(--text-main)]">ATTENDANCE CORNER</h2>
+         </div>
+        
+
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
           
-          <div>
-    <h2 class="text-sm sm:text-base font-bold text-[var(--text-main)]">ATTENDANCE CORNER</h2>
-  </div>
-
           <div class="grid grid-cols-2 gap-2.5">
             <div>             
               <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1 uppercase tracking-wide">Class</label>
@@ -549,9 +551,15 @@
 
       <!-- 2. REPORT VIEW -->
       <section id="view-report" class="hidden space-y-3.5">
+
+        <div class="flex items-center gap-2 mt-4 mb-4 ml-2">
+          <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <h2 class="text-sm sm:text-base font-bold text-[var(--text-main)]">CLASS REPORT</h2>
+         </div>
+
         <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm sm:text-base font-bold text-[var(--text-main)]"> CLASS REPORT</h3>
+            
             <!-- Print Button (Hidden initially until class & subject selected) -->
             <button id="btn-print-report" onclick="printReport()" class="touch-btn px-3.5 btn-print text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition hidden">
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
@@ -741,32 +749,6 @@
           </div>
         </div>
 
-        <!-- 4. AUDIT & ACTIVITY SECTION -->
-        <div class="space-y-1.5">
-          <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] px-1">Audit Trail</div>
-          <!-- Direct Inline Activity Log -->
-          <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
-            <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2 flex-wrap gap-2">
-              <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                </div>
-                <div>
-                  <h3 class="font-extrabold text-xs text-[var(--text-main)]">Activity Log</h3>
-                  <p class="text-[10px] text-[var(--text-sub)]">Live audit trail & attendance history</p>
-                </div>
-              </div>
-              <!-- Log Filter Pills: All vs My Actions -->
-              <div class="flex items-center gap-1 bg-[var(--bg-page)] p-0.5 rounded-xl border border-[var(--border-color)] text-[10px] font-bold">
-                <button type="button" id="btn-log-filter-all" onclick="setActivityLogFilter('all')" class="px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-xs font-bold transition">All</button>
-                <button type="button" id="btn-log-filter-mine" onclick="setActivityLogFilter('mine')" class="px-2 py-0.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-semibold transition">My Actions</button>
-              </div>
-            </div>
-            <div class="space-y-2 text-xs overflow-y-auto max-h-60 pr-1" id="activity-logs-container">
-              <!-- Populated via loadActivityLogs() -->
-            </div>
-          </div>
-        </div>
 
         <!-- 5. ACCOUNT SETTINGS -->
         <div class="space-y-1.5 pt-1">
@@ -811,10 +793,41 @@
                   <div class="text-[10px] text-[var(--text-sub)]">Toggle Light & Dark display mode</div>
                 </div>
               </div>
+                <svg class="w-4 h-4 text-[var(--text-sub)] opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+
               <!-- <span id="theme-status-label" class="text-xs font-bold text-[#245b70] dark:text-cyan-400">Light / Dark</span> -->
             </button>
           </div>
         </div>
+
+        <!-- 4. AUDIT & ACTIVITY SECTION -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] px-1">Audit Trail</div>
+          <!-- Direct Inline Activity Log -->
+          <div class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2.5">
+            <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2 flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                </div>
+                <div>
+                  <h3 class="font-extrabold text-xs text-[var(--text-main)]">Activity Log</h3>
+                  <p class="text-[10px] text-[var(--text-sub)]">Live audit trail & attendance history</p>
+                </div>
+              </div>
+              <!-- Log Filter Pills: All vs My Actions -->
+              <div class="flex items-center gap-1 bg-[var(--bg-page)] p-0.5 rounded-xl border border-[var(--border-color)] text-[10px] font-bold">
+                <button type="button" id="btn-log-filter-all" onclick="setActivityLogFilter('all')" class="px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-xs font-bold transition">All</button>
+                <button type="button" id="btn-log-filter-mine" onclick="setActivityLogFilter('mine')" class="px-2 py-0.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-semibold transition">My Actions</button>
+              </div>
+            </div>
+            <div class="space-y-2 text-xs overflow-y-auto max-h-60 pr-1" id="activity-logs-container">
+              <!-- Populated via loadActivityLogs() -->
+            </div>
+          </div>
+        </div>
+
+        
 
         <!-- 6. SESSION CONTROLS & SIGN OUT -->
         <div class="space-y-2 pt-1">

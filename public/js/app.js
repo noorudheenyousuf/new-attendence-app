@@ -1140,7 +1140,7 @@ async function renderClassesList() {
          ondrop="handleClassDrop(event, ${index})">
 
       <!-- Heading Div with dark green / dark gray distinct color background -->
-      <div class="bg-gradient-to-r from-[#183946] via-[#1f4757] to-[#183946] text-white p-3 sm:p-3.5 border-b border-white/10 flex items-center justify-between gap-2.5">
+      <div class="bg-gray-600 text-white p-3 sm:p-3.5 border-b border-white/10 flex items-center justify-between gap-2.5">
         <div class="flex items-center gap-2.5 min-w-0">
           <div class="drag-handle text-white/60 hover:text-white p-1 flex-shrink-0 cursor-grab active:cursor-grabbing transition" title="Hold card or drag handle to reorder">
             <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
@@ -5980,7 +5980,7 @@ function renderTeacherLogSessionsList() {
             <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[11px]">${escapeHtml(s.class)}</span>
             <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[11px]">${escapeHtml(s.subject || 'All Subjects')}</span>
           </div>
-          <p class="text-[11px] text-[var(--text-sub)]">Marked by: <span class="font-bold text-[var(--text-main)]">${escapeHtml(s.markedBy || 'Teacher')}</span></p>
+          
         </div>
 
         <!-- Present / Absent / Leave Badges -->
