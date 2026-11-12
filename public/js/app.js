@@ -3515,29 +3515,35 @@ async function loadActivityLogs() {
   }
 }
 
-// Teacher Daily Summary & KPI Badges (At-a-Glance Dashboard)
+// Teacher Daily Summary & Today's Status (Unified Profile Dashboard Card)
 async function updateProfileDashboardKPIs() {
   if (!currentUser) return;
 
   const todayClassesEl = document.getElementById('kpi-today-classes');
   const markedEl = document.getElementById('kpi-attendance-marked');
-  const assignedEl = document.getElementById('kpi-assigned-classes');
-  if (!todayClassesEl && !markedEl && !assignedEl) return;
+  const liveSubEl = document.getElementById('status-live-subject');
+  const liveMetaEl = document.getElementById('status-live-meta');
+  const nextSubEl = document.getElementById('status-next-subject');
+  const nextMetaEl = document.getElementById('status-next-meta');
+  if (!todayClassesEl && !markedEl && !liveSubEl && !nextSubEl) return;
 
   const myName = (currentUser.name || '').trim().toLowerCase();
   const myId = currentUser._id || currentUser.id || null;
+  const myEmail = (currentUser.email || '').trim().toLowerCase();
   const isAdmin = currentUser.role === 'admin';
 
-  // 1. Calculate today's classes from timetable
+  // 1. Calculate today's classes, live subject, and next subject from timetable
   try {
     const now = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayName = dayNames[now.getDay()].toLowerCase();
 
-    const myEmail = (currentUser.email || '').trim().toLowerCase();
     const ttRes = await API.getTimetable('', '', '');
     const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
-    const mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId, myEmail));
+    let mySlots = allSlots.filter(s => isSlotForTeacher(s, myName, myId, myEmail));
+    if (isAdmin && mySlots.length === 0) {
+      mySlots = allSlots;
+    }
 
     const todaySlots = mySlots.filter(s => {
       const d = (s.day || '').trim().toLowerCase();
@@ -3547,7 +3553,77 @@ async function updateProfileDashboardKPIs() {
     });
 
     if (todayClassesEl) todayClassesEl.textContent = String(todaySlots.length);
-  } catch (_) {}
+
+    // Calculate Live and Next Subject
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+
+    const slotsWithRange = todaySlots.map(s => {
+      const range = _parseSlotTimeRange(s.timeSlot || s.time);
+      return {
+        slot: s,
+        startMin: range ? range.startMin : null,
+        endMin: range ? range.endMin : null,
+        range
+      };
+    }).sort((a, b) => {
+      if (a.startMin !== null && b.startMin !== null) return a.startMin - b.startMin;
+      return 0;
+    });
+
+    // Find Live slot: currently active
+    const liveMatch = slotsWithRange.find(item => {
+      if (item.startMin === null || item.endMin === null) return false;
+      return currentMin >= item.startMin && currentMin < item.endMin;
+    });
+
+    // Find Next slot: earliest slot starting after now
+    const nextMatch = slotsWithRange.find(item => {
+      if (item.startMin === null) return false;
+      return item.startMin > currentMin;
+    });
+
+    if (liveSubEl) {
+      if (liveMatch) {
+        const s = liveMatch.slot;
+        liveSubEl.textContent = s.subject || 'Class';
+        if (liveMetaEl) {
+          const timeText = s.timeSlot || s.time || '';
+          const classText = s.class ? `Class ${s.class}` : '';
+          liveMetaEl.textContent = [classText, timeText].filter(Boolean).join(' • ') || 'In session';
+        }
+      } else {
+        liveSubEl.textContent = 'None';
+        if (liveMetaEl) {
+          liveMetaEl.textContent = todaySlots.length === 0 ? 'No classes today' : 'No active session';
+        }
+      }
+    }
+
+    if (nextSubEl) {
+      if (nextMatch) {
+        const s = nextMatch.slot;
+        nextSubEl.textContent = s.subject || 'Class';
+        if (nextMetaEl) {
+          const diff = nextMatch.startMin - currentMin;
+          const classText = s.class ? `Class ${s.class}` : '';
+          const diffText = diff > 0 ? (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`) : '';
+          const timeText = s.timeSlot || s.time || '';
+          const metaParts = [classText, diffText || timeText].filter(Boolean);
+          nextMetaEl.textContent = metaParts.join(' • ') || 'Upcoming';
+        }
+      } else {
+        if (todaySlots.length > 0) {
+          nextSubEl.textContent = 'Done';
+          if (nextMetaEl) nextMetaEl.textContent = 'All classes completed';
+        } else {
+          nextSubEl.textContent = 'None';
+          if (nextMetaEl) nextMetaEl.textContent = 'No upcoming classes';
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Dashboard Status Error]', err);
+  }
 
   // 2. Count attendance marked today from logs
   try {
@@ -3566,21 +3642,6 @@ async function updateProfileDashboardKPIs() {
       }
     });
     if (markedEl) markedEl.textContent = String(markedTodayCount);
-  } catch (_) {}
-
-  // 3. Count assigned classes
-  try {
-    if (assignedEl) {
-      if (isAdmin) {
-        assignedEl.textContent = String(classesList.length);
-      } else {
-        const myAssigned = classesList.filter(c => {
-          const ct = (c.classTeacher || '').trim().toLowerCase();
-          return ct === myName || ct.includes(myName);
-        });
-        assignedEl.textContent = String(myAssigned.length || classesList.length);
-      }
-    }
   } catch (_) {}
 }
 
@@ -3904,7 +3965,10 @@ function selectTopTab(tab) {
     if (reportReadyToLoad) loadReport();
     else renderReportPlaceholder();
   }
-  if (tab === 'settings') loadActivityLogs();
+  if (tab === 'settings') {
+    loadActivityLogs();
+    updateProfileDashboardKPIs();
+  }
 }
 
 function selectBottomTab(tab) {
