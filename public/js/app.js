@@ -1844,22 +1844,23 @@ function renderAttendancePlaceholder() {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="flex flex-col items-center justify-center py-10 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
-      <!-- Modern Minimalist Dual-tone Checklist in Soft Light Teal Rounded Square -->
-      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-900/50 flex items-center justify-center mb-3 shadow-sm">
-        <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <rect x="5" y="4" width="14" height="17" rx="3" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M8.5 10l1.5 1.5 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="14.5" y1="10" x2="16.5" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M8.5 15l1.5 1.5 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="14.5" y1="15" x2="16.5" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <div class="flex flex-col items-center justify-center py-12 px-6 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-xs my-1 relative overflow-hidden transition-all duration-300">
+      <!-- Standard Crisp Clipboard-Check Badge with Ambient Ring -->
+      <div class="relative flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-[#245b70]/10 dark:bg-cyan-500/10 border border-[#245b70]/20 dark:border-cyan-400/20 ring-8 ring-[#245b70]/5 dark:ring-cyan-500/5 shadow-inner mb-4 transition-transform hover:scale-105 duration-300">
+        <svg class="w-8 h-8 sm:w-9 sm:h-9 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+          <path d="m9 14 2 2 4-4"></path>
         </svg>
       </div>
-      <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
-      <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
-        Choose a class and subject above to view students and mark attendance.
+      <h3 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight mb-1.5">Select Class &amp; Subject</h3>
+      <p class="text-xs sm:text-sm text-[var(--text-sub)] font-medium max-w-xs leading-relaxed mx-auto">
+        Choose a class and subject from the filters above to load the student roster and take attendance.
       </p>
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-page)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-sub)] mt-4 select-none">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-cyan-400 animate-pulse"></span>
+        <span>Choose class &amp; subject above</span>
+      </div>
     </div>
   `;
 
@@ -1882,20 +1883,24 @@ function renderReportPlaceholder() {
   if (!container) return;
 
   container.innerHTML = `
-    <div class="flex flex-col items-center justify-center py-10 px-4 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-sm my-1">
-      <!-- Modern Minimalist Dual-tone Bar Chart in Soft Light Purple Rounded Square -->
-      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/50 flex items-center justify-center mb-3 shadow-sm">
-        <svg class="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="2"/>
-          <rect x="6.5" y="12" width="2.5" height="5" rx="1" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="10.75" y="8.5" width="2.5" height="8.5" rx="1" fill="currentColor" fill-opacity="0.5" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="15" y="6" width="2.5" height="11" rx="1" fill="currentColor" fill-opacity="0.75" stroke="currentColor" stroke-width="1.5"/>
+    <div class="flex flex-col items-center justify-center py-12 px-6 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-xs my-1 relative overflow-hidden transition-all duration-300">
+      <!-- Standard Crisp Analytics / Bar-Chart Badge with Ambient Ring -->
+      <div class="relative flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-[#245b70]/10 dark:bg-cyan-500/10 border border-[#245b70]/20 dark:border-cyan-400/20 ring-8 ring-[#245b70]/5 dark:ring-cyan-500/5 shadow-inner mb-4 transition-transform hover:scale-105 duration-300">
+        <svg class="w-8 h-8 sm:w-9 sm:h-9 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+          <path d="M3 20h18"></path>
         </svg>
       </div>
-      <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] mb-1">Select Class &amp; Subject</h3>
-      <p class="text-xs text-[var(--text-sub)] max-w-xs leading-relaxed">
-        Choose a class and subject above to view the attendance report and student analytics.
+      <h3 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight mb-1.5">Select Class &amp; Subject</h3>
+      <p class="text-xs sm:text-sm text-[var(--text-sub)] font-medium max-w-xs leading-relaxed mx-auto">
+        Choose a class and subject from the filters above to generate full attendance analytics and sheets.
       </p>
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-page)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-sub)] mt-4 select-none">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-cyan-400 animate-pulse"></span>
+        <span>Choose class &amp; subject above</span>
+      </div>
     </div>
   `;
 
