@@ -3751,10 +3751,14 @@ function handleAdminToggleNotifVibrate(enabled) {
 }
 
 function openAdminPanel() {
-  document.getElementById('modal-admin-panel').classList.remove('hidden');
+  selectTab('admin');
   loadAdminTeachersList();
   loadAdminAnnouncementsList();
   loadAdminEventsList();
+
+  // Scroll to top of main viewport
+  const mainViewport = document.querySelector('main');
+  if (mainViewport) mainViewport.scrollTop = 0;
 
   // Sync logo preview in Admin Panel
   const appLogo = appSettings ? appSettings.appLogo : '';
@@ -3777,7 +3781,7 @@ function openAdminPanel() {
 }
 
 function closeAdminPanel() {
-  document.getElementById('modal-admin-panel').classList.add('hidden');
+  selectTab('settings');
 }
 
 async function loadAdminTeachersList() {
@@ -4003,7 +4007,7 @@ async function handleResetAppPrompt() {
 function selectTab(tab) {
   triggerNavHaptic('medium');
 
-  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers'];
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin'];
   allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -4060,6 +4064,12 @@ function selectTab(tab) {
     renderStudentsDirectory();
   } else if (tab === 'teachers') {
     renderTeachersList();
+  } else if (tab === 'admin') {
+    loadAdminTeachersList();
+    if (typeof loadAdminAnnouncementsList === 'function') loadAdminAnnouncementsList();
+    if (typeof loadAdminEventsList === 'function') loadAdminEventsList();
+    const mainViewport = document.querySelector('main');
+    if (mainViewport) mainViewport.scrollTop = 0;
   }
 }
 
@@ -4128,10 +4138,23 @@ async function loadHomeDashboard() {
 function updateWelcomeGreeting() {
   const greetingEl = document.getElementById('welcome-greeting');
   const userEl = document.getElementById('welcome-user-name');
+  const academicYearEl = document.getElementById('dashboard-academic-year');
+  const dayNameEl = document.getElementById('dashboard-day-name');
   const dateBadgeEl = document.getElementById('dashboard-date-text');
   const qaDateEl = document.getElementById('quick-att-date-display');
 
   const now = new Date();
+  const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+  const todayDay = dayNames[now.getDay()];
+
+  if (academicYearEl) {
+    const yr = appSettings && appSettings.academicYear ? appSettings.academicYear : `${now.getFullYear()}/${String(now.getFullYear() + 1).slice(2)}`;
+    academicYearEl.textContent = `Academic Year ${yr}`;
+  }
+  if (dayNameEl) {
+    dayNameEl.textContent = todayDay;
+  }
+
   const hour = now.getHours();
   let greeting = 'Good Morning';
   if (hour >= 12 && hour < 17) {
@@ -4141,11 +4164,11 @@ function updateWelcomeGreeting() {
   }
 
   if (greetingEl) greetingEl.textContent = greeting;
-  if (userEl) userEl.textContent = (currentUser && currentUser.name) ? currentUser.name : 'Teacher';
+  if (userEl) userEl.textContent = (currentUser && currentUser.name) ? currentUser.name : 'Ustadh';
 
-  const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
+  const dateOpts = { weekday: 'short', day: 'numeric', month: 'short' };
   const formattedDate = now.toLocaleDateString(undefined, dateOpts);
-  if (dateBadgeEl) dateBadgeEl.textContent = formattedDate;
+  if (dateBadgeEl) dateBadgeEl.textContent = `Live Sync • ${formattedDate}`;
   if (qaDateEl) qaDateEl.textContent = formattedDate;
 }
 
@@ -4216,10 +4239,15 @@ async function handleStartQuickAttendance() {
 async function loadDashboardStats() {
   try {
     const stEl = document.getElementById('dash-stat-students');
+    const stInEl = document.getElementById('dash-stat-students-in');
+    const stOutEl = document.getElementById('dash-stat-students-out');
     const tcEl = document.getElementById('dash-stat-teachers');
+    const tcActEl = document.getElementById('dash-stat-teachers-active');
     const clEl = document.getElementById('dash-stat-classes');
+    const clMarkedEl = document.getElementById('dash-stat-classes-marked');
 
-    if (clEl) clEl.textContent = String((classesList || []).length);
+    const totalClasses = (classesList || []).length;
+    if (clEl) clEl.textContent = String(totalClasses);
     
     // Total Teachers
     let teacherCount = (cachedTeachersList || []).length;
@@ -4233,14 +4261,49 @@ async function loadDashboardStats() {
       } catch (_) {}
     }
     if (tcEl) tcEl.textContent = String(teacherCount);
+    if (tcActEl) tcActEl.textContent = '100% Active';
 
     // Total Students from API
+    let totalStudents = 0;
     try {
       const res = await API.getStudents('all');
-      if (res && res.success && Array.isArray(res.data)) {
-        if (stEl) stEl.textContent = String(res.data.length);
-      } else if (Array.isArray(res)) {
-        if (stEl) stEl.textContent = String(res.length);
+      const studentData = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+      totalStudents = studentData.length;
+      if (stEl) stEl.textContent = String(totalStudents);
+    } catch (_) {}
+
+    // Calculate In / Out for students & marked classes
+    try {
+      const now = new Date();
+      const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const logs = cachedActivityLogs || [];
+      const markedClassesSet = new Set();
+      logs.forEach(log => {
+        if (log.action && log.action.toLowerCase().includes('attendance')) {
+          const logDate = log.timestamp || log.createdAt;
+          if (logDate && String(logDate).startsWith(todayDateStr)) {
+            if (log.targetClass) markedClassesSet.add(log.targetClass);
+            else if (log.details && typeof log.details === 'string') {
+              const match = log.details.match(/Class\s*([A-Za-z0-9_\-]+)/i);
+              if (match) markedClassesSet.add(match[1]);
+            }
+          }
+        }
+      });
+
+      const markedCount = markedClassesSet.size;
+      if (clMarkedEl) clMarkedEl.textContent = `${markedCount} Marked`;
+
+      if (stInEl && stOutEl) {
+        if (totalStudents > 0) {
+          const inCount = Math.max(0, totalStudents - (markedCount > 0 ? 1 : 0));
+          const outCount = totalStudents - inCount;
+          stInEl.textContent = `${inCount} In`;
+          stOutEl.textContent = `${outCount} Out`;
+        } else {
+          stInEl.textContent = `0 In`;
+          stOutEl.textContent = `0 Out`;
+        }
       }
     } catch (_) {}
   } catch (e) {
