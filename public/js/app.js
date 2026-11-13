@@ -1,5 +1,5 @@
 // Main Application Controller for REGISTERLY
-const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E";
+const DEFAULT_AVATAR = "/default_avatar.jpg";
 let currentUser = null;
 let currentRole = 'admin'; // 'admin' or 'teacher'
 let isDarkMode = false;
@@ -1153,10 +1153,10 @@ async function renderClassesList() {
 
     const actionBtns = canUserEditDelete() ? `
       <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto pl-2">
-        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-white/15 text-white hover:bg-white hover:text-[#183946] border border-white/20 flex items-center justify-center transition shadow-xs active:scale-95">
+        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-[#245b70] hover:text-white border border-slate-200 dark:border-slate-600 flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-200 hover:bg-rose-600 hover:text-white border border-rose-400/30 flex items-center justify-center transition shadow-xs active:scale-95">
+        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-200 dark:border-rose-800 flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>` : '';
@@ -1180,19 +1180,19 @@ async function renderClassesList() {
          ondragend="handleClassDragEnd(event)"
          ondrop="handleClassDrop(event, ${index})">
 
-      <!-- Heading Div with dark green / dark gray distinct color background -->
-      <div class="bg-gray-600 text-white p-3 sm:p-3.5 border-b border-white/10 flex items-center justify-between gap-2.5">
+      <!-- Heading Div with clean white/light-gray header -->
+      <div class="bg-teal-800 text-white p-4 rounded-t-xl flex justify-between items-center">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="drag-handle text-white/60 hover:text-white p-1 flex-shrink-0 cursor-grab active:cursor-grabbing transition" title="Hold card or drag handle to reorder">
+          <div class="drag-handle text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 flex-shrink-0 cursor-grab active:cursor-grabbing transition" title="Hold card or drag handle to reorder">
             <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
             </svg>
           </div>
           <div class="min-w-0">
-            <h3 class="font-black text-white text-sm sm:text-base leading-tight truncate select-none tracking-tight">${c.isPrivate ? '<svg style=\"display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>' : ''}${escapeHtml(c.name)}</h3>
-            <div class="text-[11px] font-semibold text-teal-200 dark:text-teal-300 flex items-center gap-1.5 mt-0.5 truncate select-none">
-              <svg class="w-3.5 h-3.5 opacity-90 flex-shrink-0 text-teal-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-white/60 font-normal italic">No Teacher Assigned</span>'}</span>
+            <h3 class="text-sm font-black text-white truncate">${c.isPrivate ? '<svg style=\"display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>' : ''}${escapeHtml(c.name)}</h3>
+            <div class="text-[10px] text-teal-100 dark:text-teal-300 flex items-center gap-1 mt-0.5 truncate select-none">
+              <svg class="w-3.5 h-3.5 opacity-80 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-slate-400 dark:text-slate-500 font-normal italic">No Teacher Assigned</span>'}</span>
             </div>
           </div>
         </div>
@@ -1878,7 +1878,8 @@ async function handleSaveSubject(e) {
   const subjectCode = document.getElementById('input-sub-code').value.trim();
   const teacherEl = document.getElementById('input-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
-  const _cls = document.getElementById('add-sub-class-select') ? document.getElementById('add-sub-class-select').value : '';
+  const _cls = document.getElementById('add-sub-class-select') ? document.getElementById('add-sub-class-select').value : '';
+
   const assignedClasses = _cls ? [_cls] : [];
 
   try {
@@ -1930,7 +1931,8 @@ async function handleUpdateSubject(e) {
   const subjectCode = document.getElementById('edit-sub-code').value.trim();
   const teacherEl = document.getElementById('edit-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
-  const _editCls = document.getElementById('edit-sub-class-select') ? document.getElementById('edit-sub-class-select').value : '';
+  const _editCls = document.getElementById('edit-sub-class-select') ? document.getElementById('edit-sub-class-select').value : '';
+
   const assignedClasses = _editCls ? [_editCls] : [];
 
   try {
@@ -3712,7 +3714,11 @@ async function handleSaveEditedStudent(e) {
 // USER DIRECTIVE:
 // "when click the photo from taking attendence show sudents details fully ....only to read not edit...one more click to photo show largly...."
 async function openStudentDetailsModal(studentId) {
+  // Look in main students list first, then PW students list
   let student = studentsList.find(s => s.studentId === studentId);
+  if (!student && typeof pwStudentsList !== 'undefined') {
+    student = pwStudentsList.find(s => s.studentId === studentId);
+  }
   if (!student) {
     try {
       const res = await API.getStudents();
