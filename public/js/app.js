@@ -36,6 +36,93 @@ function classListIncludes(arr, className) {
   return arr.some(item => String(item || '').trim().toLowerCase() === target);
 }
 
+// ================= TEACHER ASSIGNMENTS SINGLE SOURCE OF TRUTH =================
+// All assignments are focused via Subject management (Subject has name, teacher, assignedClasses)
+function getTeacherAssignments(teacherName, teacherEmail) {
+  const normName = String(teacherName || '').trim().toLowerCase();
+  const normEmail = String(teacherEmail || '').trim().toLowerCase();
+
+  const allSubs = [...(subjectsList || []), ...(typeof pwSubjectsList !== 'undefined' && Array.isArray(pwSubjectsList) ? pwSubjectsList : [])];
+  const allClasses = [...(classesList || []), ...(typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList) ? pwClassesList : [])];
+
+  const matchedSubjects = allSubs.filter(s => {
+    const sTeacher = String(s.teacher || '').trim().toLowerCase();
+    const sEmail = String(s.teacherEmail || s.ownerEmail || '').trim().toLowerCase();
+    if (normName && sTeacher === normName) return true;
+    if (normEmail && sEmail === normEmail) return true;
+    return false;
+  });
+
+  const seenSub = new Set();
+  const assignedSubjects = [];
+  matchedSubjects.forEach(s => {
+    const n = (s.name || '').trim();
+    const k = n.toLowerCase();
+    if (n && !seenSub.has(k)) {
+      seenSub.add(k);
+      assignedSubjects.push(n);
+    }
+  });
+
+  const seenCls = new Set();
+  const assignedClasses = [];
+  matchedSubjects.forEach(s => {
+    (s.assignedClasses || []).forEach(cName => {
+      const cTrim = String(cName || '').trim();
+      const k = cTrim.toLowerCase();
+      if (cTrim && !seenCls.has(k)) {
+        seenCls.add(k);
+        assignedClasses.push(cTrim);
+      }
+    });
+  });
+
+  allClasses.forEach(c => {
+    const ct = String(c.classTeacher || '').trim().toLowerCase();
+    if (normName && ct === normName) {
+      const cTrim = String(c.name || '').trim();
+      const k = cTrim.toLowerCase();
+      if (cTrim && !seenCls.has(k)) {
+        seenCls.add(k);
+        assignedClasses.push(cTrim);
+      }
+    }
+  });
+
+  return { assignedSubjects, assignedClasses };
+}
+
+function renderProfileAssignments(name, email) {
+  const classesContainer = document.getElementById('edit-profile-assigned-classes');
+  const subjectsContainer = document.getElementById('edit-profile-assigned-subjects');
+  if (!classesContainer || !subjectsContainer) return;
+
+  const assign = getTeacherAssignments(name, email);
+
+  if (assign.assignedClasses.length > 0) {
+    classesContainer.innerHTML = assign.assignedClasses.map(c => `
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20 font-bold text-xs shadow-2xs select-none">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-cyan-400"></span>
+        <span>${escapeHtml(c)}</span>
+      </span>
+    `).join('');
+  } else {
+    classesContainer.innerHTML = '<span class="text-xs text-[var(--text-sub)] italic">No classes assigned yet</span>';
+  }
+
+  if (assign.assignedSubjects.length > 0) {
+    subjectsContainer.innerHTML = assign.assignedSubjects.map(s => `
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 font-bold text-xs shadow-2xs select-none">
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+        <span>${escapeHtml(s)}</span>
+      </span>
+    `).join('');
+  } else {
+    subjectsContainer.innerHTML = '<span class="text-xs text-[var(--text-sub)] italic">No subjects assigned yet</span>';
+  }
+}
+
+
 // Sanitization Helpers
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
@@ -344,7 +431,8 @@ function updateUserUI() {
       settingsRole.classList.remove('hidden');
     }
     if (settingsAvatar) settingsAvatar.src = DEFAULT_AVATAR;
-
+    const assignStrip = document.getElementById('settings-assignments-strip');
+    if (assignStrip) assignStrip.classList.add('hidden');
     const adminSection = document.getElementById('admin-settings-section');
     if (adminSection) adminSection.classList.add('hidden');
     return;
@@ -401,6 +489,24 @@ function updateUserUI() {
   }
 
   if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
+
+  // Render assigned classes & subjects in profile card
+  const assignStrip = document.getElementById('settings-assignments-strip');
+  const clsPills = document.getElementById('settings-classes-pills');
+  const subPills = document.getElementById('settings-subjects-pills');
+  if (assignStrip) assignStrip.classList.remove('hidden');
+
+  const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
+  if (clsPills) {
+    clsPills.innerHTML = myAssign.assignedClasses.length > 0
+      ? myAssign.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20 font-bold text-xs shadow-2xs">${escapeHtml(c)}</span>`).join(' ')
+      : '<span class="text-[11px] text-[var(--text-sub)] italic">None assigned</span>';
+  }
+  if (subPills) {
+    subPills.innerHTML = myAssign.assignedSubjects.length > 0
+      ? myAssign.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold text-xs shadow-2xs">${escapeHtml(s)}</span>`).join(' ')
+      : '<span class="text-[11px] text-[var(--text-sub)] italic">None assigned</span>';
+  }
 
   // Visibility based on Role:
   const adminSection = document.getElementById('admin-settings-section');
@@ -1139,10 +1245,20 @@ async function renderClassesList() {
     const placedClass = isPlaced ? ' drag-item-placed' : '';
 
     const studentCount = (cachedAllStudents || []).filter(s => isClassEqual(s.class, c.name)).length;
-    const subjectCount = (c.assignedSubjects && Array.isArray(c.assignedSubjects)) ? c.assignedSubjects.length : 0;
-
+    const classSubjects = (subjectsList || []).filter(s => (s.assignedClasses || []).some(ac => isClassEqual(ac, c.name)));
+    const uniqueClassSubjects = [];
+    const seenSub = new Set();
+    classSubjects.forEach(s => {
+      const n = (s.name || '').trim();
+      const k = n.toLowerCase();
+      if (n && !seenSub.has(k)) {
+        seenSub.add(k);
+        uniqueClassSubjects.push(n);
+      }
+    });
+    const subjectCount = uniqueClassSubjects.length;
     const subjectPills = subjectCount > 0
-      ? c.assignedSubjects.map((sub, sIdx) => {
+      ? uniqueClassSubjects.map((sub, sIdx) => {
           const col = palette[sIdx % palette.length];
           return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${col.bg} ${col.text} border ${col.border} shadow-2xs select-none transition hover:scale-105" title="${escapeHtml(sub)}">
             <span class="w-1.5 h-1.5 rounded-full ${col.dot} flex-shrink-0"></span>
@@ -1237,7 +1353,7 @@ async function openEditClassModal(id) {
   const nameInput = document.getElementById('edit-class-name');
   if (nameInput) nameInput.value = cls.name;
   await populateTeacherDropdowns('edit-class-teacher', cls.classTeacher || '');
-  renderSubjectCheckboxesForClass('edit-class-subjects-container', cls.assignedSubjects || []);
+  
 
   const modal = document.getElementById('modal-edit-class');
   if (modal) modal.classList.remove('hidden');
@@ -1255,10 +1371,8 @@ async function handleUpdateClass(e) {
 
   const name = document.getElementById('edit-class-name').value.trim();
   const classTeacher = document.getElementById('edit-class-teacher').value.trim();
-  const assignedSubjects = getSelectedSubjectCheckboxesForClass('edit-class-subjects-container');
-
   try {
-    const res = await API.updateClass(activeEditClassId, name, classTeacher, assignedSubjects);
+    const res = await API.updateClass(activeEditClassId, name, classTeacher, []);
     if (res.success) {
       showToast(`Class "${name}" updated!`);
       closeEditClassModal();
@@ -1275,9 +1389,8 @@ async function handleSaveClass(e) {
   e.preventDefault();
   const name = document.getElementById('input-class-name').value.trim();
   const classTeacher = document.getElementById('input-class-teacher').value.trim();
-  const assignedSubjects = getSelectedSubjectCheckboxesForClass('add-class-subjects-container');
   try {
-    const res = await API.addClass(name, classTeacher, assignedSubjects);
+    const res = await API.addClass(name, classTeacher, []);
     if (res.success) {
       showToast(`Class "${name}" added!`);
       closeClassModal();
@@ -1321,15 +1434,21 @@ async function loadSubjects() {
 }
 
 function getAppropriateSubjectsForClass(className) {
-  if (!className || !subjectsList || subjectsList.length === 0) return [];
-  const cls = (classesList || []).find(c => isClassEqual(c.name, className));
-  if (cls && Array.isArray(cls.assignedSubjects) && cls.assignedSubjects.length > 0) {
-    const matched = subjectsList.filter(s => cls.assignedSubjects.some(sub => isClassEqual(sub, s.name)));
-    if (matched.length > 0) {
-      return matched;
+  if (!className) return [];
+  const allSubs = [...(subjectsList || []), ...(typeof pwSubjectsList !== 'undefined' && Array.isArray(pwSubjectsList) ? pwSubjectsList : [])];
+  if (allSubs.length === 0) return [];
+  const matched = allSubs.filter(s => (s.assignedClasses || []).some(ac => isClassEqual(ac, className)));
+  const unique = [];
+  const seen = new Set();
+  matched.forEach(s => {
+    const n = (s.name || '').trim();
+    const k = n.toLowerCase();
+    if (n && !seen.has(k)) {
+      seen.add(k);
+      unique.push(s);
     }
-  }
-  return subjectsList;
+  });
+  return unique;
 }
 
 function updateAttendanceSubjectsDropdown(selectedClass) {
@@ -1344,7 +1463,7 @@ function updateAttendanceSubjectsDropdown(selectedClass) {
 
   const validSubjects = getAppropriateSubjectsForClass(selectedClass);
   if (validSubjects.length > 0) {
-    selSubject.innerHTML = validSubjects.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+    selSubject.innerHTML = validSubjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
     if (!currentSubject || currentSubject === 'all' || !validSubjects.some(s => s.name === currentSubject)) {
       currentSubject = validSubjects[0].name;
     }
@@ -1393,7 +1512,17 @@ function updateReportSubjectsDropdown(selectedClassName) {
     });
   }
 
-  const optionsHtml = relevantSubjects.map(s => `<option value="${escapeHtml(s.name || s)}">${escapeHtml(s.name || s)}</option>`).join('');
+  const seenReportNames = new Set();
+  const uniqueRelevant = [];
+  relevantSubjects.forEach(s => {
+    const sName = String(s.name || s || '').trim();
+    const k = sName.toLowerCase();
+    if (sName && !seenReportNames.has(k)) {
+      seenReportNames.add(k);
+      uniqueRelevant.push(sName);
+    }
+  });
+  const optionsHtml = uniqueRelevant.map(sName => `<option value="${escapeHtml(sName)}">${escapeHtml(sName)}</option>`).join('');
   repSubject.innerHTML = `<option value="whole">All Subjects</option>` + optionsHtml;
 
   if (prevVal && Array.from(repSubject.options).some(o => o.value === prevVal)) {
@@ -1817,42 +1946,7 @@ function renderSubjectsList() {
   container.innerHTML = html || `<div class="p-4 text-center text-xs text-[var(--text-sub)]">No subjects found.</div>`;
 }
 
-// Checkbox helper for Class assigned subjects
-function renderSubjectCheckboxesForClass(containerId, selectedSubjects = []) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
 
-  if (!subjectsList || subjectsList.length === 0) {
-    container.innerHTML = `<span class="text-xs text-[var(--text-sub)] col-span-full py-1">No subjects created yet. Add subjects in "Subjects" tab first.</span>`;
-    return;
-  }
-
-  // Deduplicate by name so the checkbox list only shows unique subject names
-  const uniqueSubjects = [];
-  const seen = new Set();
-  (subjectsList || []).forEach(s => {
-    const n = (s.name || '').trim();
-    if (n && !seen.has(n.toLowerCase())) {
-      seen.add(n.toLowerCase());
-      uniqueSubjects.push(s);
-    }
-  });
-
-  container.innerHTML = uniqueSubjects.map(s => {
-    const isChecked = selectedSubjects.some(sub => isClassEqual(sub, s.name));
-    return `
-      <label class="flex items-center gap-1.5 p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs font-bold text-[var(--text-main)] transition shadow-sm select-none">
-        <input type="checkbox" name="${containerId}-cb" value="${escapeHtml(s.name)}" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-[#245b70] focus:ring-[#245b70] accent-[#245b70] cursor-pointer">
-        <span class="truncate">${escapeHtml(s.name)}</span>
-      </label>
-    `;
-  }).join('');
-}
-
-function getSelectedSubjectCheckboxesForClass(containerId) {
-  const checkboxes = document.querySelectorAll(`input[name="${containerId}-cb"]:checked`);
-  return Array.from(checkboxes).map(cb => cb.value);
-}
 
 async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
@@ -2774,7 +2868,7 @@ async function openProfileEditPage(targetUserId = null) {
     }
     if (phoneInput) phoneInput.value = teacher.phone || '';
 
-    renderTeacherSubjectCheckboxes('edit-profile-subjects-container', teacher.assignedSubjects || []);
+    renderProfileAssignments(teacher.name, teacher.email);
 
     editProfileInitialState = {
       name: (teacher.name || '').trim(),
@@ -2816,7 +2910,7 @@ async function openProfileEditPage(targetUserId = null) {
     }
     if (phoneInput) phoneInput.value = currentUser.phone || '';
 
-    renderTeacherSubjectCheckboxes('edit-profile-subjects-container', currentUser.assignedSubjects || []);
+    renderProfileAssignments(currentUser.name, currentUser.email);
 
     editProfileInitialState = {
       name: (currentUser.name || '').trim(),
@@ -2893,14 +2987,10 @@ function hasUnsavedProfileChanges() {
   const curEmail = (document.getElementById('edit-profile-email')?.value || '').trim();
   const curPhone = (document.getElementById('edit-profile-phone')?.value || '').trim();
   const curAvatar = editProfileCurrentAvatarUrl || '';
-  const curSubjects = getSelectedTeacherCheckboxes('edit-profile-subjects-container').sort().join(',');
-  const initSubjects = (editProfileInitialState.subjects || []).slice().sort().join(',');
-
   return (curName !== editProfileInitialState.name) ||
          (curEmail !== editProfileInitialState.email) ||
          (curPhone !== editProfileInitialState.phone) ||
-         (curAvatar !== editProfileInitialState.avatarUrl) ||
-         (curSubjects !== initSubjects);
+         (curAvatar !== editProfileInitialState.avatarUrl);
 }
 
 function handleCloseProfilePageWithCheck() {
@@ -2937,8 +3027,7 @@ async function handleSaveProfile(event) {
   const phoneInput = document.getElementById('edit-profile-phone');
   const phone = phoneInput ? phoneInput.value.trim() : '';
 
-  const assignedSubjects = getSelectedTeacherCheckboxes('edit-profile-subjects-container');
-
+  
   const saveBtn = document.getElementById('btn-save-profile');
   const spinner = document.getElementById('btn-save-profile-spinner');
   const btnText = document.getElementById('btn-save-profile-text');
@@ -2954,8 +3043,7 @@ async function handleSaveProfile(event) {
         name,
         email,
         phone,
-        avatarUrl: editProfileCurrentAvatarUrl,
-        assignedSubjects
+        avatarUrl: editProfileCurrentAvatarUrl
       });
 
       if (res && res.success) {
@@ -5337,7 +5425,6 @@ function closeNotificationSettingsModal() {
 async function openClassModal() {
   document.getElementById('input-class-name').value = '';
   await populateTeacherDropdowns('input-class-teacher', '');
-  renderSubjectCheckboxesForClass('add-class-subjects-container', []);
   document.getElementById('modal-add-class').classList.remove('hidden');
 }
 function closeClassModal() {
@@ -5826,56 +5913,7 @@ async function populateTeacherDropdowns(targetSelectId, selectedValue = '') {
   selectEl.innerHTML = optionsHtml;
 }
 
-// Helper to render class checkboxes for Teacher
-function renderTeacherClassCheckboxes(containerId, selectedClasses = []) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
 
-  if (!classesList || classesList.length === 0) {
-    container.innerHTML = `<span class="col-span-full text-xs text-[var(--text-sub)] py-1">No classes available. Add classes first.</span>`;
-    return;
-  }
-
-  container.innerHTML = classesList.map(c => {
-    const isChecked = selectedClasses.includes(c.name) ? 'checked' : '';
-    const safeId = `tc-${containerId}-${c.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    return `
-      <label for="${safeId}" class="flex items-center gap-1.5 p-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs select-none transition">
-        <input type="checkbox" id="${safeId}" value="${escapeHtml(c.name)}" ${isChecked} class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
-        <span class="font-bold text-[var(--text-main)] truncate">${escapeHtml(c.name)}</span>
-      </label>
-    `;
-  }).join('');
-}
-
-// Helper to render subject checkboxes for Teacher
-function renderTeacherSubjectCheckboxes(containerId, selectedSubjects = []) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  if (!subjectsList || subjectsList.length === 0) {
-    container.innerHTML = `<span class="col-span-full text-xs text-[var(--text-sub)] py-1">No subjects available. Add subjects first.</span>`;
-    return;
-  }
-
-  container.innerHTML = subjectsList.map(s => {
-    const isChecked = selectedSubjects.includes(s.name) ? 'checked' : '';
-    const safeId = `ts-${containerId}-${s.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    return `
-      <label for="${safeId}" class="flex items-center gap-1.5 p-1.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border-color)] hover:border-[#245b70] cursor-pointer text-xs select-none transition">
-        <input type="checkbox" id="${safeId}" value="${escapeHtml(s.name)}" ${isChecked} class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
-        <span class="font-bold text-[var(--text-main)] truncate">${escapeHtml(s.name)}</span>
-      </label>
-    `;
-  }).join('');
-}
-
-function getSelectedTeacherCheckboxes(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return [];
-  const checked = container.querySelectorAll('input[type="checkbox"]:checked');
-  return Array.from(checked).map(cb => cb.value);
-}
 
 // Generate friendly fallback avatar
 function getEmailAvatarPreview(email, name = '') {
@@ -5944,8 +5982,11 @@ async function renderTeachersList() {
       teachers = teachers.filter(t =>
         (t.name && t.name.toLowerCase().includes(searchTerm)) ||
         (t.email && t.email.toLowerCase().includes(searchTerm)) ||
-        (t.assignedClasses && t.assignedClasses.some(c => c.toLowerCase().includes(searchTerm))) ||
-        (t.assignedSubjects && t.assignedSubjects.some(s => s.toLowerCase().includes(searchTerm)))
+        (() => {
+          const tAss = getTeacherAssignments(t.name, t.email);
+          return tAss.assignedClasses.some(c => c.toLowerCase().includes(searchTerm)) ||
+                 tAss.assignedSubjects.some(s => s.toLowerCase().includes(searchTerm));
+        })()
       );
     }
 
@@ -5985,12 +6026,13 @@ async function renderTeachersList() {
                 No Email
               </span>`);
 
-      const subjectsPills = (t.assignedSubjects && t.assignedSubjects.length > 0)
-        ? t.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold text-xs shadow-sm">${escapeHtml(s)}</span>`).join(' ')
+      const tAssign = getTeacherAssignments(t.name, t.email);
+      const subjectsPills = tAssign.assignedSubjects.length > 0
+        ? tAssign.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold text-xs shadow-sm">${escapeHtml(s)}</span>`).join(' ')
         : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
 
-      const classesPills = (t.assignedClasses && t.assignedClasses.length > 0)
-        ? t.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-900/30 dark:text-cyan-300 border border-[#245b70]/20 dark:border-cyan-700/30 font-bold text-xs shadow-sm">${escapeHtml(c)}</span>`).join(' ')
+      const classesPills = tAssign.assignedClasses.length > 0
+        ? tAssign.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-900/30 dark:text-cyan-300 border border-[#245b70]/20 dark:border-cyan-700/30 font-bold text-xs shadow-sm">${escapeHtml(c)}</span>`).join(' ')
         : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
 
       const totalAllTime = t.totalAllTimeSessions !== undefined ? t.totalAllTimeSessions : (t.sessionCount || 0);
@@ -6083,8 +6125,7 @@ function openAddTeacherModal() {
   document.getElementById('new-teacher-name').value = '';
   document.getElementById('new-teacher-email').value = '';
 
-  renderTeacherClassCheckboxes('new-teacher-classes-container', []);
-  renderTeacherSubjectCheckboxes('new-teacher-subjects-container', []);
+  
 
   document.getElementById('modal-add-teacher').classList.remove('hidden');
 }
@@ -6098,8 +6139,7 @@ async function handleSaveTeacher(e) {
   e.preventDefault();
   const name = document.getElementById('new-teacher-name').value.trim();
   const email = document.getElementById('new-teacher-email').value.trim();
-  const assignedClasses = getSelectedTeacherCheckboxes('new-teacher-classes-container');
-  const assignedSubjects = getSelectedTeacherCheckboxes('new-teacher-subjects-container');
+  
 
   if (!name) {
     showToast('Teacher name is required', true);
@@ -6111,8 +6151,8 @@ async function handleSaveTeacher(e) {
       name,
       email,
       avatarUrl: newTeacherPhotoUrl,
-      assignedClasses,
-      assignedSubjects
+      assignedClasses: [],
+      assignedSubjects: []
     });
 
     if (res.success) {
@@ -6126,49 +6166,7 @@ async function handleSaveTeacher(e) {
   }
 }
 
-// Edit Teacher Modal
-async function openEditTeacherModal(id) {
-  activeEditTeacherId = id;
-  const teacher = (cachedTeachersList || []).find(t => t._id === id);
-  if (!teacher) return;
 
-  editTeacherPhotoUrl = teacher.avatarUrl || '';
-
-  const idInput = document.getElementById('edit-teacher-id');
-  const nameInput = document.getElementById('edit-teacher-name');
-  const emailInput = document.getElementById('edit-teacher-email');
-  const preview = document.getElementById('edit-teacher-preview-photo');
-  const googleBadge = document.getElementById('edit-teacher-google-badge');
-
-  if (idInput) idInput.value = teacher._id;
-  if (nameInput) nameInput.value = teacher.name;
-  if (emailInput) emailInput.value = teacher.email || '';
-  if (preview) preview.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
-
-  if (googleBadge) {
-    if (teacher.googleConnected) {
-      googleBadge.innerText = 'Google Linked';
-      googleBadge.className = 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold';
-    } else if (teacher.email) {
-      googleBadge.innerText = 'Email Connected';
-      googleBadge.className = 'text-[10px] text-slate-500 font-bold';
-    } else {
-      googleBadge.innerText = 'No Email Linked';
-      googleBadge.className = 'text-[10px] text-amber-600 dark:text-amber-400 font-bold';
-    }
-  }
-
-  renderTeacherClassCheckboxes('edit-teacher-classes-container', teacher.assignedClasses || []);
-  renderTeacherSubjectCheckboxes('edit-teacher-subjects-container', teacher.assignedSubjects || []);
-
-  document.getElementById('modal-edit-teacher').classList.remove('hidden');
-}
-
-function closeEditTeacherModal() {
-  document.getElementById('modal-edit-teacher').classList.add('hidden');
-  activeEditTeacherId = null;
-  editTeacherPhotoUrl = '';
-}
 
 async function handleUpdateTeacher(e) {
   e.preventDefault();
@@ -6176,16 +6174,11 @@ async function handleUpdateTeacher(e) {
 
   const name = document.getElementById('edit-teacher-name').value.trim();
   const email = document.getElementById('edit-teacher-email').value.trim();
-  const assignedClasses = getSelectedTeacherCheckboxes('edit-teacher-classes-container');
-  const assignedSubjects = getSelectedTeacherCheckboxes('edit-teacher-subjects-container');
-
   try {
     const res = await API.editTeacher(activeEditTeacherId, {
       name,
       email,
-      avatarUrl: editTeacherPhotoUrl,
-      assignedClasses,
-      assignedSubjects
+      avatarUrl: editTeacherPhotoUrl
     });
 
     if (res.success) {
@@ -6271,17 +6264,18 @@ async function openTeacherLogModal(teacherId) {
       if (daysCountEl) daysCountEl.innerText = stats.totalDays;
       if (classesCountEl) classesCountEl.innerText = stats.classesCount;
 
-      // Assigned Classes & Subjects
+      // Assigned Classes & Subjects derived dynamically
       const classesWrap = document.getElementById('tlog-assigned-classes');
       const subjectsWrap = document.getElementById('tlog-assigned-subjects');
+      const tLogAssign = getTeacherAssignments(teacher.name, teacher.email);
       if (classesWrap) {
-        classesWrap.innerHTML = (teacher.assignedClasses && teacher.assignedClasses.length > 0)
-          ? teacher.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-xs">${escapeHtml(c)}</span>`).join('')
+        classesWrap.innerHTML = tLogAssign.assignedClasses.length > 0
+          ? tLogAssign.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-xs">${escapeHtml(c)}</span>`).join('')
           : `<span class="text-xs text-[var(--text-sub)] italic">None</span>`;
       }
       if (subjectsWrap) {
-        subjectsWrap.innerHTML = (teacher.assignedSubjects && teacher.assignedSubjects.length > 0)
-          ? teacher.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-xs">${escapeHtml(s)}</span>`).join('')
+        subjectsWrap.innerHTML = tLogAssign.assignedSubjects.length > 0
+          ? tLogAssign.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-xs">${escapeHtml(s)}</span>`).join('')
           : `<span class="text-xs text-[var(--text-sub)] italic">None</span>`;
       }
 
@@ -6926,9 +6920,9 @@ function filterTimetableSubjectsByClass() {
   if (!classSelect || !subjectSelect) return;
   const selectedClass = classSelect.value;
   const cls = classesList.find(c => isClassEqual(c.name || c, selectedClass));
-  const subjects = (cls && cls.assignedSubjects && cls.assignedSubjects.length > 0)
-    ? cls.assignedSubjects
-    : subjectsList.map(s => s.name || s);
+  const matchedSubs = (subjectsList || []).filter(s => (s.assignedClasses || []).some(ac => isClassEqual(ac, selectedClass)));
+  const uniqueNames = Array.from(new Set(matchedSubs.map(s => s.name).filter(Boolean)));
+  const subjects = uniqueNames.length > 0 ? uniqueNames : Array.from(new Set((subjectsList || []).map(s => s.name).filter(Boolean)));
   const currentVal = subjectSelect.value;
   subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
     subjects.map(s => '<option value="' + escapeHtml(s) + '" ' + (s === currentVal ? 'selected' : '') + '>' + escapeHtml(s) + '</option>').join('');

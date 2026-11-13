@@ -483,37 +483,6 @@ function renderPWStudentsView(filterClass = 'all', searchText = '') {
 }
 
 // ================================================================
-// ================================================================
-// PW CLASS SUBJECT CHECKBOX HELPERS
-// ================================================================
-function pwRenderClassSubjectCheckboxes(selectedSubjects) {
-  selectedSubjects = selectedSubjects || [];
-  const container = document.getElementById('pw-class-subject-checkboxes');
-  if (!container) return;
-  if (!pwSubjectsList || pwSubjectsList.length === 0) {
-    container.innerHTML = '<p class="text-[11px] text-pink-400 italic px-1">No private subjects yet — add subjects first.</p>';
-    return;
-  }
-  const unique = [];
-  const seen = new Set();
-  pwSubjectsList.forEach(function(s) {
-    var n = s.name.trim().toLowerCase();
-    if (!seen.has(n)) { seen.add(n); unique.push(s); }
-  });
-  container.innerHTML = unique.map(function(s) {
-    var checked = selectedSubjects.some(function(x) { return x.toLowerCase() === s.name.toLowerCase(); }) ? 'checked' : '';
-    var uid = 'pw-sub-chk-' + s._id;
-    return '<label for="' + uid + '" class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-pink-100 dark:hover:bg-pink-900/30 transition select-none">'
-      + '<input type="checkbox" id="' + uid + '" name="pw-sub-chk" value="' + escapeHtml(s.name) + '" ' + checked + ' class="w-4 h-4 rounded accent-pink-500 cursor-pointer flex-shrink-0">'
-      + '<span class="text-xs font-bold text-pink-800 dark:text-pink-200 truncate">' + escapeHtml(s.name) + '</span>'
-      + '</label>';
-  }).join('');
-}
-
-function pwGetCheckedSubjects() {
-  var checked = document.querySelectorAll('#pw-class-subject-checkboxes input[name="pw-sub-chk"]:checked');
-  return Array.from(checked).map(function(el) { return el.value; });
-}
 
 // CLASS CRUD
 // ================================================================
@@ -569,31 +538,6 @@ async function pwDeleteClass(id, name) {
   } catch (err) { showToast(err.message, true); }
 }
 
-// ================================================================
-// PW SUBJECT CLASS CHECKBOX HELPERS
-// ================================================================
-function pwRenderSubjectClassCheckboxes(selectedClasses) {
-  selectedClasses = selectedClasses || [];
-  const container = document.getElementById('pw-subject-class-checkboxes');
-  if (!container) return;
-  if (!pwClassesList || pwClassesList.length === 0) {
-    container.innerHTML = '<p class="text-[11px] text-pink-400 italic px-1">No private classes yet — add classes first.</p>';
-    return;
-  }
-  container.innerHTML = pwClassesList.map(function(c) {
-    var checked = selectedClasses.some(function(x) { return x === c.name; }) ? 'checked' : '';
-    var uid = 'pw-cls-chk-' + c._id;
-    return '<label for="' + uid + '" class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-pink-100 dark:hover:bg-pink-900/30 transition select-none">'
-      + '<input type="checkbox" id="' + uid + '" name="pw-cls-chk" value="' + escapeHtml(c.name) + '" ' + checked + ' class="w-4 h-4 rounded accent-pink-500 cursor-pointer flex-shrink-0">'
-      + '<span class="text-xs font-bold text-pink-800 dark:text-pink-200 truncate">' + escapeHtml(c.name) + '</span>'
-      + '</label>';
-  }).join('');
-}
-
-function pwGetCheckedClasses() {
-  var checked = document.querySelectorAll('#pw-subject-class-checkboxes input[name="pw-cls-chk"]:checked');
-  return Array.from(checked).map(function(el) { return el.value; });
-}
 
 // ================================================================
 // SUBJECT CRUD

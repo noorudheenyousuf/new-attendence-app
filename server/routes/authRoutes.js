@@ -292,6 +292,19 @@ router.get('/me', authMiddleware, async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    const allSubjects = await Subject.find({}).lean();
+    const allClasses = await Class.find({}).lean();
+    const normName = (user.name || '').trim().toLowerCase();
+    const normEmail = (user.email || '').trim().toLowerCase();
+    const tSubs = allSubjects.filter(s => {
+      const sTeacher = (s.teacher || '').trim().toLowerCase();
+      const sOwner = (s.ownerEmail || '').trim().toLowerCase();
+      return (normName && sTeacher === normName) || (normEmail && sOwner === normEmail);
+    });
+    const assignedSubjects = Array.from(new Set(tSubs.map(s => s.name.trim()).filter(Boolean)));
+    const classesFromSubs = tSubs.flatMap(s => s.assignedClasses || []);
+    const classesAsClassTeacher = allClasses.filter(c => (c.classTeacher || '').trim().toLowerCase() === normName).map(c => c.name);
+    const assignedClasses = Array.from(new Set([...classesFromSubs, ...classesAsClassTeacher].map(c => String(c).trim()).filter(Boolean)));
     res.json({
       success: true,
       user: {
@@ -302,8 +315,8 @@ router.get('/me', authMiddleware, async (req, res) => {
         phone: user.phone || '',
         role: user.role,
         avatarUrl: user.avatarUrl,
-        assignedClasses: user.assignedClasses || [],
-        assignedSubjects: user.assignedSubjects || [],
+        assignedClasses,
+        assignedSubjects,
         createdAt: user.createdAt,
         googleConnected: Boolean(user.googleId),
         isFirstAccount: user.isFirstAccount

@@ -47,13 +47,28 @@ router.get('/', authMiddleware, async (req, res) => {
     });
     const availableYears = Array.from(detectedYears).sort().reverse();
 
+    // Load active subjects & classes to dynamically derive teacher assignments
+    const allSubjects = await Subject.find({}).lean();
+    const allClasses = await Class.find({}).lean();
+
     // Compute live attendance session counts for each teacher based on year & class
     const enrichedTeachers = await Promise.all(
       teachers.map(async (t) => {
         const emailLower = (t.email || '').toLowerCase();
         const teacherName = t.name || '';
-        const assignedClasses = Array.isArray(t.assignedClasses) ? t.assignedClasses : [];
-        const assignedSubjects = Array.isArray(t.assignedSubjects) ? t.assignedSubjects : [];
+        const normName = teacherName.trim().toLowerCase();
+
+        // Dynamically derive assigned subjects & classes from Subject and Class collections
+        const tSubs = allSubjects.filter(s => {
+          const sTeacher = (s.teacher || '').trim().toLowerCase();
+          const sOwner = (s.ownerEmail || '').trim().toLowerCase();
+          return (normName && sTeacher === normName) || (emailLower && sOwner === emailLower);
+        });
+
+        const assignedSubjects = Array.from(new Set(tSubs.map(s => s.name.trim()).filter(Boolean)));
+        const classesFromSubs = tSubs.flatMap(s => s.assignedClasses || []);
+        const classesAsClassTeacher = allClasses.filter(c => (c.classTeacher || '').trim().toLowerCase() === normName).map(c => c.name);
+        const assignedClasses = Array.from(new Set([...classesFromSubs, ...classesAsClassTeacher].map(c => String(c).trim()).filter(Boolean)));
 
         // Match sessions marked by this teacher or assigned to this teacher
         const orConditions = [];
@@ -116,12 +131,25 @@ router.get('/:id', authMiddleware, async (req, res) => {
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher not found' });
     }
+    const allSubjects = await Subject.find({}).lean();
+    const allClasses = await Class.find({}).lean();
+    const normName = (teacher.name || '').trim().toLowerCase();
+    const normEmail = (teacher.email || '').trim().toLowerCase();
+    const tSubs = allSubjects.filter(s => {
+      const sTeacher = (s.teacher || '').trim().toLowerCase();
+      const sOwner = (s.ownerEmail || '').trim().toLowerCase();
+      return (normName && sTeacher === normName) || (normEmail && sOwner === normEmail);
+    });
+    const assignedSubjects = Array.from(new Set(tSubs.map(s => s.name.trim()).filter(Boolean)));
+    const classesFromSubs = tSubs.flatMap(s => s.assignedClasses || []);
+    const classesAsClassTeacher = allClasses.filter(c => (c.classTeacher || '').trim().toLowerCase() === normName).map(c => c.name);
+    const assignedClasses = Array.from(new Set([...classesFromSubs, ...classesAsClassTeacher].map(c => String(c).trim()).filter(Boolean)));
     res.json({
       success: true,
       data: {
         ...teacher,
-        assignedClasses: teacher.assignedClasses || [],
-        assignedSubjects: teacher.assignedSubjects || [],
+        assignedClasses,
+        assignedSubjects,
         googleConnected: Boolean(teacher.googleId)
       }
     });
