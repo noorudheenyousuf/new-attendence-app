@@ -496,29 +496,46 @@ function updateUserUI() {
     }
   }
 
-  if (settingsRole) {
-    const isAdmin = currentUser.role === 'admin';
-    settingsRole.innerText = isAdmin ? 'Administrator' : 'Teacher';
-    if (isAdmin) {
-      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30";
-    } else {
-      settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20";
-    }
-    settingsRole.classList.remove('hidden');
-  }
-
   if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
 
-  // Render Class Teacher Badge
+  // USER DIRECTIVE:
+  // "only show in profile card....plus two class teacher badge .......not teacher/administr badge"
+  // "if admin profile....show above of plus two class teacher.... administartor badge very very small... with diferent color"
+  const isAdmin = currentUser.role === 'admin';
   const ctBadge = document.getElementById('settings-classteacher-badge');
   const ctText = document.getElementById('settings-classteacher-text');
   const myCT = (currentUser.classTeacherOf || (classesList.find(c => isClassEqual(c.classTeacher, currentUser.name))?.name) || '').trim();
-  if (ctBadge && ctText) {
-    if (myCT) {
+
+  if (myCT) {
+    // User is a Class Teacher
+    if (ctBadge && ctText) {
       ctText.textContent = `${myCT.toUpperCase()} CLASS TEACHER`;
       ctBadge.classList.remove('hidden');
+    }
+    if (isAdmin) {
+      // Admin: show administrator badge ABOVE the class teacher badge, very very small with distinct purple/indigo styling
+      if (settingsRole) {
+        settingsRole.innerText = 'Administrator';
+        settingsRole.className = "inline-flex items-center px-1.5 py-0.2 rounded text-[8px] font-black tracking-widest uppercase bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 shadow-2xs";
+        settingsRole.classList.remove('hidden');
+      }
     } else {
-      ctBadge.classList.add('hidden');
+      // Regular Teacher: DO NOT SHOW teacher badge, ONLY show class teacher badge
+      if (settingsRole) {
+        settingsRole.classList.add('hidden');
+      }
+    }
+  } else {
+    // Not a Class Teacher: normal role badge
+    if (ctBadge) ctBadge.classList.add('hidden');
+    if (settingsRole) {
+      settingsRole.innerText = isAdmin ? 'Administrator' : 'Teacher';
+      if (isAdmin) {
+        settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30";
+      } else {
+        settingsRole.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20";
+      }
+      settingsRole.classList.remove('hidden');
     }
   }
 
