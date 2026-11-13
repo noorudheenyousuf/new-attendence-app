@@ -48,8 +48,12 @@ function getTeacherAssignments(teacherName, teacherEmail) {
   const matchedSubjects = allSubs.filter(s => {
     const sTeacher = String(s.teacher || '').trim().toLowerCase();
     const sEmail = String(s.teacherEmail || s.ownerEmail || '').trim().toLowerCase();
-    if (normName && sTeacher === normName) return true;
-    if (normEmail && sEmail === normEmail) return true;
+    if (sEmail && normEmail) {
+      return sEmail === normEmail;
+    }
+    if (!sEmail && normName && sTeacher === normName) {
+      return true;
+    }
     return false;
   });
 
@@ -79,7 +83,19 @@ function getTeacherAssignments(teacherName, teacherEmail) {
 
   allClasses.forEach(c => {
     const ct = String(c.classTeacher || '').trim().toLowerCase();
-    if (normName && ct === normName) {
+    const ctEmail = String(c.classTeacherEmail || '').trim().toLowerCase();
+    if (ctEmail && normEmail) {
+      if (ctEmail === normEmail) {
+        const cTrim = String(c.name || '').trim();
+        const k = cTrim.toLowerCase();
+        if (cTrim && !seenCls.has(k)) {
+          seenCls.add(k);
+          assignedClasses.push(cTrim);
+        }
+      }
+      return;
+    }
+    if (!ctEmail && normName && ct === normName) {
       const cTrim = String(c.name || '').trim();
       const k = cTrim.toLowerCase();
       if (cTrim && !seenCls.has(k)) {
@@ -1460,9 +1476,12 @@ async function handleUpdateClass(e) {
   if (!activeEditClassId) return;
 
   const name = document.getElementById('edit-class-name').value.trim();
-  const classTeacher = document.getElementById('edit-class-teacher').value.trim();
+  const teacherEl = document.getElementById('edit-class-teacher');
+  const classTeacher = teacherEl ? teacherEl.value.trim() : '';
+  const selOpt = teacherEl && teacherEl.selectedIndex >= 0 ? teacherEl.options[teacherEl.selectedIndex] : null;
+  const classTeacherEmail = selOpt ? (selOpt.getAttribute('data-email') || '') : '';
   try {
-    const res = await API.updateClass(activeEditClassId, name, classTeacher, []);
+    const res = await API.updateClass(activeEditClassId, name, classTeacher, [], classTeacherEmail);
     if (res.success) {
       showToast(`Class "${name}" updated!`);
       closeEditClassModal();
@@ -1478,9 +1497,12 @@ async function handleUpdateClass(e) {
 async function handleSaveClass(e) {
   e.preventDefault();
   const name = document.getElementById('input-class-name').value.trim();
-  const classTeacher = document.getElementById('input-class-teacher').value.trim();
+  const teacherEl = document.getElementById('input-class-teacher');
+  const classTeacher = teacherEl ? teacherEl.value.trim() : '';
+  const selOpt = teacherEl && teacherEl.selectedIndex >= 0 ? teacherEl.options[teacherEl.selectedIndex] : null;
+  const classTeacherEmail = selOpt ? (selOpt.getAttribute('data-email') || '') : '';
   try {
-    const res = await API.addClass(name, classTeacher, []);
+    const res = await API.addClass(name, classTeacher, [], false, classTeacherEmail);
     if (res.success) {
       showToast(`Class "${name}" added!`);
       closeClassModal();
@@ -2061,6 +2083,11 @@ async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
   document.getElementById('input-sub-code').value = '';
   await populateTeacherDropdowns('input-sub-teacher', '');
+  const dl = document.getElementById('sub-names-datalist');
+  if (dl) {
+    const uniqueNames = Array.from(new Set((subjectsList || []).map(s => s.name).filter(Boolean)));
+    dl.innerHTML = uniqueNames.map(n => `<option value="${escapeHtml(n)}">`).join('');
+  }
   // Populate class dropdown — public (main) classes only, one class per entry
   const _addSubSel = document.getElementById('add-sub-class-select');
   if (_addSubSel) {
@@ -2081,12 +2108,14 @@ async function handleSaveSubject(e) {
   const subjectCode = document.getElementById('input-sub-code').value.trim();
   const teacherEl = document.getElementById('input-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
+  const selOpt = teacherEl && teacherEl.selectedIndex >= 0 ? teacherEl.options[teacherEl.selectedIndex] : null;
+  const teacherEmail = selOpt ? (selOpt.getAttribute('data-email') || '') : '';
   const _cls = document.getElementById('add-sub-class-select') ? document.getElementById('add-sub-class-select').value : '';
 
   const assignedClasses = _cls ? [_cls] : [];
 
   try {
-    const res = await API.addSubject({ name, subjectCode, teacher, assignedClasses });
+    const res = await API.addSubject({ name, subjectCode, teacher, teacherEmail, assignedClasses });
     if (res.success) {
       showToast(`Subject "${name}" added!`);
       closeSubjectModal();
@@ -2134,12 +2163,14 @@ async function handleUpdateSubject(e) {
   const subjectCode = document.getElementById('edit-sub-code').value.trim();
   const teacherEl = document.getElementById('edit-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
+  const selOpt = teacherEl && teacherEl.selectedIndex >= 0 ? teacherEl.options[teacherEl.selectedIndex] : null;
+  const teacherEmail = selOpt ? (selOpt.getAttribute('data-email') || '') : '';
   const _editCls = document.getElementById('edit-sub-class-select') ? document.getElementById('edit-sub-class-select').value : '';
 
   const assignedClasses = _editCls ? [_editCls] : [];
 
   try {
-    const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher, assignedClasses });
+    const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher, teacherEmail, assignedClasses });
     if (res.success) {
       showToast(`Subject "${name}" updated!`);
       closeEditSubjectModal();
@@ -2406,6 +2437,7 @@ async function saveAttendance() {
       if (saveBtnText) saveBtnText.innerText = 'Update Attendance';
       await loadActivityLogs();
       await loadReport();
+      updateProfileDashboardKPIs();
     }
   } catch (error) {
     showToast(error.message, true);
@@ -2429,6 +2461,7 @@ async function deleteCurrentAttendance() {
       await loadAttendanceRoster();
       await loadActivityLogs();
       await loadReport();
+      updateProfileDashboardKPIs();
     }
   } catch (error) {
     showToast(error.message || 'Error deleting attendance', true);
@@ -3181,8 +3214,7 @@ async function handleSaveProfile(event) {
         email,
         phone,
         classTeacherOf,
-        avatarUrl: editProfileCurrentAvatarUrl,
-        assignedSubjects
+        avatarUrl: editProfileCurrentAvatarUrl
       });
 
       if (res && res.success && res.user) {
@@ -3206,6 +3238,10 @@ async function handleSaveProfile(event) {
         };
 
         showToast('Profile updated successfully!');
+        try {
+          await Promise.all([loadClasses(), loadTeachersData(), loadSubjects()]);
+        } catch (_) {}
+        updateProfileDashboardKPIs();
         selectTab('settings');
       } else {
         throw new Error((res && res.message) || 'Failed to update profile');
@@ -4234,23 +4270,27 @@ async function updateProfileDashboardKPIs() {
     console.error('[Dashboard Status Error]', err);
   }
 
-  // 2. Count attendance marked today from logs
+  // 2. Count attendance marked today from live Attendance documents
   try {
     const now = new Date();
     const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const logs = cachedActivityLogs || [];
-    let markedTodayCount = 0;
-    logs.forEach(log => {
-      if (log.action && log.action.toLowerCase().includes('attendance')) {
-        const performed = (log.performedBy || '').trim().toLowerCase();
-        const isMyLog = isAdmin || performed === myName || performed.includes(myName);
-        const logDate = log.timestamp || log.createdAt;
-        if (isMyLog && logDate && String(logDate).startsWith(todayDateStr)) {
-          markedTodayCount++;
-        }
-      }
-    });
-    markedEls.forEach(el => el.textContent = String(markedTodayCount));
+    const attRes = await API.getAttendance(todayDateStr);
+    const todayAttendances = (attRes && attRes.data) ? attRes.data : (Array.isArray(attRes) ? attRes : []);
+
+    let myAttendances = todayAttendances;
+    if (!isAdmin) {
+      const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
+      myAttendances = todayAttendances.filter(att => {
+        const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
+        const markedName = (att.markedBy || '').toLowerCase().trim();
+        if (markedEmail && myEmail && markedEmail === myEmail) return true;
+        if (markedName && myName && markedName === myName) return true;
+        const matchClass = myAssign.assignedClasses.some(c => isClassEqual(c, att.class));
+        const matchSub = myAssign.assignedSubjects.some(s => (s || '').toLowerCase() === (att.subject || '').toLowerCase());
+        return matchClass && matchSub;
+      });
+    }
+    markedEls.forEach(el => el.textContent = String(myAttendances.length));
   } catch (_) {}
 }
 
@@ -6052,7 +6092,8 @@ async function populateTeacherDropdowns(targetSelectId, selectedValue = '') {
   let optionsHtml = `<option value="">${defaultLabel}</option>`;
   cachedTeachersList.forEach(t => {
     const isSel = (selectedValue && (selectedValue === t.name || selectedValue === t.email)) ? 'selected' : '';
-    optionsHtml += `<option value="${escapeHtml(t.name)}" ${isSel}>${escapeHtml(t.name)}</option>`;
+    const label = t.email ? `${t.name} (${t.email})` : t.name;
+    optionsHtml += `<option value="${escapeHtml(t.name)}" data-email="${escapeHtml(t.email || '')}" ${isSel}>${escapeHtml(label)}</option>`;
   });
 
   // If previous custom value exists, keep it selectable
@@ -8650,6 +8691,135 @@ function jumpToTakeAttendance(className, subjectName) {
     setTimeout(() => {
       const selSub = document.getElementById('sel-subject');
       if (selSub && Array.from(selSub.options).some(o => o.value === subjectName)) {
+        selSub.value = subjectName;
+        handleSubjectChange();
+      }
+    }, 300);
+  }
+}
+
+
+// ================= TODAY'S MARKED ATTENDANCE MODAL =================
+async function openTodayMarkedModal() {
+  triggerNavHaptic('light');
+  const modal = document.getElementById('modal-today-marked');
+  const listEl = document.getElementById('today-marked-modal-slots-list');
+  const titleEl = document.getElementById('today-marked-modal-title');
+  if (!modal || !listEl) return;
+
+  modal.classList.remove('hidden');
+  listEl.innerHTML = '<div class="p-8 text-center text-xs text-cyan-200 flex flex-col items-center justify-center gap-2.5"><div class="w-6 h-6 rounded-full border-2 border-emerald-300 border-t-transparent animate-spin"></div><span>Loading marked attendance sessions...</span></div>';
+
+  try {
+    const now = new Date();
+    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const myEmail = (currentUser?.email || '').trim().toLowerCase();
+    const myName = (currentUser?.name || '').trim().toLowerCase();
+    const isAdmin = currentUser?.role === 'admin';
+
+    const attRes = await API.getAttendance(todayDateStr);
+    const todayAttendances = (attRes && attRes.data) ? attRes.data : (Array.isArray(attRes) ? attRes : []);
+
+    let myAttendances = todayAttendances;
+    if (!isAdmin) {
+      const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
+      myAttendances = todayAttendances.filter(att => {
+        const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
+        const markedName = (att.markedBy || '').toLowerCase().trim();
+        if (markedEmail && myEmail && markedEmail === myEmail) return true;
+        if (markedName && myName && markedName === myName) return true;
+        const matchClass = myAssign.assignedClasses.some(c => isClassEqual(c, att.class));
+        const matchSub = myAssign.assignedSubjects.some(s => (s || '').toLowerCase() === (att.subject || '').toLowerCase());
+        return matchClass && matchSub;
+      });
+    }
+
+    if (titleEl) {
+      titleEl.textContent = 'Marked Sessions Today (' + myAttendances.length + ')';
+    }
+
+    if (myAttendances.length === 0) {
+      listEl.innerHTML = `
+        <div class="p-6 rounded-2xl bg-white/10 border border-white/15 text-center space-y-1.5">
+          <div class="text-sm font-bold text-amber-300">No attendance marked yet today!</div>
+          <div class="text-xs text-cyan-100/70">Tap "Today's Classes" to check your schedule and start taking attendance.</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Sort by most recently updated
+    myAttendances.sort((a, b) => {
+      const tA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const tB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    listEl.innerHTML = myAttendances.map(att => {
+      const timeDate = att.updatedAt || att.createdAt;
+      let timeStr = 'Today';
+      if (timeDate) {
+        try {
+          const d = new Date(timeDate);
+          timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        } catch (_) {}
+      }
+
+      const total = att.summary?.total || (att.records ? att.records.length : 0);
+      const present = att.summary?.present || 0;
+      const absent = att.summary?.absent || 0;
+      const pct = att.summary?.percentage !== undefined ? att.summary.percentage : (total > 0 ? Math.round((present / total) * 100) : 0);
+
+      return `
+        <div onclick="jumpToAttendanceSession('${escapeQuotes(att.class || '')}', '${escapeQuotes(att.subject || '')}', '${escapeQuotes(att.date || '')}')" class="p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-between gap-3 transition cursor-pointer active:scale-98 group">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black text-emerald-300">${escapeHtml(timeStr)}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-lg bg-white/20 text-white font-extrabold uppercase tracking-wider">${escapeHtml(att.class || '')}</span>
+              ${att.markedBy ? `<span class="text-[10px] text-cyan-200/70">By: ${escapeHtml(att.markedBy)}</span>` : ''}
+            </div>
+            <div class="text-sm font-black text-white mt-1 truncate group-hover:text-emerald-200 transition">
+              ${escapeHtml(att.subject || 'All Subjects')}
+            </div>
+          </div>
+          <div class="flex-shrink-0 text-right">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 text-[11px] font-black shadow-xs">
+              <span>${present}/${total} Present (${pct}%)</span>
+            </span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    listEl.innerHTML = '<div class="p-4 text-center text-xs text-rose-300">Error loading marked sessions: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function closeTodayMarkedModal() {
+  const modal = document.getElementById('modal-today-marked');
+  if (modal) modal.classList.add('hidden');
+}
+
+function jumpToAttendanceSession(className, subjectName, dateStr) {
+  closeTodayMarkedModal();
+  selectTab('attendance');
+  if (dateStr) {
+    currentDateStr = dateStr;
+    const picker = document.getElementById('attendance-date-picker');
+    if (picker) picker.value = dateStr;
+    updateDateDisplay();
+  }
+  if (className) {
+    const selClass = document.getElementById('sel-class');
+    if (selClass) {
+      selClass.value = className;
+      handleClassChange();
+    }
+  }
+  if (subjectName) {
+    setTimeout(() => {
+      const selSub = document.getElementById('sel-subject');
+      if (selSub) {
         selSub.value = subjectName;
         handleSubjectChange();
       }

@@ -60,7 +60,7 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 // @desc    Add a class (name, optional class teacher, and assigned subjects; supports isPrivate)
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, classTeacher, assignedSubjects, isPrivate } = req.body;
+    const { name, classTeacher, classTeacherEmail, assignedSubjects, isPrivate } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Class name is required' });
     }
@@ -94,9 +94,34 @@ router.post('/', authMiddleware, async (req, res) => {
       ? assignedSubjects.map(s => String(s).trim()).filter(Boolean)
       : [];
 
+    let resolvedClassTeacher = classTeacher || (isPrivateBool ? userName : 'Not Assigned');
+    let resolvedClassTeacherEmail = (classTeacherEmail || '').toLowerCase().trim();
+
+    let teacherUser = null;
+    if (resolvedClassTeacherEmail) {
+      teacherUser = await User.findOne({ email: resolvedClassTeacherEmail });
+    } else if (resolvedClassTeacher && resolvedClassTeacher !== 'Not Assigned') {
+      teacherUser = await User.findOne({ name: caseInsensitiveRegex(resolvedClassTeacher) });
+    }
+
+    if (teacherUser) {
+      resolvedClassTeacher = teacherUser.name;
+      resolvedClassTeacherEmail = (teacherUser.email || '').toLowerCase().trim();
+      await User.updateMany({ _id: { $ne: teacherUser._id }, classTeacherOf: caseInsensitiveRegex(cleanName) }, { $set: { classTeacherOf: '' } });
+      if (teacherUser.classTeacherOf && teacherUser.classTeacherOf.toLowerCase() !== cleanName.toLowerCase()) {
+        await Class.updateMany({ name: caseInsensitiveRegex(teacherUser.classTeacherOf), classTeacher: teacherUser.name }, { $set: { classTeacher: 'Not Assigned', classTeacherEmail: '' } });
+      }
+      teacherUser.classTeacherOf = cleanName;
+      await teacherUser.save();
+    } else if (!resolvedClassTeacher || resolvedClassTeacher === 'Not Assigned') {
+      await User.updateMany({ classTeacherOf: caseInsensitiveRegex(cleanName) }, { $set: { classTeacherOf: '' } });
+      resolvedClassTeacherEmail = '';
+    }
+
     const newClass = await Class.create({
       name: cleanName,
-      classTeacher: classTeacher || (isPrivateBool ? userName : 'Not Assigned'),
+      classTeacher: resolvedClassTeacher,
+      classTeacherEmail: resolvedClassTeacherEmail,
       assignedSubjects: subjectsArray,
       isPrivate: isPrivateBool,
       ownerEmail: isPrivateBool ? userEmail : '',
@@ -154,7 +179,7 @@ router.post('/', authMiddleware, async (req, res) => {
 // @desc    Update class & cascade name changes across Students, Attendance, Timetable, Subjects, and Teachers
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { name, classTeacher, assignedSubjects } = req.body;
+    const { name, classTeacher, classTeacherEmail, assignedSubjects } = req.body;
     const oldClass = await Class.findById(req.params.id);
     if (!oldClass) {
       return res.status(404).json({ success: false, message: 'Class not found' });
@@ -180,9 +205,36 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     }
 
+    let resolvedClassTeacher = classTeacher !== undefined ? (classTeacher || 'Not Assigned') : oldClass.classTeacher;
+    let resolvedClassTeacherEmail = (classTeacherEmail !== undefined ? (classTeacherEmail || '') : (oldClass.classTeacherEmail || '')).toLowerCase().trim();
+
+    if (classTeacher !== undefined || classTeacherEmail !== undefined) {
+      let teacherUser = null;
+      if (resolvedClassTeacherEmail) {
+        teacherUser = await User.findOne({ email: resolvedClassTeacherEmail });
+      } else if (resolvedClassTeacher && resolvedClassTeacher !== 'Not Assigned') {
+        teacherUser = await User.findOne({ name: caseInsensitiveRegex(resolvedClassTeacher) });
+      }
+
+      if (teacherUser) {
+        resolvedClassTeacher = teacherUser.name;
+        resolvedClassTeacherEmail = (teacherUser.email || '').toLowerCase().trim();
+        await User.updateMany({ _id: { $ne: teacherUser._id }, classTeacherOf: caseInsensitiveRegex(cleanName) }, { $set: { classTeacherOf: '' } });
+        if (teacherUser.classTeacherOf && teacherUser.classTeacherOf.toLowerCase() !== cleanName.toLowerCase()) {
+          await Class.updateMany({ name: caseInsensitiveRegex(teacherUser.classTeacherOf), classTeacher: teacherUser.name }, { $set: { classTeacher: 'Not Assigned', classTeacherEmail: '' } });
+        }
+        teacherUser.classTeacherOf = cleanName;
+        await teacherUser.save();
+      } else if (!resolvedClassTeacher || resolvedClassTeacher === 'Not Assigned') {
+        await User.updateMany({ classTeacherOf: caseInsensitiveRegex(cleanName) }, { $set: { classTeacherOf: '' } });
+        resolvedClassTeacherEmail = '';
+      }
+    }
+
     const updatePayload = {
       name: cleanName,
-      classTeacher: classTeacher !== undefined ? (classTeacher || 'Not Assigned') : oldClass.classTeacher
+      classTeacher: resolvedClassTeacher,
+      classTeacherEmail: resolvedClassTeacherEmail
     };
 
     if (assignedSubjects !== undefined) {
@@ -258,6 +310,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
       if (!oldClass.isPrivate) {
         await Timetable.updateMany({ class: oldClassRegex }, { $set: { class: cleanName } });
+        await User.updateMany({ classTeacherOf: oldClassRegex }, { $set: { classTeacherOf: cleanName } });
       }
 
       const subjectQuery = oldClass.isPrivate

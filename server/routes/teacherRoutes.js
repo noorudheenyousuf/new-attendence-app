@@ -439,12 +439,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
       teacher.classTeacherOf = newCT;
       try {
         if (newCT) {
+          await User.updateMany({ _id: { $ne: teacher._id }, classTeacherOf: caseInsensitiveRegex(newCT) }, { $set: { classTeacherOf: '' } });
           if (oldCT && oldCT.toLowerCase() !== newCT.toLowerCase()) {
-            await Class.updateMany({ name: oldCT, classTeacher: teacher.name }, { classTeacher: '' });
+            await Class.updateMany({ name: caseInsensitiveRegex(oldCT), classTeacher: teacher.name }, { $set: { classTeacher: 'Not Assigned', classTeacherEmail: '' } });
           }
-          await Class.updateMany({ name: newCT }, { classTeacher: teacher.name });
+          await Class.updateMany({ name: caseInsensitiveRegex(newCT) }, { $set: { classTeacher: teacher.name, classTeacherEmail: (teacher.email || '').toLowerCase().trim() } });
         } else if (oldCT) {
-          await Class.updateMany({ name: oldCT, classTeacher: teacher.name }, { classTeacher: '' });
+          await Class.updateMany({ name: caseInsensitiveRegex(oldCT), classTeacher: teacher.name }, { $set: { classTeacher: 'Not Assigned', classTeacherEmail: '' } });
         }
       } catch (ctErr) {
         console.error('[Teacher ClassTeacher Sync]', ctErr);
@@ -464,6 +465,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       await Attendance.updateMany({ markedBy: oldName }, { markedBy: teacher.name });
       await Subject.updateMany({ teacher: oldName }, { teacher: teacher.name });
       await Class.updateMany({ classTeacher: oldName }, { classTeacher: teacher.name });
+      await Timetable.updateMany({ teacher: oldName }, { teacher: teacher.name });
     }
 
     if (emailChanged && oldEmail && teacher.email) {

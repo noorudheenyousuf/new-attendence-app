@@ -16,6 +16,12 @@ const subjectSchema = new mongoose.Schema({
     default: '',
     trim: true
   },
+  teacherEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
   assignedClasses: {
     type: [String],
     default: []

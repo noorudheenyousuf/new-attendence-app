@@ -11,6 +11,12 @@ const classSchema = new mongoose.Schema({
     default: 'Not Assigned',
     trim: true
   },
+  classTeacherEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
   assignedSubjects: [{
     type: String,
     trim: true

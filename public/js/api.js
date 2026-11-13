@@ -120,17 +120,17 @@ const API = {
     });
   },
 
-  async addClass(name, classTeacher, assignedSubjects = []) {
+  async addClass(name, classTeacher, assignedSubjects = [], classTeacherEmail = '') {
     return this.request('/classes', {
       method: 'POST',
-      body: JSON.stringify({ name, classTeacher, assignedSubjects })
+      body: JSON.stringify({ name, classTeacher, assignedSubjects, classTeacherEmail })
     });
   },
 
-  async updateClass(id, name, classTeacher, assignedSubjects = []) {
+  async updateClass(id, name, classTeacher, assignedSubjects = [], classTeacherEmail = '') {
     return this.request(`/classes/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name, classTeacher, assignedSubjects })
+      body: JSON.stringify({ name, classTeacher, assignedSubjects, classTeacherEmail })
     });
   },
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Subject = require('../models/Subject');
 const Class = require('../models/Class');
+const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 const optionalAuth = require('../middleware/optionalAuth');
@@ -53,10 +54,10 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/subjects
-// @desc    Add subject (name, subject code optional, teacher optional, assigned classes, isPrivate)
+// @desc    Add or reassign subject (name, subject code optional, teacher optional, teacherEmail optional, assigned classes, isPrivate)
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, subjectCode, teacher, assignedClasses, isPrivate } = req.body;
+    const { name, subjectCode, teacher, teacherEmail, assignedClasses, isPrivate } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Subject name is required' });
     }
@@ -71,21 +72,65 @@ router.post('/', authMiddleware, async (req, res) => {
       ? subjectCode.trim()
       : ((cleanName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'SUB') + '101');
 
+    let resolvedTeacher = teacher ? teacher.trim() : (isPrivateBool ? userName : '');
+    let resolvedTeacherEmail = (teacherEmail || '').toLowerCase().trim();
+
+    if (!resolvedTeacherEmail && resolvedTeacher) {
+      const tUser = await User.findOne({ name: caseInsensitiveRegex(resolvedTeacher) });
+      if (tUser && tUser.email) resolvedTeacherEmail = tUser.email.toLowerCase().trim();
+    }
+
     const classesArray = Array.isArray(assignedClasses)
       ? assignedClasses.map(c => String(c).trim()).filter(Boolean)
       : (assignedClasses ? assignedClasses.split(',').map(s => s.trim()).filter(Boolean) : []);
+    const targetClass = classesArray[0] || '';
 
-    // Single class or unassigned (dropdown enforces max one class)
-    const newSubject = await Subject.create({
-      name: cleanName,
-      subjectCode: finalCode,
-      teacher: teacher ? teacher.trim() : (isPrivateBool ? userName : ''),
-      assignedClasses: classesArray,
-      isPrivate: isPrivateBool,
-      ownerEmail: isPrivateBool ? userEmail : '',
-      ownerId: isPrivateBool ? req.user._id : null,
-      ownerName: isPrivateBool ? userName : ''
-    });
+    // Check if subject already exists in this scope
+    const queryScope = isPrivateBool
+      ? { name: caseInsensitiveRegex(cleanName), isPrivate: true, ownerEmail: userEmail }
+      : { name: caseInsensitiveRegex(cleanName), isPrivate: { $ne: true } };
+
+    // 1. Check if there is an existing subject with this name and target class
+    let existingSubject = targetClass
+      ? await Subject.findOne({ ...queryScope, assignedClasses: caseInsensitiveRegex(targetClass) })
+      : null;
+
+    // 2. If not found, check if there is an unassigned subject with this name
+    if (!existingSubject) {
+      existingSubject = await Subject.findOne({ ...queryScope, $or: [{ assignedClasses: { $size: 0 } }, { assignedClasses: { $exists: false } }] });
+    }
+
+    let finalSubject;
+    let isReassigned = false;
+    if (existingSubject) {
+      isReassigned = true;
+      const oldClass = (existingSubject.assignedClasses || [])[0] || '';
+      if (oldClass && targetClass && oldClass.toLowerCase() !== targetClass.toLowerCase()) {
+        const oldClassQ = isPrivateBool
+          ? { name: oldClass, isPrivate: true, ownerEmail: userEmail }
+          : { name: oldClass };
+        await Class.updateOne(oldClassQ, { $pull: { assignedSubjects: existingSubject.name } });
+      }
+
+      existingSubject.name = cleanName;
+      existingSubject.subjectCode = finalCode;
+      existingSubject.teacher = resolvedTeacher;
+      existingSubject.teacherEmail = resolvedTeacherEmail;
+      existingSubject.assignedClasses = classesArray;
+      finalSubject = await existingSubject.save();
+    } else {
+      finalSubject = await Subject.create({
+        name: cleanName,
+        subjectCode: finalCode,
+        teacher: resolvedTeacher,
+        teacherEmail: resolvedTeacherEmail,
+        assignedClasses: classesArray,
+        isPrivate: isPrivateBool,
+        ownerEmail: isPrivateBool ? userEmail : '',
+        ownerId: isPrivateBool ? req.user._id : null,
+        ownerName: isPrivateBool ? userName : ''
+      });
+    }
 
     if (classesArray.length === 1) {
       const classQuery = isPrivateBool
@@ -95,20 +140,20 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     await ActivityLog.create({
-      action: `${isPrivateBool ? 'Private Subject Added' : 'Subject Added'}: ${cleanName}`,
-      details: `Code: ${finalCode}${classesArray.length ? ` • Classes: ${classesArray.join(', ')}` : ''}`,
+      action: `${isPrivateBool ? 'Private Subject ' : 'Subject '}${isReassigned ? 'Reassigned' : 'Added'}: ${cleanName}`,
+      details: `Teacher: ${resolvedTeacher || 'None'}${resolvedTeacherEmail ? ' (' + resolvedTeacherEmail + ')' : ''} • Code: ${finalCode}${classesArray.length ? ` • Class: ${classesArray.join(', ')}` : ''}`,
       performedBy: userName,
       performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
       role: userRole,
       entityType: 'subject',
-      entityId: newSubject._id.toString(),
+      entityId: finalSubject._id.toString(),
       canUndo: true,
       previousState: null,
       isPrivate: isPrivateBool,
       ownerEmail: isPrivateBool ? userEmail : ''
     });
 
-    res.status(201).json({ success: true, data: newSubject });
+    res.status(201).json({ success: true, data: finalSubject });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -133,6 +178,12 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const updatedName    = name        ? name.trim()        : oldSubject.name;
     const updatedCode    = subjectCode ? subjectCode.trim()  : oldSubject.subjectCode;
     const updatedTeacher = teacher !== undefined ? teacher.trim() : oldSubject.teacher;
+    let updatedTeacherEmail = (req.body.teacherEmail !== undefined ? req.body.teacherEmail : (oldSubject.teacherEmail || '')).toLowerCase().trim();
+
+    if (teacher !== undefined && !req.body.teacherEmail && updatedTeacher) {
+      const tUser = await User.findOne({ name: caseInsensitiveRegex(updatedTeacher) });
+      if (tUser && tUser.email) updatedTeacherEmail = tUser.email.toLowerCase().trim();
+    }
 
     // Each subject doc represents one subject-class entry independently
     // Dropdown enforces max one class — just update this single doc
@@ -171,7 +222,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     // Update this single subject doc
     await Subject.findByIdAndUpdate(req.params.id, {
       name: updatedName, subjectCode: updatedCode,
-      teacher: updatedTeacher, assignedClasses: newClasses
+      teacher: updatedTeacher, teacherEmail: updatedTeacherEmail, assignedClasses: newClasses
     });
 
     const finalDoc = await Subject.findById(req.params.id);

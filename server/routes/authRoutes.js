@@ -7,8 +7,10 @@ const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const Subject = require('../models/Subject');
 const Class = require('../models/Class');
+const Timetable = require('../models/Timetable');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 const getGoogleClientId = () => {
   try {
@@ -361,12 +363,14 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
       try {
         if (newCT) {
+          // Clear any other user who was class teacher of newCT
+          await User.updateMany({ _id: { $ne: user._id }, classTeacherOf: caseInsensitiveRegex(newCT) }, { $set: { classTeacherOf: '' } });
           if (oldCT && oldCT.toLowerCase() !== newCT.toLowerCase()) {
-            await Class.updateMany({ name: oldCT, classTeacher: user.name }, { classTeacher: '' });
+            await Class.updateMany({ name: caseInsensitiveRegex(oldCT), classTeacher: user.name }, { $set: { classTeacher: 'Not Assigned', classTeacherEmail: '' } });
           }
-          await Class.updateMany({ name: newCT }, { classTeacher: user.name });
+          await Class.updateMany({ name: caseInsensitiveRegex(newCT) }, { $set: { classTeacher: user.name, classTeacherEmail: (user.email || '').toLowerCase().trim() } });
         } else if (oldCT) {
-          await Class.updateMany({ name: oldCT, classTeacher: user.name }, { classTeacher: '' });
+          await Class.updateMany({ name: caseInsensitiveRegex(oldCT), classTeacher: user.name }, { $set: { classTeacher: 'Not Assigned', classTeacherEmail: '' } });
         }
       } catch (ctErr) {
         console.error('[Class Teacher Sync Error]', ctErr);
@@ -402,6 +406,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
         await Attendance.updateMany({ markedBy: oldName }, { markedBy: user.name });
         await Subject.updateMany({ teacher: oldName }, { teacher: user.name });
         await Class.updateMany({ classTeacher: oldName }, { classTeacher: user.name });
+        await Timetable.updateMany({ teacher: oldName }, { teacher: user.name });
       } catch (cascadeErr) {
         console.error('[Profile Cascade Error]', cascadeErr);
       }
