@@ -36,6 +36,42 @@ function classListIncludes(arr, className) {
   return arr.some(item => String(item || '').trim().toLowerCase() === target);
 }
 
+// Helper to get the exact sequence in which subjects appear on the "Add Subject" page
+function getSubjectOrderFromAddSubjectPage() {
+  const orderedNames = [];
+  const seen = new Set();
+  const allSubs = [...(subjectsList || []), ...(typeof pwSubjectsList !== 'undefined' && Array.isArray(pwSubjectsList) ? pwSubjectsList : [])];
+  const allClasses = [...(classesList || []), ...(typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList) ? pwClassesList : [])];
+
+  // 1. Grouped by classesList (exact order rendered on Add Subject page / renderSubjectsList)
+  allClasses.forEach(cls => {
+    const clsName = (cls.name || cls || '').trim();
+    const classSubs = allSubs.filter(s =>
+      Array.isArray(s.assignedClasses) && s.assignedClasses.some(ac => isClassEqual(ac, clsName))
+    );
+    classSubs.forEach(s => {
+      const n = (s.name || '').trim();
+      const k = n.toLowerCase();
+      if (n && !seen.has(k)) {
+        seen.add(k);
+        orderedNames.push(n);
+      }
+    });
+  });
+
+  // 2. Unassigned subjects
+  allSubs.forEach(s => {
+    const n = (s.name || '').trim();
+    const k = n.toLowerCase();
+    if (n && !seen.has(k)) {
+      seen.add(k);
+      orderedNames.push(n);
+    }
+  });
+
+  return orderedNames;
+}
+
 // ================= TEACHER ASSIGNMENTS SINGLE SOURCE OF TRUTH =================
 // All assignments are focused via Subject management (Subject has name, teacher, assignedClasses)
 function getTeacherAssignments(teacherName, teacherEmail) {
@@ -135,13 +171,17 @@ function getTeacherAssignments(teacherName, teacherEmail) {
     return 0;
   });
 
+  // Always follow assigned subjects order as the exact order on Add Subject page
+  const pageOrder = getSubjectOrderFromAddSubjectPage();
   assignedSubjects.sort((a, b) => {
-    const idxA = allSubs.findIndex(s => (s.name || '').trim().toLowerCase() === (a || '').trim().toLowerCase());
-    const idxB = allSubs.findIndex(s => (s.name || '').trim().toLowerCase() === (b || '').trim().toLowerCase());
+    const normA = (a || '').trim().toLowerCase();
+    const normB = (b || '').trim().toLowerCase();
+    const idxA = pageOrder.findIndex(name => name.toLowerCase() === normA);
+    const idxB = pageOrder.findIndex(name => name.toLowerCase() === normB);
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
     if (idxA !== -1) return -1;
     if (idxB !== -1) return 1;
-    return 0;
+    return a.localeCompare(b);
   });
 
   return { assignedSubjects, assignedClasses };
@@ -1593,7 +1633,7 @@ function getAppropriateSubjectsForClass(className) {
   return unique;
 }
 
-function updateAttendanceSubjectsDropdown(selectedClass) {
+function updateAttendanceSubjectsDropdown(selectedClass, preferredSubject) {
   const selSubject = document.getElementById('sel-subject');
   if (!selSubject) return;
 
@@ -1603,34 +1643,82 @@ function updateAttendanceSubjectsDropdown(selectedClass) {
     return;
   }
 
+  const targetSub = (preferredSubject !== undefined && preferredSubject !== null && preferredSubject !== '')
+    ? String(preferredSubject).trim()
+    : String(currentSubject || '').trim();
+
   const isTeacher = currentUser && currentUser.role !== 'admin';
   if (isTeacher) {
     const { teacherSubs, isCT } = getTeacherAllowedSubjectsForClass(selectedClass);
     if (teacherSubs.length > 0) {
       selSubject.innerHTML = teacherSubs.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
-      if (!currentSubject || currentSubject === 'all' || !teacherSubs.some(s => s.name === currentSubject)) {
-        currentSubject = teacherSubs[0].name;
+
+      let match = null;
+      if (targetSub && targetSub !== 'all') {
+        match = teacherSubs.find(s => (s.name || '').trim().toLowerCase() === targetSub.toLowerCase());
       }
-      selSubject.value = currentSubject;
+
+      if (match) {
+        currentSubject = match.name;
+        selSubject.value = currentSubject;
+      } else if (targetSub && targetSub !== 'all') {
+        const newOpt = document.createElement('option');
+        newOpt.value = targetSub;
+        newOpt.textContent = targetSub;
+        selSubject.appendChild(newOpt);
+        currentSubject = targetSub;
+        selSubject.value = targetSub;
+      } else {
+        currentSubject = teacherSubs[0].name;
+        selSubject.value = currentSubject;
+      }
     } else if (isCT) {
       selSubject.innerHTML = `<option value="General">General (Class Teacher)</option>`;
       currentSubject = 'General';
       selSubject.value = 'General';
     } else {
-      selSubject.innerHTML = `<option value="" disabled selected>No subjects assigned to you</option>`;
-      currentSubject = '';
+      if (targetSub && targetSub !== 'all') {
+        selSubject.innerHTML = `<option value="${escapeHtml(targetSub)}">${escapeHtml(targetSub)}</option>`;
+        currentSubject = targetSub;
+        selSubject.value = targetSub;
+      } else {
+        selSubject.innerHTML = `<option value="" disabled selected>No subjects assigned to you</option>`;
+        currentSubject = '';
+      }
     }
   } else {
     const validSubjects = getAppropriateSubjectsForClass(selectedClass);
     if (validSubjects.length > 0) {
       selSubject.innerHTML = validSubjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
-      if (!currentSubject || currentSubject === 'all' || !validSubjects.some(s => s.name === currentSubject)) {
-        currentSubject = validSubjects[0].name;
+
+      let match = null;
+      if (targetSub && targetSub !== 'all') {
+        match = validSubjects.find(s => (s.name || '').trim().toLowerCase() === targetSub.toLowerCase());
       }
-      selSubject.value = currentSubject;
+
+      if (match) {
+        currentSubject = match.name;
+        selSubject.value = currentSubject;
+      } else if (targetSub && targetSub !== 'all') {
+        const newOpt = document.createElement('option');
+        newOpt.value = targetSub;
+        newOpt.textContent = targetSub;
+        selSubject.appendChild(newOpt);
+        currentSubject = targetSub;
+        selSubject.value = targetSub;
+      } else {
+        currentSubject = validSubjects[0].name;
+        selSubject.value = currentSubject;
+      }
     } else {
-      selSubject.innerHTML = `<option value="General">General</option>`;
-      currentSubject = 'General';
+      if (targetSub && targetSub !== 'all') {
+        selSubject.innerHTML = `<option value="${escapeHtml(targetSub)}">${escapeHtml(targetSub)}</option>`;
+        currentSubject = targetSub;
+        selSubject.value = targetSub;
+      } else {
+        selSubject.innerHTML = `<option value="General">General</option>`;
+        currentSubject = 'General';
+      }
     }
   }
 }
@@ -1845,6 +1933,7 @@ async function handleSubjectDrop(e, targetIndex) {
 
   renderSubjectsList();
   populateSubjectDropdowns();
+  updateUserUI();
 
   setTimeout(() => {
     if (recentlyPlacedSubjectId === movedSubject._id) {
@@ -1967,6 +2056,7 @@ async function handleSubjectTouchEnd(e) {
 
       renderSubjectsList();
       populateSubjectDropdowns();
+      updateUserUI();
 
       setTimeout(() => {
         if (recentlyPlacedSubjectId === movedSubject._id) {
@@ -8743,21 +8833,15 @@ function jumpToTakeAttendance(className, subjectName) {
   closeTodayScheduleModal();
   selectTab('attendance');
   if (className) {
+    currentClass = className;
     const selClass = document.getElementById('sel-class');
     if (selClass) {
       selClass.value = className;
-      handleClassChange();
     }
   }
-  if (subjectName) {
-    setTimeout(() => {
-      const selSub = document.getElementById('sel-subject');
-      if (selSub && Array.from(selSub.options).some(o => o.value === subjectName)) {
-        selSub.value = subjectName;
-        handleSubjectChange();
-      }
-    }, 300);
-  }
+  attendanceReadyToLoad = true;
+  updateAttendanceSubjectsDropdown(currentClass, subjectName);
+  loadAttendanceRoster();
 }
 
 
