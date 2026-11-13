@@ -3204,6 +3204,12 @@
           <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Class Teacher</label>
           <input type="text" id="pw-input-class-teacher" placeholder="Your name or leave blank" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
         </div>
+        <div>
+          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Assign Subjects <span class="ml-1 font-normal text-pink-400 text-[10px]">(optional)</span></label>
+          <div id="pw-class-subject-checkboxes" class="max-h-32 overflow-y-auto rounded-xl border border-pink-200 dark:border-pink-700 bg-pink-50 dark:bg-pink-950/40 p-2 space-y-1">
+            <p class="text-[11px] text-pink-400 italic px-1">No private subjects yet — add subjects first.</p>
+          </div>
+        </div>
         <div class="flex gap-2 pt-1">
           <button type="button" onclick="pwCloseClassModal()" class="flex-1 py-2.5 rounded-xl border border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-300 font-bold text-sm hover:bg-pink-50 transition">Cancel</button>
           <button type="submit" class="flex-1 py-2.5 pw-gradient-btn rounded-xl font-bold text-sm shadow-md">Save</button>
@@ -3239,10 +3245,10 @@
           <input type="text" id="pw-input-subject-teacher" placeholder="Teacher name" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
         </div>
         <div>
-          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Assign to Class</label>
-          <select id="pw-input-subject-class" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
-            <option value="">— No class (optional) —</option>
-          </select>
+          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Assign to Classes <span class="ml-1 font-normal text-pink-400 text-[10px]">(optional)</span></label>
+          <div id="pw-subject-class-checkboxes" class="max-h-32 overflow-y-auto rounded-xl border border-pink-200 dark:border-pink-700 bg-pink-50 dark:bg-pink-950/40 p-2 space-y-1">
+            <p class="text-[11px] text-pink-400 italic px-1">No private classes yet — add classes first.</p>
+          </div>
         </div>
         <div class="flex gap-2 pt-1">
           <button type="button" onclick="pwCloseSubjectModal()" class="flex-1 py-2.5 rounded-xl border border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-300 font-bold text-sm hover:bg-pink-50 transition">Cancel</button>
@@ -3252,45 +3258,155 @@
     </div>
   </div>
 
-  <!-- PW: Add/Edit Private Student -->
-  <div id="pw-modal-student" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white dark:bg-[#2d1020] w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-pink-200 dark:border-pink-800">
-      <div class="flex items-center justify-between mb-4">
+  <!-- PW: Add/Edit Private Student — Full fields matching main student modal -->
+  <div id="pw-modal-student" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden">
+    <div class="bg-white dark:bg-[#2d1020] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-pink-200 dark:border-pink-800 my-auto max-h-[92vh] overflow-y-auto space-y-3.5">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-pink-100 dark:border-pink-900 pb-2.5">
         <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-xl bg-pink-100 dark:bg-pink-900/40 flex items-center justify-center">
+          <div class="w-8 h-8 rounded-xl bg-pink-100 dark:bg-pink-900/40 flex items-center justify-center flex-shrink-0">
             <svg class="w-4 h-4 text-pink-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
           </div>
-          <h3 id="pw-student-modal-title" class="font-extrabold text-base text-pink-800 dark:text-pink-200">Add Private Student</h3>
+          <div>
+            <h3 id="pw-student-modal-title" class="font-extrabold text-base text-pink-800 dark:text-pink-200">Add Private Student</h3>
+            <p class="text-[11px] text-pink-400">Private — only visible to you</p>
+          </div>
         </div>
         <button onclick="pwCloseStudentModal()" class="w-8 h-8 rounded-full bg-pink-100 dark:bg-pink-900/40 text-pink-500 flex items-center justify-center font-bold text-sm hover:bg-pink-200 transition">✕</button>
       </div>
-      <form onsubmit="pwSaveStudent(event)" class="space-y-3">
+
+      <form onsubmit="pwSaveStudent(event)" class="space-y-3.5">
         <input type="hidden" id="pw-input-student-db-id" value="">
-        <div id="pw-student-id-row">
-          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">
-            Student ID
-            <span class="ml-1 font-normal text-pink-400 text-[10px]">(auto-generated, freely editable)</span>
-          </label>
-          <input type="text" id="pw-input-student-id" placeholder="P-101" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-bold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
-          <p class="text-[10px] text-pink-400 mt-0.5 pl-1">Must start with P- (e.g. P-101, P-A2). No duplicates allowed.</p>
+
+        <!-- Photo + Student ID row -->
+        <div class="bg-pink-50 dark:bg-pink-950/30 p-3 rounded-2xl border border-pink-200 dark:border-pink-800 flex items-center gap-3">
+          <div class="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-pink-400 flex-shrink-0 cursor-pointer group shadow-sm"
+               onclick="document.getElementById('pw-student-photo-file').click()" title="Click to upload photo">
+            <img id="pw-preview-photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f9a8d4'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E"
+                 class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-pink-900/40 flex items-center justify-center opacity-80 group-hover:opacity-100 transition text-white">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+          </div>
+          <input type="file" id="pw-student-photo-file" accept="image/*" class="hidden" onchange="pwHandlePhotoUpload(event)">
+          <div class="flex-1 min-w-0" id="pw-student-id-row">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-[10px] font-bold text-pink-600 dark:text-pink-400 uppercase">Student ID <span class="text-pink-400 font-normal">(editable)</span></label>
+              <button type="button" onclick="document.getElementById('pw-student-photo-file').click()" class="text-[11px] font-bold text-pink-600 hover:underline flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Photo
+              </button>
+            </div>
+            <input type="text" id="pw-input-student-id" placeholder="P-101"
+                   class="touch-input w-full border border-pink-300 dark:border-pink-700 rounded-xl px-3 text-sm font-black text-pink-700 dark:text-pink-300 bg-white dark:bg-pink-950/40 focus:outline-none focus:ring-2 focus:ring-pink-400">
+            <p class="text-[10px] text-pink-400 mt-0.5">Must start with P- • No duplicates</p>
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Student Name *</label>
-          <input type="text" id="pw-input-student-name" required placeholder="Full name" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-bold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+
+        <!-- Name, Class, Roll -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="col-span-1">
+            <label class="block text-[10px] font-bold text-pink-700 dark:text-pink-300 mb-0.5">Name *</label>
+            <input type="text" id="pw-input-student-name" required placeholder="Full Name"
+                   class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-3 text-xs font-bold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-pink-700 dark:text-pink-300 mb-0.5">Class *</label>
+            <select id="pw-input-student-class" required
+                    class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2 text-xs font-bold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+              <option value="">— Class —</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-pink-700 dark:text-pink-300 mb-0.5">Roll No</label>
+            <input type="text" id="pw-input-student-roll" placeholder="1"
+                   class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-3 text-xs font-bold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Class *</label>
-          <select id="pw-input-student-class" required class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
-            <option value="">— Select Class —</option>
-          </select>
+
+        <!-- Address Details -->
+        <div class="bg-pink-50 dark:bg-pink-950/30 p-3 rounded-2xl border border-pink-200 dark:border-pink-800 space-y-2 text-xs">
+          <div class="text-[10px] font-black text-pink-600 uppercase tracking-wider">Address Details</div>
+          <div>
+            <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Full Address</label>
+            <input type="text" id="pw-input-student-address" placeholder="House Name / Street"
+                   class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-3 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Place</label>
+              <input type="text" id="pw-input-student-place" placeholder="Place"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">District</label>
+              <input type="text" id="pw-input-student-district" placeholder="District"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">State</label>
+              <input type="text" id="pw-input-student-state" placeholder="State"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Roll Number</label>
-          <input type="text" id="pw-input-student-roll" placeholder="e.g. 1" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+
+        <!-- Family Details -->
+        <div class="bg-pink-50 dark:bg-pink-950/30 p-3 rounded-2xl border border-pink-200 dark:border-pink-800 space-y-2 text-xs">
+          <div class="text-[10px] font-black text-pink-600 uppercase tracking-wider">Family Details</div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Father</label>
+              <input type="text" id="pw-input-student-fatherName" placeholder="Father's Name"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2.5 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Mother</label>
+              <input type="text" id="pw-input-student-motherName" placeholder="Mother's Name"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2.5 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Mobile</label>
+              <input type="text" id="pw-input-student-fatherMobile" placeholder="e.g. 9876543210"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2.5 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">WhatsApp</label>
+              <input type="text" id="pw-input-student-fatherWhatsapp" placeholder="WhatsApp No."
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2.5 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+          </div>
         </div>
+
+        <!-- Academic Status -->
+        <div class="bg-pink-50 dark:bg-pink-950/30 p-3 rounded-2xl border border-pink-200 dark:border-pink-800 space-y-2 text-xs">
+          <div class="text-[10px] font-black text-pink-600 uppercase tracking-wider">Academic Status</div>
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Year Joined</label>
+              <input type="text" id="pw-input-student-yearJoined" placeholder="2024"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Rank</label>
+              <input type="text" id="pw-input-student-rank" placeholder="e.g. A+"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-pink-500 mb-0.5">Prev College</label>
+              <input type="text" id="pw-input-student-previousCollege" placeholder="Institution"
+                     class="touch-input w-full bg-white dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-2 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+            </div>
+          </div>
+        </div>
+
+        <!-- Buttons -->
         <div class="flex gap-2 pt-1">
           <button type="button" onclick="pwCloseStudentModal()" class="flex-1 py-2.5 rounded-xl border border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-300 font-bold text-sm hover:bg-pink-50 transition">Cancel</button>
-          <button type="submit" class="flex-1 py-2.5 pw-gradient-btn rounded-xl font-bold text-sm shadow-md">Save</button>
+          <button type="submit" class="flex-1 py-2.5 pw-gradient-btn rounded-xl font-bold text-sm shadow-md">Enroll</button>
         </div>
       </form>
     </div>

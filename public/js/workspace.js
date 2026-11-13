@@ -267,24 +267,39 @@ function renderPWClassesView() {
                <p class="text-sm font-bold">No private classes yet</p>
                <p class="text-xs mt-1">Tap "Add Class" to get started</p>
              </div>`
-          : pwClassesList.map(cls => `
-            <div class="bg-white/80 dark:bg-pink-950/30 rounded-2xl p-3.5 border border-pink-200 dark:border-pink-800 shadow-sm flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2 min-w-0">
-                ${lockSVG()}
-                <div class="min-w-0">
-                  <div class="text-sm font-black text-pink-800 dark:text-pink-200 truncate">${escapeHtml(cls.name)}</div>
-                  <div class="text-[10px] text-pink-500">Teacher: ${escapeHtml(cls.classTeacher || 'Not Assigned')}</div>
+          : pwClassesList.map(cls => {
+            const subs = cls.assignedSubjects || [];
+            return `
+            <div class="bg-white dark:bg-[#2d1020] rounded-2xl border border-pink-300 dark:border-pink-800 shadow-md overflow-hidden">
+              <!-- Dark gradient header -->
+              <div class="bg-gradient-to-r from-pink-700 via-rose-600 to-pink-500 p-3 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  ${lockSVG('14')}
+                  <div class="min-w-0">
+                    <div class="text-sm font-black text-white truncate">${escapeHtml(cls.name)}</div>
+                    <div class="text-[10px] text-pink-100 opacity-90">👩‍🏫 ${escapeHtml(cls.classTeacher || 'No Teacher Assigned')}</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <button onclick="pwEditClass('${cls._id}')" class="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 text-white flex items-center justify-center active:scale-95 transition" title="Edit">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button onclick="pwDeleteClass('${cls._id}','${escapeQuotes(cls.name)}')" class="w-7 h-7 rounded-lg bg-white/20 hover:bg-red-400/40 text-white flex items-center justify-center active:scale-95 transition" title="Delete">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+                  </button>
                 </div>
               </div>
-              <div class="flex items-center gap-1.5 flex-shrink-0">
-                <button onclick="pwEditClass('${cls._id}')" class="w-8 h-8 rounded-xl bg-pink-100 dark:bg-pink-900/40 text-pink-600 dark:text-pink-300 flex items-center justify-center hover:bg-pink-200 active:scale-95 transition">
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                </button>
-                <button onclick="pwDeleteClass('${cls._id}','${escapeQuotes(cls.name)}')" class="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-500 flex items-center justify-center hover:bg-red-100 active:scale-95 transition">
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
-                </button>
+              <!-- Body: subject pills -->
+              <div class="p-3 space-y-2 bg-gradient-to-b from-pink-50 to-white dark:from-pink-950/20 dark:to-[#2d1020]">
+                <div class="text-[9px] font-black uppercase tracking-widest text-pink-500 dark:text-pink-400">📚 Assigned Subjects</div>
+                <div class="flex flex-wrap gap-1.5">
+                  ${subs.length > 0
+                    ? subs.map(sub => `<span class="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-700 text-[10px] font-bold shadow-xs">${escapeHtml(sub)}</span>`).join('')
+                    : `<span class="text-[10px] text-pink-300 dark:text-pink-600 italic">No subjects assigned yet</span>`}
+                </div>
               </div>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
       </div>
     </div>`;
 }
@@ -457,6 +472,38 @@ function renderPWStudentsView(filterClass = 'all', searchText = '') {
 }
 
 // ================================================================
+// ================================================================
+// PW CLASS SUBJECT CHECKBOX HELPERS
+// ================================================================
+function pwRenderClassSubjectCheckboxes(selectedSubjects) {
+  selectedSubjects = selectedSubjects || [];
+  const container = document.getElementById('pw-class-subject-checkboxes');
+  if (!container) return;
+  if (!pwSubjectsList || pwSubjectsList.length === 0) {
+    container.innerHTML = '<p class="text-[11px] text-pink-400 italic px-1">No private subjects yet — add subjects first.</p>';
+    return;
+  }
+  const unique = [];
+  const seen = new Set();
+  pwSubjectsList.forEach(function(s) {
+    var n = s.name.trim().toLowerCase();
+    if (!seen.has(n)) { seen.add(n); unique.push(s); }
+  });
+  container.innerHTML = unique.map(function(s) {
+    var checked = selectedSubjects.some(function(x) { return x.toLowerCase() === s.name.toLowerCase(); }) ? 'checked' : '';
+    var uid = 'pw-sub-chk-' + s._id;
+    return '<label for="' + uid + '" class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-pink-100 dark:hover:bg-pink-900/30 transition select-none">'
+      + '<input type="checkbox" id="' + uid + '" name="pw-sub-chk" value="' + escapeHtml(s.name) + '" ' + checked + ' class="w-4 h-4 rounded accent-pink-500 cursor-pointer flex-shrink-0">'
+      + '<span class="text-xs font-bold text-pink-800 dark:text-pink-200 truncate">' + escapeHtml(s.name) + '</span>'
+      + '</label>';
+  }).join('');
+}
+
+function pwGetCheckedSubjects() {
+  var checked = document.querySelectorAll('#pw-class-subject-checkboxes input[name="pw-sub-chk"]:checked');
+  return Array.from(checked).map(function(el) { return el.value; });
+}
+
 // CLASS CRUD
 // ================================================================
 function pwOpenAddClassModal() {
@@ -464,6 +511,7 @@ function pwOpenAddClassModal() {
   document.getElementById('pw-class-modal-title').textContent = 'Add Private Class';
   document.getElementById('pw-input-class-name').value = '';
   document.getElementById('pw-input-class-teacher').value = currentUser ? currentUser.name : '';
+  pwRenderClassSubjectCheckboxes([]);
   pwEditClassId = null;
 }
 
@@ -480,19 +528,21 @@ function pwEditClass(id) {
   document.getElementById('pw-class-modal-title').textContent = 'Edit Private Class';
   document.getElementById('pw-input-class-name').value = cls.name;
   document.getElementById('pw-input-class-teacher').value = cls.classTeacher || '';
+  pwRenderClassSubjectCheckboxes(cls.assignedSubjects || []);
 }
 
 async function pwSaveClass(e) {
   e.preventDefault();
   const name = document.getElementById('pw-input-class-name').value.trim();
   const teacher = document.getElementById('pw-input-class-teacher').value.trim();
+  const assignedSubjects = pwGetCheckedSubjects();
   if (!name) return showToast('Class name is required', true);
   try {
     if (pwEditClassId) {
-      await API.request(`/classes/${pwEditClassId}`, { method: 'PUT', body: JSON.stringify({ name, classTeacher: teacher }) });
+      await API.request(`/classes/${pwEditClassId}`, { method: 'PUT', body: JSON.stringify({ name, classTeacher: teacher, assignedSubjects }) });
       showToast(`Class "${name}" updated!`);
     } else {
-      await API.addPrivateClass(name, teacher);
+      await API.addPrivateClass(name, teacher, assignedSubjects);
       showToast(`Private class "${name}" created!`);
     }
     pwCloseClassModal();
@@ -512,6 +562,32 @@ async function pwDeleteClass(id, name) {
 }
 
 // ================================================================
+// PW SUBJECT CLASS CHECKBOX HELPERS
+// ================================================================
+function pwRenderSubjectClassCheckboxes(selectedClasses) {
+  selectedClasses = selectedClasses || [];
+  const container = document.getElementById('pw-subject-class-checkboxes');
+  if (!container) return;
+  if (!pwClassesList || pwClassesList.length === 0) {
+    container.innerHTML = '<p class="text-[11px] text-pink-400 italic px-1">No private classes yet — add classes first.</p>';
+    return;
+  }
+  container.innerHTML = pwClassesList.map(function(c) {
+    var checked = selectedClasses.some(function(x) { return x === c.name; }) ? 'checked' : '';
+    var uid = 'pw-cls-chk-' + c._id;
+    return '<label for="' + uid + '" class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-pink-100 dark:hover:bg-pink-900/30 transition select-none">'
+      + '<input type="checkbox" id="' + uid + '" name="pw-cls-chk" value="' + escapeHtml(c.name) + '" ' + checked + ' class="w-4 h-4 rounded accent-pink-500 cursor-pointer flex-shrink-0">'
+      + '<span class="text-xs font-bold text-pink-800 dark:text-pink-200 truncate">' + escapeHtml(c.name) + '</span>'
+      + '</label>';
+  }).join('');
+}
+
+function pwGetCheckedClasses() {
+  var checked = document.querySelectorAll('#pw-subject-class-checkboxes input[name="pw-cls-chk"]:checked');
+  return Array.from(checked).map(function(el) { return el.value; });
+}
+
+// ================================================================
 // SUBJECT CRUD
 // ================================================================
 function pwOpenAddSubjectModal() {
@@ -520,9 +596,7 @@ function pwOpenAddSubjectModal() {
   document.getElementById('pw-input-subject-name').value = '';
   document.getElementById('pw-input-subject-code').value = '';
   document.getElementById('pw-input-subject-teacher').value = currentUser ? currentUser.name : '';
-  // Populate class dropdown
-  const sel = document.getElementById('pw-input-subject-class');
-  sel.innerHTML = `<option value="">— No class —</option>` + pwClassesList.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+  pwRenderSubjectClassCheckboxes([]);
   pwEditSubjectId = null;
 }
 
@@ -540,8 +614,7 @@ function pwEditSubject(id) {
   document.getElementById('pw-input-subject-name').value = sub.name;
   document.getElementById('pw-input-subject-code').value = sub.subjectCode || '';
   document.getElementById('pw-input-subject-teacher').value = sub.teacher || '';
-  const sel = document.getElementById('pw-input-subject-class');
-  sel.innerHTML = `<option value="">— No class —</option>` + pwClassesList.map(c => `<option value="${escapeHtml(c.name)}" ${(sub.assignedClasses||[]).includes(c.name) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+  pwRenderSubjectClassCheckboxes(sub.assignedClasses || []);
 }
 
 async function pwSaveSubject(e) {
@@ -549,9 +622,9 @@ async function pwSaveSubject(e) {
   const name = document.getElementById('pw-input-subject-name').value.trim();
   const code = document.getElementById('pw-input-subject-code').value.trim();
   const teacher = document.getElementById('pw-input-subject-teacher').value.trim();
-  const cls = document.getElementById('pw-input-subject-class').value;
+  const assignedClasses = pwGetCheckedClasses();
   if (!name) return showToast('Subject name is required', true);
-  const data = { name, subjectCode: code, teacher, assignedClasses: cls ? [cls] : [] };
+  const data = { name, subjectCode: code, teacher, assignedClasses };
   try {
     if (pwEditSubjectId) {
       await API.updateSubject(pwEditSubjectId, data);
@@ -579,11 +652,56 @@ async function pwDeleteSubject(id, name) {
 // ================================================================
 // STUDENT CRUD
 // ================================================================
+
+// PW photo state
+let pwStudentPhotoUrl = '';
+
+// Photo upload handler for PW student modal (reuses main app's compressImage + API.uploadPhoto)
+async function pwHandlePhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    showToast('Processing photo...');
+    const base64 = await compressImage(file, 500, 500, 0.82);
+    pwStudentPhotoUrl = base64;
+    const preview = document.getElementById('pw-preview-photo');
+    if (preview) preview.src = base64;
+    showToast('Saving to storage...');
+    const uploadRes = await API.uploadPhoto(file, 'students');
+    if (uploadRes && uploadRes.success && uploadRes.url) {
+      pwStudentPhotoUrl = uploadRes.url;
+      showToast('Photo saved!');
+    } else {
+      showToast('Photo selected!');
+    }
+  } catch (err) {
+    showToast('Photo selected!');
+  }
+}
+
+// Helper: reset all PW student modal fields
+function pwResetStudentModal() {
+  pwStudentPhotoUrl = '';
+  const DEFAULT_PW_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f9a8d4'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E";
+  const preview = document.getElementById('pw-preview-photo');
+  if (preview) preview.src = DEFAULT_PW_AVATAR;
+  const fileInput = document.getElementById('pw-student-photo-file');
+  if (fileInput) fileInput.value = '';
+  ['pw-input-student-id','pw-input-student-name','pw-input-student-roll',
+   'pw-input-student-address','pw-input-student-place','pw-input-student-district','pw-input-student-state',
+   'pw-input-student-fatherName','pw-input-student-motherName',
+   'pw-input-student-fatherMobile','pw-input-student-fatherWhatsapp',
+   'pw-input-student-yearJoined','pw-input-student-rank','pw-input-student-previousCollege'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const dbId = document.getElementById('pw-input-student-db-id');
+  if (dbId) dbId.value = '';
+}
+
 async function pwOpenAddStudentModal() {
   pwEditStudentObjId = null;
   document.getElementById('pw-student-modal-title').textContent = 'Add Private Student';
-  document.getElementById('pw-student-id-row').style.display = '';
-  // Fetch next private ID
+  pwResetStudentModal();
+  // Auto-generate next P- ID
   try {
     const r = await API.getNextPrivateStudentId();
     document.getElementById('pw-input-student-id').value = r.nextId || 'P-101';
@@ -591,10 +709,10 @@ async function pwOpenAddStudentModal() {
     document.getElementById('pw-input-student-id').value = 'P-101';
   }
   document.getElementById('pw-input-student-id').readOnly = false;
-  document.getElementById('pw-input-student-name').value = '';
-  document.getElementById('pw-input-student-roll').value = '';
+  // Populate class dropdown with PW classes
   const cls = document.getElementById('pw-input-student-class');
-  cls.innerHTML = pwClassesList.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('') || '<option value="">No classes — add one first</option>';
+  cls.innerHTML = pwClassesList.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('')
+    || '<option value="">No classes — add one first</option>';
   document.getElementById('pw-modal-student').classList.remove('hidden');
 }
 
@@ -603,28 +721,68 @@ async function pwEditStudent(id) {
   if (!st) return;
   pwEditStudentObjId = id;
   document.getElementById('pw-student-modal-title').textContent = 'Edit Private Student';
-  document.getElementById('pw-student-id-row').style.display = '';
+  pwResetStudentModal();
+
+  // Fill all fields
+  document.getElementById('pw-input-student-db-id').value = id;
   document.getElementById('pw-input-student-id').value = String(st.studentId);
-  document.getElementById('pw-input-student-id').readOnly = false; // Faculty can edit freely
-  document.getElementById('pw-input-student-name').value = st.name;
-  document.getElementById('pw-input-student-roll').value = st.roll;
+  document.getElementById('pw-input-student-id').readOnly = false;
+  document.getElementById('pw-input-student-name').value = st.name || '';
+  document.getElementById('pw-input-student-roll').value = st.roll || '';
+  document.getElementById('pw-input-student-address').value = st.address || '';
+  document.getElementById('pw-input-student-place').value = st.place || '';
+  document.getElementById('pw-input-student-district').value = st.district || '';
+  document.getElementById('pw-input-student-state').value = st.state || '';
+  document.getElementById('pw-input-student-fatherName').value = st.fatherName || '';
+  document.getElementById('pw-input-student-motherName').value = st.motherName || '';
+  document.getElementById('pw-input-student-fatherMobile').value = st.fatherMobile || '';
+  document.getElementById('pw-input-student-fatherWhatsapp').value = st.fatherWhatsapp || '';
+  document.getElementById('pw-input-student-yearJoined').value = st.yearJoined || '';
+  document.getElementById('pw-input-student-rank').value = st.rank || '';
+  document.getElementById('pw-input-student-previousCollege').value = st.previousCollege || '';
+
+  // Load existing photo
+  if (st.photoUrl) {
+    pwStudentPhotoUrl = st.photoUrl;
+    const preview = document.getElementById('pw-preview-photo');
+    if (preview) preview.src = st.photoUrl;
+  }
+
+  // Populate class dropdown
   const cls = document.getElementById('pw-input-student-class');
-  cls.innerHTML = pwClassesList.map(c => `<option value="${escapeHtml(c.name)}" ${isClassEqual(c.name, st.class) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('') || '<option value="">No classes</option>';
+  cls.innerHTML = pwClassesList.map(c =>
+    `<option value="${escapeHtml(c.name)}" ${isClassEqual(c.name, st.class) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+  ).join('') || '<option value="">No classes</option>';
+
   document.getElementById('pw-modal-student').classList.remove('hidden');
 }
 
 function pwCloseStudentModal() {
   document.getElementById('pw-modal-student').classList.add('hidden');
   pwEditStudentObjId = null;
+  pwStudentPhotoUrl = '';
 }
 
 async function pwSaveStudent(e) {
   e.preventDefault();
-  const studentId = document.getElementById('pw-input-student-id').value.trim();
-  const name = document.getElementById('pw-input-student-name').value.trim();
-  const roll = document.getElementById('pw-input-student-roll').value.trim();
-  const cls = document.getElementById('pw-input-student-class').value;
-  if (!name || !roll || !cls) return showToast('Name, class and roll are required', true);
+  const studentId   = document.getElementById('pw-input-student-id').value.trim();
+  const name        = document.getElementById('pw-input-student-name').value.trim();
+  const roll        = document.getElementById('pw-input-student-roll').value.trim();
+  const cls         = document.getElementById('pw-input-student-class').value;
+  const address     = document.getElementById('pw-input-student-address').value.trim();
+  const place       = document.getElementById('pw-input-student-place').value.trim();
+  const district    = document.getElementById('pw-input-student-district').value.trim();
+  const state       = document.getElementById('pw-input-student-state').value.trim();
+  const fatherName  = document.getElementById('pw-input-student-fatherName').value.trim();
+  const motherName  = document.getElementById('pw-input-student-motherName').value.trim();
+  const fatherMobile    = document.getElementById('pw-input-student-fatherMobile').value.trim();
+  const fatherWhatsapp  = document.getElementById('pw-input-student-fatherWhatsapp').value.trim();
+  const yearJoined      = document.getElementById('pw-input-student-yearJoined').value.trim();
+  const rank            = document.getElementById('pw-input-student-rank').value.trim();
+  const previousCollege = document.getElementById('pw-input-student-previousCollege').value.trim();
+
+  if (!name) return showToast('Student name is required', true);
+  if (!cls)  return showToast('Please select a class', true);
   if (!studentId) return showToast('Student ID is required', true);
 
   // Frontend duplicate check
@@ -632,14 +790,22 @@ async function pwSaveStudent(e) {
     String(s.studentId).toLowerCase() === studentId.toLowerCase() &&
     s._id !== pwEditStudentObjId
   );
-  if (dup) return showToast(`Student ID "${studentId}" already exists in your workspace!`, true);
+  if (dup) return showToast(`ID "${studentId}" already exists in your workspace!`, true);
+
+  const payload = {
+    name, class: cls, roll, studentId,
+    photoUrl: pwStudentPhotoUrl || undefined,
+    address, place, district, state,
+    fatherName, motherName, fatherMobile, fatherWhatsapp,
+    yearJoined, rank, previousCollege
+  };
 
   try {
     if (pwEditStudentObjId) {
-      await API.updateStudent(pwEditStudentObjId, { name, class: cls, roll, studentId });
+      await API.updateStudent(pwEditStudentObjId, payload);
       showToast(`Student "${name}" updated!`);
     } else {
-      await API.addPrivateStudent({ name, class: cls, roll, studentId });
+      await API.addPrivateStudent(payload);
       showToast(`Private student "${name}" enrolled as ${studentId}!`);
     }
     pwCloseStudentModal();

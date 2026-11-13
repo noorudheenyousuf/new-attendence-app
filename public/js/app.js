@@ -195,6 +195,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       await loadClasses();
       await loadSubjects();
       await loadTeachersData();
+      // Re-render after settings load so canUserEditDelete() uses correct value
+      renderClassesList();
+      renderSubjectsList();
+      renderStudentsDirectory();
+      renderTeachersList();
       renderAttendancePlaceholder(); // Deferred: Show placeholder on initial load instead of auto-loading roster
 
       // Set default year and month to current date for reports
@@ -5967,6 +5972,10 @@ async function renderTeachersList() {
         ? t.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold text-xs shadow-sm">${escapeHtml(s)}</span>`).join(' ')
         : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
 
+      const classesPills = (t.assignedClasses && t.assignedClasses.length > 0)
+        ? t.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-900/30 dark:text-cyan-300 border border-[#245b70]/20 dark:border-cyan-700/30 font-bold text-xs shadow-sm">${escapeHtml(c)}</span>`).join(' ')
+        : `<span class="text-xs text-[var(--text-sub)] italic">None assigned</span>`;
+
       const totalAllTime = t.totalAllTimeSessions !== undefined ? t.totalAllTimeSessions : (t.sessionCount || 0);
       const currentSessions = t.sessionCount || 0;
       const sessionButtonLabel = selectedYear === 'all'
@@ -6030,6 +6039,11 @@ async function renderTeachersList() {
             </div>
           </div>
 
+          <!-- Classes strip -->
+          <div class="border-t border-[var(--border-color)] bg-[var(--bg-page)] px-3 py-2 flex items-start gap-2">
+            <span class="text-[10px] font-bold text-[#245b70] dark:text-cyan-400 uppercase tracking-wide pt-0.5 flex-shrink-0">Classes</span>
+            <div class="flex flex-wrap gap-1 flex-1">${classesPills}</div>
+          </div>
           <!-- Subjects strip at bottom -->
           <div class="border-t border-[var(--border-color)] bg-[var(--bg-page)] px-3 py-2 flex items-start gap-2">
             <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase tracking-wide pt-0.5 flex-shrink-0">Subjects</span>
