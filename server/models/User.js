@@ -45,6 +45,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
+  classTeacherOf: {
+    type: String,
+    default: '',
+    trim: true
+  },
   phone: {
     type: String,
     default: ''

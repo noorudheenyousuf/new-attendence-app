@@ -69,6 +69,7 @@ router.get('/', authMiddleware, async (req, res) => {
         const classesFromSubs = tSubs.flatMap(s => s.assignedClasses || []);
         const classesAsClassTeacher = allClasses.filter(c => (c.classTeacher || '').trim().toLowerCase() === normName).map(c => c.name);
         const assignedClasses = Array.from(new Set([...classesFromSubs, ...classesAsClassTeacher].map(c => String(c).trim()).filter(Boolean)));
+        const classTeacherOf = t.classTeacherOf || classesAsClassTeacher[0] || '';
 
         // Match sessions marked by this teacher or assigned to this teacher
         const orConditions = [];
@@ -106,6 +107,7 @@ router.get('/', authMiddleware, async (req, res) => {
           ...t,
           assignedClasses,
           assignedSubjects,
+          classTeacherOf,
           googleConnected: Boolean(t.googleId),
           sessionCount,
           totalAllTimeSessions
@@ -144,10 +146,12 @@ router.get('/:id', authMiddleware, async (req, res) => {
     const classesFromSubs = tSubs.flatMap(s => s.assignedClasses || []);
     const classesAsClassTeacher = allClasses.filter(c => (c.classTeacher || '').trim().toLowerCase() === normName).map(c => c.name);
     const assignedClasses = Array.from(new Set([...classesFromSubs, ...classesAsClassTeacher].map(c => String(c).trim()).filter(Boolean)));
+    const classTeacherOf = teacher.classTeacherOf || classesAsClassTeacher[0] || '';
     res.json({
       success: true,
       data: {
         ...teacher,
+        classTeacherOf,
         assignedClasses,
         assignedSubjects,
         googleConnected: Boolean(teacher.googleId)
@@ -378,7 +382,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Permission denied: Cannot edit other teacher profiles' });
     }
 
-    const { name, email, avatarUrl, assignedClasses, assignedSubjects, phone, role } = req.body;
+    const { name, email, avatarUrl, assignedClasses, assignedSubjects, phone, role, classTeacherOf } = req.body;
     const teacher = await User.findById(req.params.id);
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher not found' });
@@ -427,6 +431,24 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     if (phone !== undefined) {
       teacher.phone = String(phone).trim();
+    }
+
+    if (classTeacherOf !== undefined) {
+      const newCT = String(classTeacherOf).trim();
+      const oldCT = (teacher.classTeacherOf || '').trim();
+      teacher.classTeacherOf = newCT;
+      try {
+        if (newCT) {
+          if (oldCT && oldCT.toLowerCase() !== newCT.toLowerCase()) {
+            await Class.updateMany({ name: oldCT, classTeacher: teacher.name }, { classTeacher: '' });
+          }
+          await Class.updateMany({ name: newCT }, { classTeacher: teacher.name });
+        } else if (oldCT) {
+          await Class.updateMany({ name: oldCT, classTeacher: teacher.name }, { classTeacher: '' });
+        }
+      } catch (ctErr) {
+        console.error('[Teacher ClassTeacher Sync]', ctErr);
+      }
     }
 
     // Role changes are strictly Admin only

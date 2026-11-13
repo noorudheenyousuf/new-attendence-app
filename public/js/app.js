@@ -509,6 +509,19 @@ function updateUserUI() {
 
   if (settingsAvatar) settingsAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
 
+  // Render Class Teacher Badge
+  const ctBadge = document.getElementById('settings-classteacher-badge');
+  const ctText = document.getElementById('settings-classteacher-text');
+  const myCT = (currentUser.classTeacherOf || (classesList.find(c => isClassEqual(c.classTeacher, currentUser.name))?.name) || '').trim();
+  if (ctBadge && ctText) {
+    if (myCT) {
+      ctText.textContent = `${myCT.toUpperCase()} CLASS TEACHER`;
+      ctBadge.classList.remove('hidden');
+    } else {
+      ctBadge.classList.add('hidden');
+    }
+  }
+
   // Render assigned classes & subjects in profile card
   const assignStrip = document.getElementById('settings-assignments-strip');
   const clsPills = document.getElementById('settings-classes-pills');
@@ -922,6 +935,42 @@ async function loadClasses() {
   }
 }
 
+function getTeacherAllowedClasses() {
+  if (!currentUser || currentUser.role === 'admin') {
+    return classesList || [];
+  }
+  const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
+  const allowedSet = new Set(myAssign.assignedClasses.map(c => (c || '').trim().toLowerCase()));
+  if (currentUser.classTeacherOf) {
+    allowedSet.add(currentUser.classTeacherOf.trim().toLowerCase());
+  }
+  (classesList || []).forEach(c => {
+    if (isClassEqual(c.classTeacher, currentUser.name)) {
+      allowedSet.add((c.name || '').trim().toLowerCase());
+    }
+  });
+  return (classesList || []).filter(c => allowedSet.has((c.name || '').trim().toLowerCase()));
+}
+
+function getTeacherAllowedSubjectsForClass(className) {
+  const allForClass = getAppropriateSubjectsForClass(className);
+  if (!currentUser || currentUser.role === 'admin') {
+    return { teacherSubs: allForClass, isCT: true };
+  }
+  const normName = (currentUser.name || '').trim().toLowerCase();
+  const normEmail = (currentUser.email || '').trim().toLowerCase();
+  const isCT = (currentUser.classTeacherOf && isClassEqual(currentUser.classTeacherOf, className)) ||
+               (classesList || []).some(c => isClassEqual(c.name, className) && isClassEqual(c.classTeacher, currentUser.name));
+
+  const teacherSubs = allForClass.filter(s => {
+    const st = (s.teacher || '').trim().toLowerCase();
+    const se = (s.teacherEmail || s.ownerEmail || '').trim().toLowerCase();
+    return (normName && st === normName) || (normEmail && se === normEmail);
+  });
+
+  return { teacherSubs, isCT };
+}
+
 function populateClassDropdowns() {
   const selClass = document.getElementById('sel-class');
   const repClass = document.getElementById('report-class');
@@ -932,9 +981,14 @@ function populateClassDropdowns() {
   const optionsHtml = classesList.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
 
   if (selClass) {
+    const isTeacher = currentUser && currentUser.role !== 'admin';
+    const allowedClasses = isTeacher ? getTeacherAllowedClasses() : classesList;
     const placeholderOpt = `<option value="" disabled selected>Select Class</option>`;
-    selClass.innerHTML = placeholderOpt + optionsHtml;
-    // Don't auto-set currentClass on initial load; wait for user selection
+    if (isTeacher && allowedClasses.length === 0) {
+      selClass.innerHTML = `<option value="" disabled selected>No classes assigned to you</option>`;
+    } else {
+      selClass.innerHTML = placeholderOpt + allowedClasses.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    }
   }
   if (repClass) {
     const placeholderOpt = `<option value="" disabled selected>Select Class</option>`;
@@ -1480,16 +1534,35 @@ function updateAttendanceSubjectsDropdown(selectedClass) {
     return;
   }
 
-  const validSubjects = getAppropriateSubjectsForClass(selectedClass);
-  if (validSubjects.length > 0) {
-    selSubject.innerHTML = validSubjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
-    if (!currentSubject || currentSubject === 'all' || !validSubjects.some(s => s.name === currentSubject)) {
-      currentSubject = validSubjects[0].name;
+  const isTeacher = currentUser && currentUser.role !== 'admin';
+  if (isTeacher) {
+    const { teacherSubs, isCT } = getTeacherAllowedSubjectsForClass(selectedClass);
+    if (teacherSubs.length > 0) {
+      selSubject.innerHTML = teacherSubs.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+      if (!currentSubject || currentSubject === 'all' || !teacherSubs.some(s => s.name === currentSubject)) {
+        currentSubject = teacherSubs[0].name;
+      }
+      selSubject.value = currentSubject;
+    } else if (isCT) {
+      selSubject.innerHTML = `<option value="General">General (Class Teacher)</option>`;
+      currentSubject = 'General';
+      selSubject.value = 'General';
+    } else {
+      selSubject.innerHTML = `<option value="" disabled selected>No subjects assigned to you</option>`;
+      currentSubject = '';
     }
-    selSubject.value = currentSubject;
   } else {
-    selSubject.innerHTML = `<option value="General">General</option>`;
-    currentSubject = 'General';
+    const validSubjects = getAppropriateSubjectsForClass(selectedClass);
+    if (validSubjects.length > 0) {
+      selSubject.innerHTML = validSubjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+      if (!currentSubject || currentSubject === 'all' || !validSubjects.some(s => s.name === currentSubject)) {
+        currentSubject = validSubjects[0].name;
+      }
+      selSubject.value = currentSubject;
+    } else {
+      selSubject.innerHTML = `<option value="General">General</option>`;
+      currentSubject = 'General';
+    }
   }
 }
 
@@ -2888,6 +2961,12 @@ async function openProfileEditPage(targetUserId = null) {
     if (phoneInput) phoneInput.value = teacher.phone || '';
 
     renderProfileAssignments(teacher.name, teacher.email);
+    const ctSelTeacher = document.getElementById('edit-profile-class-teacher');
+    if (ctSelTeacher) {
+      ctSelTeacher.innerHTML = '<option value="">— Not a Class Teacher —</option>' +
+        (classesList || []).map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+      ctSelTeacher.value = teacher.classTeacherOf || (classesList.find(c => isClassEqual(c.classTeacher, teacher.name))?.name) || '';
+    }
 
     editProfileInitialState = {
       name: (teacher.name || '').trim(),
@@ -2930,6 +3009,12 @@ async function openProfileEditPage(targetUserId = null) {
     if (phoneInput) phoneInput.value = currentUser.phone || '';
 
     renderProfileAssignments(currentUser.name, currentUser.email);
+    const ctSelUser = document.getElementById('edit-profile-class-teacher');
+    if (ctSelUser) {
+      ctSelUser.innerHTML = '<option value="">— Not a Class Teacher —</option>' +
+        (classesList || []).map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+      ctSelUser.value = currentUser.classTeacherOf || (classesList.find(c => isClassEqual(c.classTeacher, currentUser.name))?.name) || '';
+    }
 
     editProfileInitialState = {
       name: (currentUser.name || '').trim(),
@@ -3054,10 +3139,12 @@ async function handleSaveProfile(event) {
   try {
     if (activeEditProfileUserId) {
       // Admin editing a teacher
+      const classTeacherOf = document.getElementById('edit-profile-class-teacher')?.value || '';
       const res = await API.editTeacher(activeEditProfileUserId, {
         name,
         email,
         phone,
+        classTeacherOf,
         avatarUrl: editProfileCurrentAvatarUrl
       });
 
@@ -3071,10 +3158,12 @@ async function handleSaveProfile(event) {
       }
     } else {
       // User editing own profile
+      const classTeacherOf = document.getElementById('edit-profile-class-teacher')?.value || '';
       const res = await API.updateProfile({
         name,
         email,
         phone,
+        classTeacherOf,
         avatarUrl: editProfileCurrentAvatarUrl,
         assignedSubjects
       });
@@ -4657,7 +4746,8 @@ function populateQuickAttendanceDropdowns() {
   if (!qaClass || !qaSubject) return;
 
   const currentVal = qaClass.value;
-  const validClasses = classesList || [];
+  const isTeacher = currentUser && currentUser.role !== 'admin';
+  const validClasses = isTeacher ? getTeacherAllowedClasses() : (classesList || []);
   let html = `<option value="">-- Select Class --</option>`;
   validClasses.forEach(c => {
     const isSel = c.name === currentVal ? 'selected' : '';
@@ -4679,11 +4769,23 @@ function handleQuickAttendanceClassChange() {
     return;
   }
 
-  const validSubjects = getAppropriateSubjectsForClass(selectedClass);
-  if (validSubjects && validSubjects.length > 0) {
-    qaSubject.innerHTML = validSubjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+  const isTeacher = currentUser && currentUser.role !== 'admin';
+  if (isTeacher) {
+    const { teacherSubs, isCT } = getTeacherAllowedSubjectsForClass(selectedClass);
+    if (teacherSubs.length > 0) {
+      qaSubject.innerHTML = teacherSubs.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+    } else if (isCT) {
+      qaSubject.innerHTML = `<option value="General">General (Class Teacher)</option>`;
+    } else {
+      qaSubject.innerHTML = `<option value="" disabled selected>No subjects assigned</option>`;
+    }
   } else {
-    qaSubject.innerHTML = `<option value="General">General</option>`;
+    const validSubjects = getAppropriateSubjectsForClass(selectedClass);
+    if (validSubjects && validSubjects.length > 0) {
+      qaSubject.innerHTML = validSubjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+    } else {
+      qaSubject.innerHTML = `<option value="General">General</option>`;
+    }
   }
 }
 
@@ -8283,4 +8385,167 @@ function initTimetableNotificationScheduler() {
   checkAndTriggerTimetableNotifications();
   // Check every 30 seconds
   setInterval(checkAndTriggerTimetableNotifications, 30000);
+}
+
+// ================= TODAY'S SCHEDULE & ATTENDANCE STATUS MODAL =================
+async function openTodayScheduleModal() {
+  triggerNavHaptic('light');
+  const modal = document.getElementById('modal-today-schedule');
+  const listEl = document.getElementById('today-schedule-modal-slots-list');
+  const titleEl = document.getElementById('today-schedule-modal-title');
+  if (!modal || !listEl) return;
+
+  modal.classList.remove('hidden');
+  listEl.innerHTML = `<div class="p-8 text-center text-xs text-cyan-200 flex flex-col items-center justify-center gap-2.5"><div class="w-6 h-6 rounded-full border-2 border-cyan-300 border-t-transparent animate-spin"></div><span>Loading today's schedule & attendance...</span></div>`;
+
+  try {
+    const now = new Date();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = dayNames[now.getDay()].toLowerCase();
+    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const myEmail = (currentUser?.email || '').trim().toLowerCase();
+    const myName = (currentUser?.name || '').trim().toLowerCase();
+    const isAdmin = currentUser?.role === 'admin';
+
+    // 1. Fetch timetable slots
+    const ttRes = await API.getTimetable('', '', myEmail);
+    const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
+    let mySlots = allSlots.filter(s => (s.teacherEmail || '').trim().toLowerCase() === myEmail);
+    if (isAdmin && mySlots.length === 0) mySlots = allSlots;
+
+    const todaySlots = mySlots.filter(s => {
+      const d = (s.day || '').trim().toLowerCase();
+      const days = Array.isArray(s.days) ? s.days.map(x => x.trim().toLowerCase()) : [];
+      const splitDays = d.split(',').map(x => x.trim().toLowerCase());
+      return d === todayName || d === 'all days' || splitDays.includes(todayName) || days.includes(todayName) || days.includes('all days');
+    });
+
+    // 2. Fetch today's attendance records to check if marked
+    let todayAttendances = [];
+    try {
+      const attRes = await API.getAttendance(todayDateStr);
+      todayAttendances = (attRes && attRes.data) ? attRes.data : (Array.isArray(attRes) ? attRes : []);
+    } catch (_) {}
+
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+
+    // Sort slots chronologically
+    const slotsWithRange = todaySlots.map(s => {
+      const range = _parseSlotTimeRange(s.timeSlot || s.time);
+      return {
+        slot: s,
+        startMin: range ? range.startMin : null,
+        endMin: range ? range.endMin : null
+      };
+    }).sort((a, b) => {
+      if (a.startMin !== null && b.startMin !== null) return a.startMin - b.startMin;
+      return 0;
+    });
+
+    if (titleEl) titleEl.textContent = dayNames[now.getDay()] + "'s Schedule (" + todaySlots.length + " Classes)";
+
+    if (todaySlots.length === 0) {
+      listEl.innerHTML = `
+        <div class="p-6 rounded-2xl bg-white/10 border border-white/15 text-center space-y-1.5">
+          <div class="text-sm font-bold text-amber-300">No classes scheduled for today!</div>
+          <div class="text-xs text-cyan-100/70">Enjoy your day or check other days in your Timetable.</div>
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = slotsWithRange.map(({ slot: s, startMin, endMin }) => {
+      const timeStr = s.timeSlot || s.time || 'Period';
+      const isLive = startMin !== null && endMin !== null && currentMin >= startMin && currentMin < endMin;
+      const isUpcoming = startMin !== null && currentMin < startMin;
+      const isPassed = endMin !== null && currentMin >= endMin;
+
+      // Check if attendance is marked for this class & subject today
+      const isMarked = todayAttendances.some(att =>
+        isClassEqual(att.class, s.class) &&
+        (String(att.subject || '').trim().toLowerCase() === String(s.subject || '').trim().toLowerCase() || att.subject === 'all')
+      );
+
+      let statusBadge = '';
+      if (isMarked) {
+        statusBadge = `
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 text-[11px] font-black shadow-xs">
+            <svg class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Marked</span>
+          </span>
+        `;
+      } else if (isLive) {
+        statusBadge = `
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/30 text-emerald-200 border border-emerald-400/50 text-[11px] font-black animate-pulse shadow-xs">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>Live Now</span>
+          </span>
+        `;
+      } else if (isUpcoming) {
+        const diff = startMin - currentMin;
+        const diffText = diff > 0 ? (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`) : 'Soon';
+        statusBadge = `
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-400/20 text-amber-200 border border-amber-300/40 text-[11px] font-bold">
+            <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>Upcoming (${diffText})</span>
+          </span>
+        `;
+      } else {
+        statusBadge = `
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-400/40 text-[11px] font-bold">
+            <span>Not Marked</span>
+          </span>
+        `;
+      }
+
+      return `
+        <div onclick="jumpToTakeAttendance('${escapeQuotes(s.class || '')}', '${escapeQuotes(s.subject || '')}')" class="p-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-between gap-3 transition cursor-pointer active:scale-98 group">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black text-amber-300">${escapeHtml(timeStr)}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-lg bg-white/20 text-white font-extrabold uppercase tracking-wider">${escapeHtml(s.class || '')}</span>
+              ${s.room ? `<span class="text-[10px] text-cyan-200/80">Room: ${escapeHtml(s.room)}</span>` : ''}
+            </div>
+            <div class="text-sm font-black text-white mt-1 truncate group-hover:text-cyan-200 transition">
+              ${escapeHtml(s.subject || 'Class')}
+            </div>
+          </div>
+          <div class="flex-shrink-0">
+            ${statusBadge}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div class="p-4 text-center text-xs text-rose-300">Error loading schedule: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function closeTodayScheduleModal() {
+  const modal = document.getElementById('modal-today-schedule');
+  if (modal) modal.classList.add('hidden');
+}
+
+function jumpToTakeAttendance(className, subjectName) {
+  closeTodayScheduleModal();
+  selectTab('attendance');
+  if (className) {
+    const selClass = document.getElementById('sel-class');
+    if (selClass) {
+      selClass.value = className;
+      handleClassChange();
+    }
+  }
+  if (subjectName) {
+    setTimeout(() => {
+      const selSub = document.getElementById('sel-subject');
+      if (selSub && Array.from(selSub.options).some(o => o.value === subjectName)) {
+        selSub.value = subjectName;
+        handleSubjectChange();
+      }
+    }, 300);
+  }
 }

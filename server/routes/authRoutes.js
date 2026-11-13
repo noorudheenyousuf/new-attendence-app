@@ -273,6 +273,7 @@ router.post('/google', async (req, res) => {
         email: user.email,
         role: user.role,
         avatarUrl: user.avatarUrl,
+        classTeacherOf: user.classTeacherOf || '',
         assignedClasses: user.assignedClasses || [],
         assignedSubjects: user.assignedSubjects || [],
         googleConnected: Boolean(user.googleId),
@@ -305,6 +306,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     const classesFromSubs = tSubs.flatMap(s => s.assignedClasses || []);
     const classesAsClassTeacher = allClasses.filter(c => (c.classTeacher || '').trim().toLowerCase() === normName).map(c => c.name);
     const assignedClasses = Array.from(new Set([...classesFromSubs, ...classesAsClassTeacher].map(c => String(c).trim()).filter(Boolean)));
+    const classTeacherOf = user.classTeacherOf || classesAsClassTeacher[0] || '';
     res.json({
       success: true,
       user: {
@@ -315,6 +317,7 @@ router.get('/me', authMiddleware, async (req, res) => {
         phone: user.phone || '',
         role: user.role,
         avatarUrl: user.avatarUrl,
+        classTeacherOf,
         assignedClasses,
         assignedSubjects,
         createdAt: user.createdAt,
@@ -331,7 +334,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 // @desc    USER DIRECTIVE: Consolidated Profile Editing for all accounts
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { name, email, avatarUrl, phone, assignedSubjects } = req.body;
+    const { name, email, avatarUrl, phone, assignedSubjects, classTeacherOf } = req.body;
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -348,6 +351,26 @@ router.put('/profile', authMiddleware, async (req, res) => {
     }
     if (typeof phone !== 'undefined') {
       user.phone = String(phone).trim();
+    }
+
+    // Class Teacher Assignment
+    if (typeof classTeacherOf !== 'undefined') {
+      const newCT = String(classTeacherOf).trim();
+      const oldCT = (user.classTeacherOf || '').trim();
+      user.classTeacherOf = newCT;
+
+      try {
+        if (newCT) {
+          if (oldCT && oldCT.toLowerCase() !== newCT.toLowerCase()) {
+            await Class.updateMany({ name: oldCT, classTeacher: user.name }, { classTeacher: '' });
+          }
+          await Class.updateMany({ name: newCT }, { classTeacher: user.name });
+        } else if (oldCT) {
+          await Class.updateMany({ name: oldCT, classTeacher: user.name }, { classTeacher: '' });
+        }
+      } catch (ctErr) {
+        console.error('[Class Teacher Sync Error]', ctErr);
+      }
     }
 
     // Email edit: Admin can edit email; check uniqueness
@@ -407,6 +430,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
         phone: user.phone || '',
         role: user.role,
         avatarUrl: user.avatarUrl,
+        classTeacherOf: user.classTeacherOf || '',
         assignedClasses: user.assignedClasses || [],
         assignedSubjects: user.assignedSubjects || [],
         createdAt: user.createdAt,

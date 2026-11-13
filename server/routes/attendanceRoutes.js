@@ -80,6 +80,35 @@ router.post('/', authMiddleware, async (req, res) => {
     });
     const isPrivate = Boolean(classDoc && classDoc.isPrivate);
 
+    // Permission check: teachers can only mark attendance for their assigned classes/subjects
+    if (req.user && req.user.role !== 'admin' && !isPrivate) {
+      const normUser = (req.user.name || '').trim().toLowerCase();
+      const normEmail = userEmail;
+      const isClassTeacher = classDoc && (classDoc.classTeacher || '').trim().toLowerCase() === normUser;
+      const userCTOf = ((req.user.classTeacherOf || '').trim().toLowerCase() === cleanClass.toLowerCase());
+
+      const subjectDoc = await Subject.findOne({
+        name: caseInsensitiveRegex(targetSubject),
+        $or: [
+          { assignedClasses: caseInsensitiveRegex(cleanClass) },
+          { class: caseInsensitiveRegex(cleanClass) }
+        ],
+        $or: [
+          { teacher: caseInsensitiveRegex(req.user.name) },
+          { teacherEmail: normEmail }
+        ]
+      });
+
+      const hasAssignedClass = (req.user.assignedClasses || []).some(c => c.trim().toLowerCase() === cleanClass.toLowerCase());
+
+      if (!isClassTeacher && !userCTOf && !subjectDoc && !hasAssignedClass) {
+        return res.status(403).json({
+          success: false,
+          message: `Permission denied: You are not assigned to take attendance for Class "${cleanClass}" and Subject "${targetSubject}".`
+        });
+      }
+    }
+
     // Calculate counts
     const total = records.length;
     const present = records.filter(r => r.status === 'P').length;
