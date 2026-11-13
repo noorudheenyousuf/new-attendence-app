@@ -4288,19 +4288,20 @@ async function updateProfileDashboardKPIs() {
 
     let myAttendances = todayAttendances;
     if (!isAdmin) {
-      const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
       myAttendances = todayAttendances.filter(att => {
         const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
         const markedName = (att.markedBy || '').toLowerCase().trim();
+        // Primary: email match (most reliable)
         if (markedEmail && myEmail && markedEmail === myEmail) return true;
+        // Fallback: name match (for old records without markedByEmail)
         if (markedName && myName && markedName === myName) return true;
-        const matchClass = myAssign.assignedClasses.some(c => isClassEqual(c, att.class));
-        const matchSub = myAssign.assignedSubjects.some(s => (s || '').toLowerCase() === (att.subject || '').toLowerCase());
-        return matchClass && matchSub;
+        return false;
       });
     }
     markedEls.forEach(el => el.textContent = String(myAttendances.length));
-  } catch (_) {}
+  } catch (err) {
+    console.error('[Marked Today KPI Error]', err);
+  }
 }
 
 async function undoLog(logId) {
@@ -8736,15 +8737,14 @@ async function openTodayMarkedModal() {
 
     let myAttendances = todayAttendances;
     if (!isAdmin) {
-      const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
       myAttendances = todayAttendances.filter(att => {
         const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
         const markedName = (att.markedBy || '').toLowerCase().trim();
+        // Primary: email match (most reliable)
         if (markedEmail && myEmail && markedEmail === myEmail) return true;
+        // Fallback: name match (for old records without markedByEmail)
         if (markedName && myName && markedName === myName) return true;
-        const matchClass = myAssign.assignedClasses.some(c => isClassEqual(c, att.class));
-        const matchSub = myAssign.assignedSubjects.some(s => (s || '').toLowerCase() === (att.subject || '').toLowerCase());
-        return matchClass && matchSub;
+        return false;
       });
     }
 
