@@ -268,7 +268,17 @@ function renderPWClassesView() {
                <p class="text-xs mt-1">Tap "Add Class" to get started</p>
              </div>`
           : pwClassesList.map(cls => {
-            const subs = (pwSubjectsList || []).filter(function(s) { return (s.assignedClasses || []).some(function(ac) { return ac === cls.name; }); }).map(function(s) { return s.name; });
+            const subs = (pwSubjectsList || []).filter(function(s) {
+              const inAssigned = (s.assignedClasses || []).some(function(ac) { return (ac || '').trim().toLowerCase() === (cls.name || '').trim().toLowerCase(); });
+              const inSingle = (s.class || '').trim().toLowerCase() === (cls.name || '').trim().toLowerCase();
+              return inAssigned || inSingle;
+            }).map(function(s) { return s.name; });
+            // Follow pwSubjectsList order
+            subs.sort(function(a, b) {
+              const idxA = (pwSubjectsList || []).findIndex(s => s.name === a);
+              const idxB = (pwSubjectsList || []).findIndex(s => s.name === b);
+              return idxA - idxB;
+            });
             return `
             <div class="bg-white dark:bg-[#2d1020] rounded-2xl border border-pink-300 dark:border-pink-800 shadow-md overflow-hidden">
               <!-- Clean light header with SVG icon -->
@@ -460,7 +470,7 @@ function renderPWStudentsView(filterClass = 'all', searchText = '') {
              </div>`
           : filtered.map(st => `
             <div class="bg-white/80 dark:bg-pink-950/30 rounded-2xl p-3 border border-pink-200 dark:border-pink-800 shadow-sm flex items-center gap-3">
-              <img src="${escapeHtml(st.photoUrl || DEFAULT_AVATAR)}" class="w-10 h-10 rounded-xl object-cover border-2 border-pink-200 dark:border-pink-700 flex-shrink-0" alt="${escapeHtml(st.name)}">
+              <img src="${escapeHtml(st.photoUrl || DEFAULT_AVATAR)}" class="w-10 h-10 rounded-xl object-cover border-2 border-pink-200 dark:border-pink-700 flex-shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition" alt="${escapeHtml(st.name)}" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view full student details">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1 flex-wrap">
                   ${lockSVG('12')}
@@ -898,6 +908,7 @@ function updateNotifBadge(count) {
     if (count > 0) {
       headerBadge.textContent = count > 9 ? '9+' : String(count);
       headerBadge.classList.remove('hidden');
+      headerBadge.classList.add('badge-jump');
       headerBadge.style.display = 'flex';
     } else {
       headerBadge.classList.add('hidden');

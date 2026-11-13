@@ -896,3 +896,27 @@ input:checked + .switch-slider:before {
 .pw-animate-enter {
   animation: pw-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
+/* Bouncing / Jumping animation for message number badge */
+@keyframes badgeJump {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  25% {
+    transform: translateY(-5px) scale(1.15);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+  50% {
+    transform: translateY(0) scale(1);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  75% {
+    transform: translateY(-2.5px) scale(1.08);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+.badge-jump {
+  animation: badgeJump 1.2s infinite ease-in-out;
+}
+

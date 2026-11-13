@@ -89,6 +89,25 @@ function getTeacherAssignments(teacherName, teacherEmail) {
     }
   });
 
+  // Follow exact order of classes and subjects everywhere, in assigned class also
+  assignedClasses.sort((a, b) => {
+    const idxA = allClasses.findIndex(c => isClassEqual(c.name, a));
+    const idxB = allClasses.findIndex(c => isClassEqual(c.name, b));
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return 0;
+  });
+
+  assignedSubjects.sort((a, b) => {
+    const idxA = allSubs.findIndex(s => (s.name || '').trim().toLowerCase() === (a || '').trim().toLowerCase());
+    const idxB = allSubs.findIndex(s => (s.name || '').trim().toLowerCase() === (b || '').trim().toLowerCase());
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return 0;
+  });
+
   return { assignedSubjects, assignedClasses };
 }
 
@@ -2200,7 +2219,7 @@ function renderAttendanceList() {
   // USER DIRECTIVE: "when taking attendence not show id and roll"
   // Here we explicitly DO NOT SHOW studentId and DO NOT SHOW roll!
   container.innerHTML = studentsList.map(st => {
-    const record = attendanceRecords.find(r => r.studentId === st.studentId) || { status: 'P', note: '' };
+    const record = attendanceRecords.find(r => String(r.studentId) === String(st.studentId)) || { status: 'P', note: '' };
     const isP = record.status === 'P';
     const isA = record.status === 'A';
     const isL = record.status === 'L';
@@ -2209,7 +2228,7 @@ function renderAttendanceList() {
       <div class="bg-[var(--card-bg)] p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2.5 transition-all">
         <!-- Student Info: Photo & Name ONLY (No ID and No Roll) - Click Photo to View Details -->
         <div class="flex items-center gap-3 min-w-0">
-          <div class="relative flex-shrink-0 cursor-pointer group" onclick="openStudentDetailsModal(${st.studentId})" title="Click to view student details">
+          <div class="relative flex-shrink-0 cursor-pointer group" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view student details">
             <img src="${st.photoUrl || DEFAULT_AVATAR}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] group-hover:scale-105 transition shadow-sm">
             <span class="absolute -bottom-1 -right-1 text-[9px] font-black px-1.5 py-0.2 rounded-md ${
               isP ? 'bg-emerald-600 text-white' : isA ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
@@ -2222,15 +2241,15 @@ function renderAttendanceList() {
 
         <!-- Medium-Big Status Toggle Buttons -->
         <div class="flex items-center gap-1.5 flex-shrink-0">
-          <button onclick="setStudentStatus(${st.studentId}, 'P')" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
+          <button onclick="setStudentStatus('${escapeQuotes(String(st.studentId))}', 'P')" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
             isP ? 'bg-emerald-600 text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700'
           }">P</button>
           
-          <button onclick="setStudentStatus(${st.studentId}, 'A')" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
+          <button onclick="setStudentStatus('${escapeQuotes(String(st.studentId))}', 'A')" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
             isA ? 'bg-rose-600 text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-rose-50 hover:text-rose-700'
           }">A</button>
 
-          <button onclick="setStudentStatus(${st.studentId}, 'L')" title="Mark Leave" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
+          <button onclick="setStudentStatus('${escapeQuotes(String(st.studentId))}', 'L')" title="Mark Leave" class="w-10 h-10 rounded-xl font-black text-xs flex items-center justify-center transition-all ${
             isL ? 'bg-amber-500 text-white shadow-md scale-105' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-amber-50 hover:text-amber-700'
           }">L</button>
         </div>
@@ -2243,7 +2262,7 @@ function renderAttendanceList() {
 
 function setStudentStatus(studentId, status) {
   triggerNavHaptic('light');
-  let record = attendanceRecords.find(r => r.studentId === studentId);
+  let record = attendanceRecords.find(r => String(r.studentId) === String(studentId));
   if (!record) {
     record = { studentId, status, note: '' };
     attendanceRecords.push(record);
@@ -2622,7 +2641,7 @@ async function renderStudentsDirectory() {
       <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2.5 min-w-0 select-none">
-            <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
+            <img src="${st.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(st.name)}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view full student details">
             <div class="truncate">
               <div class="flex items-center gap-1.5">
                 <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.isPrivate ? '<svg style="display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' : ''}${st.name}</span>
@@ -2994,10 +3013,6 @@ function hasUnsavedProfileChanges() {
 }
 
 function handleCloseProfilePageWithCheck() {
-  if (hasUnsavedProfileChanges()) {
-    const discard = confirm('You have unsaved changes. Discard them?');
-    if (!discard) return;
-  }
   const fallback = activeEditProfileUserId ? 'teachers' : 'settings';
   goBackFromSubPage(fallback);
 }
@@ -3802,15 +3817,31 @@ async function handleSaveEditedStudent(e) {
 // USER DIRECTIVE:
 // "when click the photo from taking attendence show sudents details fully ....only to read not edit...one more click to photo show largly...."
 async function openStudentDetailsModal(studentId) {
+  const targetId = String(studentId);
   // Look in main students list first, then PW students list
-  let student = studentsList.find(s => s.studentId === studentId);
-  if (!student && typeof pwStudentsList !== 'undefined') {
-    student = pwStudentsList.find(s => s.studentId === studentId);
+  let student = (studentsList || []).find(s => String(s.studentId) === targetId);
+  if (!student && typeof pwStudentsList !== 'undefined' && Array.isArray(pwStudentsList)) {
+    student = pwStudentsList.find(s => String(s.studentId) === targetId);
   }
   if (!student) {
     try {
-      const res = await API.getStudents();
-      student = res.data.find(s => s.studentId === studentId);
+      const res = await API.getStudents('all');
+      if (res && res.data) {
+        student = res.data.find(s => String(s.studentId) === targetId);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  if (!student && typeof auth !== 'undefined' && auth && auth.token) {
+    try {
+      const pwRes = await fetch('/api/students?scope=private', {
+        headers: { Authorization: `Bearer ${auth.token}` }
+      });
+      const pwJson = await pwRes.json();
+      if (pwJson && pwJson.data) {
+        student = pwJson.data.find(s => String(s.studentId) === targetId);
+      }
     } catch (e) {
       console.log(e);
     }
