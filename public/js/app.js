@@ -7125,12 +7125,17 @@ function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
     if (desc) desc.textContent = 'This slot overlaps with an existing class in this room/class:';
   }
 
-  // Find teacher name from teachersList if available
+  // Find teacher name from cachedTeachersList
   const ownerEmail = (conflictSlot.teacherEmail || '').trim();
   let teacherName = ownerEmail;
-  if (window.teachersList && teachersList.length > 0) {
-    const found = teachersList.find(t => (t.email || '').toLowerCase() === ownerEmail.toLowerCase());
+  const _tList = (typeof cachedTeachersList !== 'undefined' && cachedTeachersList) || [];
+  if (_tList.length > 0) {
+    const found = _tList.find(t => (t.email || '').toLowerCase() === ownerEmail.toLowerCase());
     if (found) teacherName = found.name || found.email || ownerEmail;
+  }
+  // Also check currentUser if the slot belongs to self
+  if (teacherName === ownerEmail && currentUser && (currentUser.email || '').toLowerCase() === ownerEmail.toLowerCase()) {
+    teacherName = currentUser.name || ownerEmail;
   }
 
   const slotDays = Array.isArray(conflictSlot.days) && conflictSlot.days.length > 0
