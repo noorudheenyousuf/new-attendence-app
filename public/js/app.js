@@ -436,6 +436,13 @@ async function loadCurrentUser() {
   openAuthModal();
 }
 
+function updateHeaderAvatar() {
+  const headerAvatar = document.getElementById('user-avatar-img');
+  if (headerAvatar && currentUser) {
+    headerAvatar.src = currentUser.avatarUrl || DEFAULT_AVATAR;
+  }
+}
+
 function updateUserUI() {
   const headerName = document.getElementById('header-profile-name');
   const headerRole = document.getElementById('header-profile-role');
