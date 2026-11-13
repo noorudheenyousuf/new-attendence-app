@@ -6992,34 +6992,54 @@ async function handleSaveTimetableSlot(e) {
     return;
   }
 
-  // Feature 3: Schedule conflict / overlap detection
+  // Feature 3: Schedule conflict / overlap detection (custom modal)
   const newRange = _parseSlotTimeRange(slotData.timeSlot);
-  if (newRange && cachedCurrentTimetableSlots && cachedCurrentTimetableSlots.length > 0) {
-    const overlapping = cachedCurrentTimetableSlots.find(s => {
-      if (slotId && String(s._id) === String(slotId)) return false;
-      const existingDays = Array.isArray(s.days) && s.days.length > 0
-        ? s.days
-        : (s.day || '').split(',').map(x => x.trim()).filter(Boolean);
-      const daysOverlap = daysArr.some(d =>
-        d === 'All Days' || existingDays.includes('All Days') || existingDays.includes(d)
-      );
-      if (!daysOverlap) return false;
-
+  if (newRange) {
+    let allSlotsForCheck = cachedCurrentTimetableSlots || [];
+    try {
+      const allRes = await API.getTimetable('', '', '');
+      allSlotsForCheck = (allRes && allRes.data) ? allRes.data : (Array.isArray(allRes) ? allRes : allSlotsForCheck);
+    } catch(_) {}
+    const myEmail = ((currentUser && currentUser.email) || timetableViewTeacherEmail || '').trim().toLowerCase();
+    let selfConflictSlot = null;
+    let classConflictSlot = null;
+    for (const s of allSlotsForCheck) {
+      if (slotId && String(s._id) === String(slotId)) continue;
       const existRange = _parseSlotTimeRange(s.timeSlot || s.time);
-      if (!existRange) return false;
-
-      return (newRange.startMin < existRange.endMin && existRange.startMin < newRange.endMin);
-    });
-
-    if (overlapping) {
-      const proceed = confirm(
-        `⚠️ Schedule Conflict Warning!\n\nThis slot overlaps with an existing class:\n` +
-        `• Subject: ${overlapping.subject} (${overlapping.class})\n` +
-        `• Time: ${overlapping.timeSlot || overlapping.time}\n` +
-        `• Day(s): ${overlapping.day || (overlapping.days || []).join(', ')}\n\n` +
-        `Do you still want to save this slot?`
+      if (!existRange) continue;
+      const timeOverlap = newRange.startMin < existRange.endMin && existRange.startMin < newRange.endMin;
+      if (!timeOverlap) continue;
+      const existDays = Array.isArray(s.days) && s.days.length > 0
+        ? s.days : (s.day || '').split(',').map(x => x.trim()).filter(Boolean);
+      const dayOverlap = daysArr.some(d =>
+        d === 'All Days' || existDays.includes('All Days') || existDays.includes(d)
       );
-      if (!proceed) return;
+      if (!dayOverlap) continue;
+      const ownerEmail = (s.teacherEmail || '').trim().toLowerCase();
+      if (ownerEmail === myEmail) { selfConflictSlot = s; break; }
+      if (!classConflictSlot && isClassEqual(s.class, slotData.class)) { classConflictSlot = s; }
+    }
+    const conflictSlot = selfConflictSlot || classConflictSlot;
+    if (conflictSlot) {
+      const conflictType = selfConflictSlot ? 'self' : 'other';
+      const btn0 = e.target.querySelector('button[type="submit"]');
+      const saveAction = async () => {
+        const btn2 = document.getElementById('timetable-slot-modal') ? document.getElementById('timetable-slot-modal').querySelector('button[type="submit"]') : null;
+        if (btn2) { btn2.disabled = true; btn2.textContent = 'Saving...'; }
+        try {
+          if (slotId) { await API.updateTimetableSlot(slotId, slotData); showToast('Timetable slot updated!'); }
+          else { await API.createTimetableSlot(slotData); showToast('Timetable slot added!'); }
+          closeAddTimetableSlotModal();
+          if (currentTimetableDay !== 'all' && !daysArr.includes(currentTimetableDay) && !daysArr.includes('All Days')) {
+            currentTimetableDay = daysArr[0] || 'all'; _updateTimetableDayTabs();
+          }
+          await renderTimetableSlots();
+          checkAndTriggerTimetableNotifications();
+        } catch (err2) { showToast('Failed to save slot: ' + err2.message, true); }
+        finally { if (btn2) { btn2.disabled = false; btn2.textContent = slotId ? 'Save Changes' : 'Save Slot'; } }
+      };
+      showTimetableConflictModal(conflictType, conflictSlot, saveAction);
+      return;
     }
   }
 
@@ -7084,6 +7104,71 @@ let cachedCurrentTimetableSlots = [];
 let draggedTimetableSlotId = null;
 
 // Parse a slot time range like "09:00 AM - 10:00 AM" into start and end minute numbers
+// ---- TIMETABLE CONFLICT MODAL ----
+function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
+  const modal = document.getElementById('modal-timetable-conflict');
+  if (!modal) { if (onConfirm) onConfirm(); return; }
+  const badge = document.getElementById('conflict-modal-type-badge');
+  const title = document.getElementById('conflict-modal-title');
+  const desc = document.getElementById('conflict-modal-desc');
+  const details = document.getElementById('conflict-modal-details');
+  const saveBtn = document.getElementById('conflict-modal-save-btn');
+  const cancelBtn = document.getElementById('conflict-modal-cancel-btn');
+
+  if (conflictType === 'self') {
+    if (badge) badge.textContent = '⚠️ Your Own Conflict';
+    if (title) title.textContent = 'You Already Have a Class!';
+    if (desc) desc.textContent = 'You already have a slot scheduled at this time:';
+  } else {
+    if (badge) badge.textContent = '⚠️ Class Conflict';
+    if (title) title.textContent = 'Slot Overlap Detected!';
+    if (desc) desc.textContent = 'This slot overlaps with an existing class in this room/class:';
+  }
+
+  // Find teacher name from teachersList if available
+  const ownerEmail = (conflictSlot.teacherEmail || '').trim();
+  let teacherName = ownerEmail;
+  if (window.teachersList && teachersList.length > 0) {
+    const found = teachersList.find(t => (t.email || '').toLowerCase() === ownerEmail.toLowerCase());
+    if (found) teacherName = found.name || found.email || ownerEmail;
+  }
+
+  const slotDays = Array.isArray(conflictSlot.days) && conflictSlot.days.length > 0
+    ? conflictSlot.days.join(', ')
+    : (conflictSlot.day || '—');
+
+  if (details) {
+    details.innerHTML =
+      '<div class="flex items-center gap-2"><span class="text-cyan-300 font-bold w-16 shrink-0">Subject</span><span class="text-white font-semibold">' + escapeHtml(conflictSlot.subject || '—') + '</span></div>' +
+      '<div class="flex items-center gap-2"><span class="text-cyan-300 font-bold w-16 shrink-0">Teacher</span><span class="text-white font-semibold">' + escapeHtml(teacherName) + '</span></div>' +
+      '<div class="flex items-center gap-2"><span class="text-cyan-300 font-bold w-16 shrink-0">Class</span><span class="text-white font-semibold">' + escapeHtml(conflictSlot.class || '—') + '</span></div>' +
+      '<div class="flex items-center gap-2"><span class="text-cyan-300 font-bold w-16 shrink-0">Time</span><span class="text-white font-semibold">' + escapeHtml(conflictSlot.timeSlot || conflictSlot.time || '—') + '</span></div>' +
+      '<div class="flex items-center gap-2"><span class="text-cyan-300 font-bold w-16 shrink-0">Days</span><span class="text-white font-semibold">' + escapeHtml(slotDays) + '</span></div>';
+  }
+
+  // Wire buttons
+  const newSaveBtn = saveBtn.cloneNode(true);
+  saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+  const newCancelBtn = cancelBtn.cloneNode(true);
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+  document.getElementById('conflict-modal-save-btn').addEventListener('click', function() {
+    closeTimetableConflictModal();
+    if (onConfirm) onConfirm();
+  });
+  document.getElementById('conflict-modal-cancel-btn').addEventListener('click', function() {
+    closeTimetableConflictModal();
+  });
+
+  modal.classList.remove('hidden');
+  if (window.triggerNavHaptic) triggerNavHaptic('warning');
+}
+
+function closeTimetableConflictModal() {
+  const modal = document.getElementById('modal-timetable-conflict');
+  if (modal) modal.classList.add('hidden');
+}
+
 function _parseSlotTimeRange(timeStr) {
   if (!timeStr) return null;
   const parts = String(timeStr).split(/[-–—to]/i).map(p => p.trim()).filter(Boolean);
