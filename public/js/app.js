@@ -3207,7 +3207,9 @@ async function handleSaveProfile(event) {
 
       if (res && res.success) {
         showToast(res.message || `Teacher "${name}" updated!`);
-        await loadTeachersData();
+        try {
+          await Promise.all([loadClasses(), loadTeachersData(), loadSubjects()]);
+        } catch (_) {}
         await renderTeachersList();
         selectTab('teachers');
       } else {
@@ -3234,7 +3236,7 @@ async function handleSaveProfile(event) {
 
         updateUserUI();
         updateHeaderAvatar();
-        renderDashboardGreetings();
+        updateWelcomeGreeting();
 
         editProfileInitialState = {
           name: (currentUser.name || '').trim(),
@@ -4802,6 +4804,11 @@ function updateWelcomeGreeting() {
   const formattedDate = now.toLocaleDateString(undefined, dateOpts);
   if (dateBadgeEl) dateBadgeEl.textContent = `Live Sync • ${formattedDate}`;
   if (qaDateEl) qaDateEl.textContent = formattedDate;
+}
+
+// Alias for backwards compatibility
+function renderDashboardGreetings() {
+  updateWelcomeGreeting();
 }
 
 function populateQuickAttendanceDropdowns() {
