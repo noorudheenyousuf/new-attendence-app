@@ -56,12 +56,8 @@ const attendanceSchema = new mongoose.Schema({
     default: '',
     trim: true,
     lowercase: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
   }
-});
+}, { timestamps: true });
 
 // Compound index including ownerEmail so private workspace sessions don't collide with main institution sessions
 attendanceSchema.index({ date: 1, class: 1, subject: 1, ownerEmail: 1 });

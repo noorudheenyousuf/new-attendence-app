@@ -2442,9 +2442,9 @@ async function saveAttendance() {
       showToast('Attendance saved & updated successfully!');
       const saveBtnText = document.getElementById('btn-save-attendance-text');
       if (saveBtnText) saveBtnText.innerText = 'Update Attendance';
+      updateProfileDashboardKPIs();
       await loadActivityLogs();
       await loadReport();
-      updateProfileDashboardKPIs();
     }
   } catch (error) {
     showToast(error.message, true);
@@ -2465,10 +2465,10 @@ async function deleteCurrentAttendance() {
     });
     if (res.success) {
       showToast('Attendance record deleted!');
+      updateProfileDashboardKPIs();
       await loadAttendanceRoster();
       await loadActivityLogs();
       await loadReport();
-      updateProfileDashboardKPIs();
     }
   } catch (error) {
     showToast(error.message || 'Error deleting attendance', true);
@@ -4281,10 +4281,10 @@ async function updateProfileDashboardKPIs() {
 
   // 2. Count attendance marked today from live Attendance documents
   try {
-    const now = new Date();
-    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayDateStr = formatLocalDate(new Date());
     const attRes = await API.getAttendance(todayDateStr);
-    const todayAttendances = (attRes && attRes.data) ? attRes.data : (Array.isArray(attRes) ? attRes : []);
+    const rawList = (attRes && attRes.data !== undefined) ? attRes.data : attRes;
+    const todayAttendances = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
 
     let myAttendances = todayAttendances;
     if (!isAdmin) {
@@ -4292,9 +4292,13 @@ async function updateProfileDashboardKPIs() {
         const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
         const markedName = (att.markedBy || '').toLowerCase().trim();
         // Primary: email match (most reliable)
-        if (markedEmail && myEmail && markedEmail === myEmail) return true;
+        if (markedEmail && myEmail) {
+          return markedEmail === myEmail;
+        }
         // Fallback: name match (for old records without markedByEmail)
-        if (markedName && myName && markedName === myName) return true;
+        if (markedName && myName) {
+          return markedName === myName || markedName.includes(myName) || myName.includes(markedName);
+        }
         return false;
       });
     }
@@ -8726,14 +8730,14 @@ async function openTodayMarkedModal() {
   listEl.innerHTML = '<div class="p-8 text-center text-xs text-cyan-200 flex flex-col items-center justify-center gap-2.5"><div class="w-6 h-6 rounded-full border-2 border-emerald-300 border-t-transparent animate-spin"></div><span>Loading marked attendance sessions...</span></div>';
 
   try {
-    const now = new Date();
-    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayDateStr = formatLocalDate(new Date());
     const myEmail = (currentUser?.email || '').trim().toLowerCase();
     const myName = (currentUser?.name || '').trim().toLowerCase();
     const isAdmin = currentUser?.role === 'admin';
 
     const attRes = await API.getAttendance(todayDateStr);
-    const todayAttendances = (attRes && attRes.data) ? attRes.data : (Array.isArray(attRes) ? attRes : []);
+    const rawList = (attRes && attRes.data !== undefined) ? attRes.data : attRes;
+    const todayAttendances = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
 
     let myAttendances = todayAttendances;
     if (!isAdmin) {
@@ -8741,9 +8745,13 @@ async function openTodayMarkedModal() {
         const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
         const markedName = (att.markedBy || '').toLowerCase().trim();
         // Primary: email match (most reliable)
-        if (markedEmail && myEmail && markedEmail === myEmail) return true;
+        if (markedEmail && myEmail) {
+          return markedEmail === myEmail;
+        }
         // Fallback: name match (for old records without markedByEmail)
-        if (markedName && myName && markedName === myName) return true;
+        if (markedName && myName) {
+          return markedName === myName || markedName.includes(myName) || myName.includes(markedName);
+        }
         return false;
       });
     }

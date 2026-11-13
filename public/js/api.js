@@ -205,9 +205,17 @@ const API = {
   },
 
   // Attendance
-  async getAttendance(date, className, subject = 'all') {
-    const params = new URLSearchParams({ date, class: className, subject });
-    return this.request(`/attendance?${params.toString()}`);
+  async getAttendance(date, className, subject) {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (className && className !== 'undefined' && className !== 'null') {
+      params.append('class', className);
+    }
+    if (subject && subject !== 'undefined' && subject !== 'null') {
+      params.append('subject', subject);
+    }
+    const query = params.toString();
+    return this.request(`/attendance${query ? `?${query}` : ''}`);
   },
 
   async saveAttendance(data) {

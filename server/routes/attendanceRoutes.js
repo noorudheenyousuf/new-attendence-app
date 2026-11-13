@@ -16,10 +16,11 @@ router.get('/', optionalAuth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Date is required' });
     }
 
+    const cleanClassName = (typeof className === 'string' && className !== 'undefined' && className !== 'null') ? className.trim() : '';
     const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
 
     // If className is not provided, return all attendance records for date (used for Live Campus Overview)
-    if (!className) {
+    if (!cleanClassName) {
       let query = { date };
       if (scope === 'public') {
         query.isPrivate = { $ne: true };
@@ -32,17 +33,17 @@ router.get('/', optionalAuth, async (req, res) => {
       return res.json({ success: true, data: records });
     }
 
-    const targetSubject = subject || 'all';
+    const targetSubject = (subject && subject !== 'undefined' && subject !== 'null') ? subject.trim() : 'all';
 
     // Check if this class is private
     const classDoc = await Class.findOne({
-      name: caseInsensitiveRegex(className),
+      name: caseInsensitiveRegex(cleanClassName),
       ...(userEmail ? { $or: [{ isPrivate: { $ne: true } }, { isPrivate: true, ownerEmail: userEmail }] } : { isPrivate: { $ne: true } })
     });
 
     let query = {
       date,
-      class: caseInsensitiveRegex(className),
+      class: caseInsensitiveRegex(cleanClassName),
       subject: caseInsensitiveRegex(targetSubject)
     };
 
