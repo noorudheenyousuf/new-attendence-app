@@ -195,7 +195,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // @route   PUT /api/subjects/:id
-// @desc    Edit subject details
+// @desc    Edit subject details — fixes all siblings (same name) atomically
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { name, subjectCode, teacher, assignedClasses } = req.body;
@@ -210,104 +210,117 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied to this private subject' });
     }
 
-    const classesArray = Array.isArray(assignedClasses)
-      ? assignedClasses.map(c => String(c).trim()).filter(Boolean)
-      : (assignedClasses ? assignedClasses.split(',').map(s => s.trim()).filter(Boolean) : oldSubject.assignedClasses);
-
-    const updatedName = name ? name.trim() : oldSubject.name;
-    const updatedCode = subjectCode ? subjectCode.trim() : oldSubject.subjectCode;
+    const updatedName    = name        ? name.trim()        : oldSubject.name;
+    const updatedCode    = subjectCode ? subjectCode.trim()  : oldSubject.subjectCode;
     const updatedTeacher = teacher !== undefined ? teacher.trim() : oldSubject.teacher;
 
-    if (classesArray.length > 1) {
-      const firstClass = classesArray[0];
-      const otherClasses = classesArray.slice(1);
+    // New class list requested (may be empty = unassigned)
+    const newClasses = Array.isArray(assignedClasses)
+      ? assignedClasses.map(c => String(c).trim()).filter(Boolean)
+      : (assignedClasses
+          ? assignedClasses.split(',').map(s => s.trim()).filter(Boolean)
+          : oldSubject.assignedClasses || []);
 
-      const updated = await Subject.findByIdAndUpdate(
-        req.params.id,
-        {
+    // --- Find ALL sibling docs (same name, same privacy scope) ---
+    const siblingQuery = oldSubject.isPrivate
+      ? { name: caseInsensitiveRegex(oldSubject.name), isPrivate: true, ownerEmail: oldSubject.ownerEmail }
+      : { name: caseInsensitiveRegex(oldSubject.name), $or: [{ isPrivate: false }, { isPrivate: { $exists: false } }] };
+    const allSiblings = await Subject.find(siblingQuery);
+    const existingClasses = allSiblings.flatMap(s => s.assignedClasses || []);
+
+    // Classes to remove (were assigned before, not in new list)
+    const toRemove = existingClasses.filter(c => !newClasses.some(nc => nc.toLowerCase() === c.toLowerCase()));
+    // Classes to add (in new list but no sibling doc yet)
+    const toAdd = newClasses.filter(nc => !existingClasses.some(ec => ec.toLowerCase() === nc.toLowerCase()));
+
+    // 1. Delete sibling docs for removed classes & pull from Class.assignedSubjects
+    for (const cls of toRemove) {
+      const delQuery = oldSubject.isPrivate
+        ? { name: caseInsensitiveRegex(oldSubject.name), assignedClasses: cls, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
+        : { name: caseInsensitiveRegex(oldSubject.name), assignedClasses: cls, $or: [{ isPrivate: false }, { isPrivate: { $exists: false } }] };
+      await Subject.deleteMany(delQuery);
+      // Remove from Class.assignedSubjects only if no other sibling covers this class
+      const stillExists = await Subject.findOne({ ...delQuery });
+      if (!stillExists) {
+        const classQ = oldSubject.isPrivate
+          ? { name: cls, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
+          : { name: cls };
+        await Class.updateOne(classQ, { $pull: { assignedSubjects: oldSubject.name } });
+        // Also pull updated name in case it changed
+        if (updatedName !== oldSubject.name) {
+          await Class.updateOne(classQ, { $pull: { assignedSubjects: updatedName } });
+        }
+      }
+    }
+
+    // 2. Update ALL remaining sibling docs with new name/code/teacher
+    await Subject.updateMany(
+      siblingQuery,
+      { name: updatedName, subjectCode: updatedCode, teacher: updatedTeacher }
+    );
+
+    // Also update Class.assignedSubjects if name changed
+    if (updatedName !== oldSubject.name) {
+      for (const cls of existingClasses.filter(c => !toRemove.includes(c))) {
+        const classQ = oldSubject.isPrivate
+          ? { name: cls, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
+          : { name: cls };
+        await Class.updateOne(classQ, {
+          $pull: { assignedSubjects: oldSubject.name }
+        });
+        await Class.updateOne(classQ, {
+          $addToSet: { assignedSubjects: updatedName }
+        });
+      }
+    }
+
+    // 3. Create new sibling docs for newly added classes
+    for (const cls of toAdd) {
+      const existsCheck = oldSubject.isPrivate
+        ? { name: updatedName, assignedClasses: cls, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
+        : { name: updatedName, assignedClasses: cls, $or: [{ isPrivate: false }, { isPrivate: { $exists: false } }] };
+      const alreadyExists = await Subject.findOne(existsCheck);
+      if (!alreadyExists) {
+        await Subject.create({
           name: updatedName,
           subjectCode: updatedCode,
           teacher: updatedTeacher,
-          assignedClasses: [firstClass]
-        },
-        { new: true }
-      );
-      const classQueryFirst = oldSubject.isPrivate
-        ? { name: firstClass, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
-        : { name: firstClass };
-      await Class.updateOne(classQueryFirst, { $addToSet: { assignedSubjects: updatedName } });
-
-      for (const cls of otherClasses) {
-        const query = oldSubject.isPrivate
-          ? { name: updatedName, assignedClasses: cls, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
-          : { name: updatedName, assignedClasses: cls, isPrivate: { $ne: true } };
-        const existing = await Subject.findOne(query);
-        if (!existing) {
-          await Subject.create({
-            name: updatedName,
-            subjectCode: updatedCode,
-            teacher: updatedTeacher,
-            assignedClasses: [cls],
-            isPrivate: Boolean(oldSubject.isPrivate),
-            ownerEmail: oldSubject.isPrivate ? oldSubject.ownerEmail : '',
-            ownerId: oldSubject.isPrivate ? oldSubject.ownerId : null,
-            ownerName: oldSubject.isPrivate ? oldSubject.ownerName : ''
-          });
-        }
-        const classQueryOther = oldSubject.isPrivate
-          ? { name: cls, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
-          : { name: cls };
-        await Class.updateOne(classQueryOther, { $addToSet: { assignedSubjects: updatedName } });
+          assignedClasses: [cls],
+          isPrivate: Boolean(oldSubject.isPrivate),
+          ownerEmail: oldSubject.isPrivate ? oldSubject.ownerEmail : '',
+          ownerId: oldSubject.isPrivate ? oldSubject.ownerId : null,
+          ownerName: oldSubject.isPrivate ? oldSubject.ownerName : ''
+        });
       }
+      const classQ = oldSubject.isPrivate
+        ? { name: cls, isPrivate: true, ownerEmail: oldSubject.ownerEmail }
+        : { name: cls };
+      await Class.updateOne(classQ, { $addToSet: { assignedSubjects: updatedName } });
+    }
 
-      await ActivityLog.create({
-        action: `${oldSubject.isPrivate ? 'Private Subject Updated' : 'Subject Updated'}: ${updated.name}`,
-        details: `Code: ${updated.subjectCode} • Classes: ${classesArray.join(', ')}`,
-        performedBy: req.user ? req.user.name : 'Teacher',
-        role: req.user ? req.user.role : 'teacher',
-        entityType: 'subject',
-        entityId: updated._id.toString(),
-        canUndo: true,
-        previousState: oldSubject.toObject(),
-        isPrivate: Boolean(oldSubject.isPrivate),
-        ownerEmail: oldSubject.isPrivate ? oldSubject.ownerEmail : ''
+    // 4. If nothing left (unassigned), update this one doc with empty assignedClasses
+    if (newClasses.length === 0) {
+      await Subject.findByIdAndUpdate(req.params.id, {
+        name: updatedName, subjectCode: updatedCode, teacher: updatedTeacher, assignedClasses: []
       });
-
-      return res.json({ success: true, data: updated });
     }
 
-    const updated = await Subject.findByIdAndUpdate(
-      req.params.id,
-      {
-        name: updatedName,
-        subjectCode: updatedCode,
-        teacher: updatedTeacher,
-        assignedClasses: classesArray
-      },
-      { new: true }
-    );
-
-    if (classesArray.length === 1) {
-      const classQuerySingle = oldSubject.isPrivate
-        ? { name: classesArray[0], isPrivate: true, ownerEmail: oldSubject.ownerEmail }
-        : { name: classesArray[0] };
-      await Class.updateOne(classQuerySingle, { $addToSet: { assignedSubjects: updatedName } });
-    }
+    const finalDoc = await Subject.findById(req.params.id);
 
     await ActivityLog.create({
-      action: `${oldSubject.isPrivate ? 'Private Subject Updated' : 'Subject Updated'}: ${updated.name}`,
-      details: `Code: ${updated.subjectCode}${classesArray.length ? ` • Classes: ${classesArray.join(', ')}` : ''}`,
+      action: `${oldSubject.isPrivate ? 'Private Subject Updated' : 'Subject Updated'}: ${updatedName}`,
+      details: `Code: ${updatedCode}${newClasses.length ? ` • Classes: ${newClasses.join(', ')}` : ' • Unassigned'}`,
       performedBy: req.user ? req.user.name : 'Teacher',
       role: req.user ? req.user.role : 'teacher',
       entityType: 'subject',
-      entityId: updated._id.toString(),
+      entityId: req.params.id,
       canUndo: true,
       previousState: oldSubject.toObject(),
       isPrivate: Boolean(oldSubject.isPrivate),
       ownerEmail: oldSubject.isPrivate ? oldSubject.ownerEmail : ''
     });
 
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: finalDoc });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

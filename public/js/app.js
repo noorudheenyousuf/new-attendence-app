@@ -1855,6 +1855,8 @@ async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
   document.getElementById('input-sub-code').value = '';
   await populateTeacherDropdowns('input-sub-teacher', '');
+  // Render class checkboxes — public (main) classes only
+  renderTeacherClassCheckboxes('add-sub-class-checkboxes', []);
   document.getElementById('modal-add-subject').classList.remove('hidden');
 }
 
@@ -1868,13 +1870,15 @@ async function handleSaveSubject(e) {
   const subjectCode = document.getElementById('input-sub-code').value.trim();
   const teacherEl = document.getElementById('input-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
+  const assignedClasses = getSelectedTeacherCheckboxes('add-sub-class-checkboxes');
 
   try {
-    const res = await API.addSubject({ name, subjectCode, teacher });
+    const res = await API.addSubject({ name, subjectCode, teacher, assignedClasses });
     if (res.success) {
       showToast(`Subject "${name}" added!`);
       closeSubjectModal();
-      await loadSubjects();
+      // Reload both — class.assignedSubjects is updated on the backend
+      await Promise.all([loadSubjects(), loadClasses()]);
     }
   } catch (error) {
     showToast(error.message, true);
@@ -1882,17 +1886,29 @@ async function handleSaveSubject(e) {
 }
 
 let activeEditSubjectId = null;
+let activeEditSubjectName = null; // track original name so backend can find all siblings
 async function openEditSubjectModal(id, name, code, teacher) {
   activeEditSubjectId = id;
+  activeEditSubjectName = name; // store original name
   document.getElementById('edit-sub-name').value = name;
   document.getElementById('edit-sub-code').value = code || '';
   await populateTeacherDropdowns('edit-sub-teacher', teacher || '');
+
+  // Pre-check ALL classes this subject family is currently assigned to.
+  // A subject named "Maths" may exist as multiple sibling docs (one per class).
+  // We collect assignedClasses from ALL sibling docs with the same name.
+  const siblingClasses = (subjectsList || [])
+    .filter(s => s.name.trim().toLowerCase() === name.trim().toLowerCase() && !s.isPrivate)
+    .flatMap(s => s.assignedClasses || []);
+  renderTeacherClassCheckboxes('edit-sub-class-checkboxes', siblingClasses);
+
   document.getElementById('modal-edit-subject').classList.remove('hidden');
 }
 
 function closeEditSubjectModal() {
   document.getElementById('modal-edit-subject').classList.add('hidden');
   activeEditSubjectId = null;
+  activeEditSubjectName = null;
 }
 
 async function handleUpdateSubject(e) {
@@ -1903,13 +1919,15 @@ async function handleUpdateSubject(e) {
   const subjectCode = document.getElementById('edit-sub-code').value.trim();
   const teacherEl = document.getElementById('edit-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
+  const assignedClasses = getSelectedTeacherCheckboxes('edit-sub-class-checkboxes');
 
   try {
-    const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher });
+    const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher, assignedClasses });
     if (res.success) {
       showToast(`Subject "${name}" updated!`);
       closeEditSubjectModal();
-      await loadSubjects();
+      // Reload both subjects AND classes — class.assignedSubjects may have changed
+      await Promise.all([loadSubjects(), loadClasses()]);
     }
   } catch (error) {
     showToast(error.message, true);
