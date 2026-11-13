@@ -1184,7 +1184,7 @@ async function renderClassesList() {
             </svg>
           </div>
           <div class="min-w-0">
-            <h3 class="font-black text-white text-sm sm:text-base leading-tight truncate select-none tracking-tight">${escapeHtml(c.name)}</h3>
+            <h3 class="font-black text-white text-sm sm:text-base leading-tight truncate select-none tracking-tight">${c.isPrivate ? '<svg style=\"display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>' : ''}${escapeHtml(c.name)}</h3>
             <div class="text-[11px] font-semibold text-teal-200 dark:text-teal-300 flex items-center gap-1.5 mt-0.5 truncate select-none">
               <svg class="w-3.5 h-3.5 opacity-90 flex-shrink-0 text-teal-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-white/60 font-normal italic">No Teacher Assigned</span>'}</span>
@@ -1727,7 +1727,7 @@ function _generateSubjectCardHtml(s, index, categoryContext = '') {
       </div>
       <div>
         <div class="flex items-center gap-2">
-          <h3 class="font-bold text-[var(--text-main)] text-sm select-none">${escapeHtml(s.name)}</h3>
+          <h3 class="font-bold text-[var(--text-main)] text-sm select-none">${s.isPrivate ? '<svg style="display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' : ''}${escapeHtml(s.name)}</h3>
           <span class="text-[10px] font-black px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70] dark:bg-cyan-400/10 dark:text-cyan-400 select-none">${escapeHtml(s.subjectCode)}</span>
         </div>
         ${s.teacher ? `<p class="text-xs text-[var(--text-sub)] mt-0.5 select-none">Teacher: ${escapeHtml(s.teacher)}</p>` : ''}
@@ -2499,7 +2499,7 @@ async function renderStudentsDirectory() {
             <img src="${st.photoUrl || DEFAULT_AVATAR}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm">
             <div class="truncate">
               <div class="flex items-center gap-1.5">
-                <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.name}</span>
+                <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.isPrivate ? '<svg style="display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' : ''}${st.name}</span>
                 <span class="text-[10px] font-black bg-[#245b70]/10 text-[#245b70] px-1.5 py-0.2 rounded flex-shrink-0">ID: ${st.studentId}</span>
               </div>
               <p class="text-xs text-[var(--text-sub)] truncate">${st.class} · Roll: ${st.roll}</p>
@@ -4311,7 +4311,7 @@ function selectTab(tab) {
     previousAppTab = currentActiveTab;
     currentActiveTab = tab;
   }
-  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages'];
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace'];
   allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -4319,6 +4319,11 @@ function selectTab(tab) {
 
   const activeEl = document.getElementById(`view-${tab}`);
   if (activeEl) activeEl.classList.remove('hidden');
+
+  // Revert pink theme when leaving workspace
+  if (tab !== 'workspace' && typeof revertPinkTheme === 'function' && typeof pwActive !== 'undefined' && pwActive) {
+    revertPinkTheme();
+  }
 
   // Update 4 bottom navigation tabs: home, attendance, report, settings
   const mainTabs = ['home', 'attendance', 'report', 'settings'];
@@ -4561,7 +4566,8 @@ async function loadDashboardStats() {
     const clEl = document.getElementById('dash-stat-classes');
     const clMarkedEl = document.getElementById('dash-stat-classes-marked');
 
-    const totalClasses = (classesList || []).length;
+    // Campus Overview: public classes only
+    const totalClasses = (classesList || []).filter(c => !c.isPrivate).length;
     if (clEl) clEl.textContent = String(totalClasses);
     
     // Total Teachers
@@ -4578,12 +4584,14 @@ async function loadDashboardStats() {
     if (tcEl) tcEl.textContent = String(teacherCount);
     if (tcActEl) tcActEl.textContent = '100% Active';
 
-    // Total Students from API
+    // Total Students from API — CAMPUS OVERVIEW: public only (exclude private workspace)
     let totalStudents = 0;
     try {
       const res = await API.getStudents('all');
       const studentData = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-      totalStudents = studentData.length;
+      // Only count public (non-private) students in campus overview
+      const publicStudents = studentData.filter(s => !s.isPrivate);
+      totalStudents = publicStudents.length;
       if (stEl) stEl.textContent = String(totalStudents);
     } catch (_) {}
 
@@ -6343,15 +6351,15 @@ async function checkUnreadMessages() {
         const readBy = (m.readBy || []).map(id => String(id));
         return !readBy.includes(String(myId));
       }).length;
-    const badge = document.getElementById('unread-msg-badge');
-    if (badge) {
-      badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
-      if (unreadCount > 0) {
-        badge.classList.remove('hidden');
-        badge.style.display = 'flex';
-      } else {
-        badge.classList.add('hidden');
-        badge.style.display = '';
+    // Update header notification bell badge (badge moved from messages card to header bell)
+    if (typeof updateNotifBadge === 'function') {
+      updateNotifBadge(unreadCount);
+    } else {
+      const badge = document.getElementById('header-unread-msg-badge');
+      if (badge) {
+        badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+        if (unreadCount > 0) { badge.classList.remove('hidden'); badge.style.display = 'flex'; }
+        else { badge.classList.add('hidden'); badge.style.display = ''; }
       }
     }
   } catch (err) {
@@ -6365,8 +6373,12 @@ async function openMessagesModal() {
   if (mainViewport) mainViewport.scrollTop = 0;
   await loadMessages();
   try { await API.markMessagesRead(); } catch(_) {}
-  const badge = document.getElementById('unread-msg-badge');
-  if (badge) { badge.classList.add('hidden'); badge.style.display = ''; }
+  // Clear header notification bell badge on opening messages
+  if (typeof updateNotifBadge === 'function') { updateNotifBadge(0); }
+  else {
+    const badge = document.getElementById('header-unread-msg-badge');
+    if (badge) { badge.classList.add('hidden'); badge.style.display = ''; }
+  }
 }
 
 function closeMessagesModal() {

@@ -10,10 +10,19 @@ const AppSettings = require('../models/AppSettings');
 const authMiddleware = require('../middleware/auth');
 
 // @route   GET /api/logs
-// @desc    Get activity logs (includes counts of present, absent, late)
+// @desc    Get activity logs
+//   - Teachers: get only non-private logs (private workspace logs hidden)
+//   - Admin: gets ALL logs including private ones
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const logs = await ActivityLog.find().sort({ createdAt: -1 }).limit(50);
+    const isAdmin = req.user && req.user.role === 'admin';
+    let query = {};
+    if (!isAdmin) {
+      // For non-admin teachers: only show non-private logs
+      query.isPrivate = { $ne: true };
+    }
+    // Admin gets all logs
+    const logs = await ActivityLog.find(query).sort({ createdAt: -1 }).limit(100);
     res.json({ success: true, data: logs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -27,14 +36,22 @@ router.post('/:id/undo', authMiddleware, async (req, res) => {
     const settings = await AppSettings.findOne();
     const isAdmin = req.user && req.user.role === 'admin';
     const allowNonAdmin = settings && settings.allowNonAdminEditDelete;
-
-    if (!isAdmin && !allowNonAdmin) {
-      return res.status(403).json({ success: false, message: 'Access denied: Admin privileges required to undo activity logs' });
-    }
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
 
     const log = await ActivityLog.findById(req.params.id);
     if (!log) {
       return res.status(404).json({ success: false, message: 'Log entry not found' });
+    }
+
+    // Private workspace log: only owner or admin can undo
+    if (log.isPrivate) {
+      if (!isAdmin && log.ownerEmail !== userEmail) {
+        return res.status(403).json({ success: false, message: 'Access denied: This private log does not belong to you' });
+      }
+    } else {
+      if (!isAdmin && !allowNonAdmin) {
+        return res.status(403).json({ success: false, message: 'Access denied: Admin privileges required to undo activity logs' });
+      }
     }
 
     if (log.isUndone) {
@@ -73,7 +90,6 @@ router.post('/:id/undo', authMiddleware, async (req, res) => {
           );
         }
       } else if (hasValidEntityId) {
-        // Attendance was created fresh; undo deletes the created record
         await Attendance.findByIdAndDelete(log.entityId);
       }
     } else if (log.entityType === 'student') {
@@ -84,7 +100,6 @@ router.post('/:id/undo', authMiddleware, async (req, res) => {
           if (existing) {
             await Student.findByIdAndUpdate(log.entityId, { $set: cleaned });
           } else {
-            // Re-create deleted student
             await Student.create({ ...cleaned, _id: log.entityId });
           }
         } else if (log.previousState.studentId) {
@@ -95,7 +110,6 @@ router.post('/:id/undo', authMiddleware, async (req, res) => {
           );
         }
       } else if (hasValidEntityId) {
-        // Student was enrolled fresh; undo deletes the created student
         await Student.findByIdAndDelete(log.entityId);
       }
     } else if (log.entityType === 'subject') {
@@ -111,7 +125,6 @@ router.post('/:id/undo', authMiddleware, async (req, res) => {
         } else {
           await Subject.create(cleaned);
         }
-        // Re-add to assigned classes if applicable
         if (Array.isArray(cleaned.assignedClasses) && cleaned.name) {
           for (const cls of cleaned.assignedClasses) {
             await Class.updateOne({ name: cls }, { $addToSet: { assignedSubjects: cleaned.name } });

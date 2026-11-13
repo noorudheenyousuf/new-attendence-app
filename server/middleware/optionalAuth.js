@@ -18,11 +18,10 @@ const optionalAuth = async (req, res, next) => {
         req.user = user;
       }
     }
-    next();
-  } catch (error) {
-    // Continue as guest if token is invalid or expired
-    next();
+  } catch (_) {
+    // Silently continue without authenticated user
   }
+  next();
 };
 
 module.exports = optionalAuth;

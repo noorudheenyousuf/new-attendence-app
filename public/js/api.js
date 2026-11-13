@@ -505,5 +505,53 @@ const API = {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword })
     });
+  },
+
+  // ===================== PERSONAL WORKSPACE (Private Corner) API =====================
+
+  async getPrivateClasses() {
+    return this.request('/classes?scope=private');
+  },
+
+  async addPrivateClass(name, classTeacher, assignedSubjects = []) {
+    return this.request('/classes', {
+      method: 'POST',
+      body: JSON.stringify({ name, classTeacher, assignedSubjects, isPrivate: true })
+    });
+  },
+
+  async getPrivateSubjects() {
+    return this.request('/subjects?scope=private');
+  },
+
+  async addPrivateSubject(data) {
+    return this.request('/subjects', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, isPrivate: true })
+    });
+  },
+
+  async getPrivateStudents(classFilter = 'all', search = '') {
+    const params = new URLSearchParams({ scope: 'private' });
+    if (classFilter && classFilter !== 'all') params.append('class', classFilter);
+    if (search) params.append('search', search);
+    return this.request(`/students?${params.toString()}`);
+  },
+
+  async getPublicStudents(classFilter = 'all') {
+    const params = new URLSearchParams({ scope: 'public' });
+    if (classFilter && classFilter !== 'all') params.append('class', classFilter);
+    return this.request(`/students?${params.toString()}`);
+  },
+
+  async getNextPrivateStudentId() {
+    return this.request('/students/next-id?scope=private');
+  },
+
+  async addPrivateStudent(data) {
+    return this.request('/students', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, isPrivate: true })
+    });
   }
 };

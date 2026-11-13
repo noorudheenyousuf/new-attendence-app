@@ -832,3 +832,67 @@ input:checked + .switch-slider:before {
   }
 }
 
+
+/* ============================================================
+   PERSONAL WORKSPACE — Full Pink Theme
+   ============================================================ */
+:root.workspace-pink-mode {
+  --primary-color: #be185d;
+  --secondary-teal: #e879a0;
+  --header-gradient: linear-gradient(135deg, #be185d, #e879a0);
+  --bg-page: #fdf2f8;
+  --card-bg: #ffffff;
+  --text-main: #831843;
+  --text-sub: #9d174d;
+  --border-color: #fbcfe8;
+  --input-bg: #fff0f8;
+  --input-text: #831843;
+  --input-border: #f9a8d4;
+}
+:root.workspace-pink-mode.dark {
+  --bg-page: #1a0a12;
+  --card-bg: #2d1020;
+  --text-main: #fce7f3;
+  --text-sub: #f9a8d4;
+  --border-color: #4a1532;
+  --input-bg: #200a16;
+  --input-text: #fce7f3;
+  --input-border: #6b2144;
+  --header-gradient: linear-gradient(135deg, #831843, #c0276a);
+}
+
+/* Pink workspace card background for inner content */
+.workspace-pink-bg {
+  background: linear-gradient(180deg, #fdf2f8 0%, #fce7f3 100%);
+}
+.dark .workspace-pink-bg {
+  background: linear-gradient(180deg, #1a0a12 0%, #200a16 100%);
+}
+
+/* Lock icon on private items */
+.private-lock-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: #db2777;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* Pink gradient button */
+.pw-gradient-btn {
+  background: linear-gradient(135deg, #be185d, #e879a0) !important;
+  color: #ffffff !important;
+}
+.pw-gradient-btn:hover { opacity: 0.92; }
+
+/* Workspace pulsing entry animation */
+@keyframes pw-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.pw-animate-enter {
+  animation: pw-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

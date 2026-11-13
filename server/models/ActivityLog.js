@@ -45,6 +45,16 @@ const activityLogSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isPrivate: {
+    type: Boolean,
+    default: false
+  },
+  ownerEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
   createdAt: {
     type: Date,
     default: Date.now

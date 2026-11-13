@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const attendanceRecordSchema = new mongoose.Schema({
   studentId: {
-    type: Number,
+    type: mongoose.Schema.Types.Mixed,
     required: true
   },
   status: {
@@ -47,13 +47,23 @@ const attendanceSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  isPrivate: {
+    type: Boolean,
+    default: false
+  },
+  ownerEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Compound unique index so one class & subject has one record per date
-attendanceSchema.index({ date: 1, class: 1, subject: 1 }, { unique: true });
+// Compound index including ownerEmail so private workspace sessions don't collide with main institution sessions
+attendanceSchema.index({ date: 1, class: 1, subject: 1, ownerEmail: 1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

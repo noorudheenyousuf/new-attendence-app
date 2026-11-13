@@ -1,26 +1,57 @@
 const express = require('express');
 const router = express.Router();
 const Attendance = require('../models/Attendance');
+const Class = require('../models/Class');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/attendance
-// @desc    Get attendance for date, class, and subject (case-insensitive)
-router.get('/', authMiddleware, async (req, res) => {
+// @desc    Get attendance for date, class, and subject (or all records for date if class not specified)
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { date, class: className, subject } = req.query;
-    if (!date || !className) {
-      return res.status(400).json({ success: false, message: 'Date and Class are required' });
+    const { date, class: className, subject, scope } = req.query;
+    if (!date) {
+      return res.status(400).json({ success: false, message: 'Date is required' });
+    }
+
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+
+    // If className is not provided, return all attendance records for date (used for Live Campus Overview)
+    if (!className) {
+      let query = { date };
+      if (scope === 'public') {
+        query.isPrivate = { $ne: true };
+      } else if (scope === 'private') {
+        if (!userEmail) return res.json({ success: true, data: [] });
+        query.isPrivate = true;
+        query.ownerEmail = userEmail;
+      }
+      const records = await Attendance.find(query);
+      return res.json({ success: true, data: records });
     }
 
     const targetSubject = subject || 'all';
-    const record = await Attendance.findOne({
+
+    // Check if this class is private
+    const classDoc = await Class.findOne({
+      name: caseInsensitiveRegex(className),
+      ...(userEmail ? { $or: [{ isPrivate: { $ne: true } }, { isPrivate: true, ownerEmail: userEmail }] } : { isPrivate: { $ne: true } })
+    });
+
+    let query = {
       date,
       class: caseInsensitiveRegex(className),
       subject: caseInsensitiveRegex(targetSubject)
-    });
+    };
 
+    if (classDoc && classDoc.isPrivate) {
+      query.isPrivate = true;
+      if (userEmail) query.ownerEmail = userEmail;
+    }
+
+    const record = await Attendance.findOne(query);
     res.json({ success: true, data: record });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -28,7 +59,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/attendance
-// @desc    Save or update attendance session (case-insensitive check)
+// @desc    Save or update attendance session
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { date, class: className, subject, records } = req.body;
@@ -38,6 +69,16 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const cleanClass = className.trim();
     const targetSubject = (subject || 'all').trim();
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const markedBy = req.user ? req.user.name : 'Teacher';
+    const markedByEmail = userEmail;
+
+    // Check if class is private
+    const classDoc = await Class.findOne({
+      name: caseInsensitiveRegex(cleanClass),
+      $or: [{ isPrivate: { $ne: true } }, { isPrivate: true, ownerEmail: userEmail }]
+    });
+    const isPrivate = Boolean(classDoc && classDoc.isPrivate);
 
     // Calculate counts
     const total = records.length;
@@ -47,16 +88,20 @@ router.post('/', authMiddleware, async (req, res) => {
     const percentage = total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0;
 
     const summary = { total, present, absent, leave, late: leave, percentage };
-    const markedBy = req.user ? req.user.name : 'Teacher';
-    const markedByEmail = (req.user && req.user.email) ? req.user.email.toLowerCase() : '';
 
-    const previousDoc = await Attendance.findOne({
+    let findQuery = {
       date,
       class: caseInsensitiveRegex(cleanClass),
       subject: caseInsensitiveRegex(targetSubject)
-    });
+    };
+    if (isPrivate) {
+      findQuery.isPrivate = true;
+      findQuery.ownerEmail = userEmail;
+    } else {
+      findQuery.isPrivate = { $ne: true };
+    }
 
-    // Capture previous state snapshot BEFORE mutating document
+    const previousDoc = await Attendance.findOne(findQuery);
     const previousSnapshot = previousDoc ? previousDoc.toObject() : null;
 
     let updatedAttendance;
@@ -67,6 +112,8 @@ router.post('/', authMiddleware, async (req, res) => {
       previousDoc.summary = summary;
       previousDoc.markedBy = markedBy;
       previousDoc.markedByEmail = markedByEmail;
+      previousDoc.isPrivate = isPrivate;
+      previousDoc.ownerEmail = isPrivate ? userEmail : '';
       updatedAttendance = await previousDoc.save();
     } else {
       updatedAttendance = await Attendance.create({
@@ -76,12 +123,14 @@ router.post('/', authMiddleware, async (req, res) => {
         records,
         summary,
         markedBy,
-        markedByEmail
+        markedByEmail,
+        isPrivate,
+        ownerEmail: isPrivate ? userEmail : ''
       });
     }
 
     await ActivityLog.create({
-      action: `Attendance Marked: ${cleanClass}`,
+      action: `${isPrivate ? 'Private Attendance Marked' : 'Attendance Marked'}: ${cleanClass}`,
       details: `${present} Present, ${absent} Absent, ${leave} Leave (${percentage}%) • Date: ${date}`,
       performedBy: markedBy,
       role: req.user ? req.user.role : 'teacher',
@@ -89,7 +138,9 @@ router.post('/', authMiddleware, async (req, res) => {
       entityType: 'attendance',
       entityId: updatedAttendance._id.toString(),
       canUndo: true,
-      previousState: previousSnapshot
+      previousState: previousSnapshot,
+      isPrivate,
+      ownerEmail: isPrivate ? userEmail : ''
     });
 
     res.json({ success: true, data: updatedAttendance });
@@ -99,7 +150,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // @route   DELETE /api/attendance
-// @desc    Delete recorded attendance for date, class, and subject (case-insensitive)
+// @desc    Delete recorded attendance for date, class, and subject
 router.delete('/', authMiddleware, async (req, res) => {
   try {
     const { date, class: className, subject } = req.query;
@@ -108,20 +159,36 @@ router.delete('/', authMiddleware, async (req, res) => {
     }
 
     const targetSubject = subject || 'all';
-    const deletedRecord = await Attendance.findOneAndDelete({
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+
+    const classDoc = await Class.findOne({
+      name: caseInsensitiveRegex(className),
+      $or: [{ isPrivate: { $ne: true } }, { isPrivate: true, ownerEmail: userEmail }]
+    });
+    const isPrivate = Boolean(classDoc && classDoc.isPrivate);
+
+    let query = {
       date,
       class: caseInsensitiveRegex(className),
       subject: caseInsensitiveRegex(targetSubject)
-    });
+    };
+    if (isPrivate) {
+      query.isPrivate = true;
+      query.ownerEmail = userEmail;
+    }
+
+    const deletedRecord = await Attendance.findOneAndDelete(query);
 
     if (deletedRecord) {
       await ActivityLog.create({
-        action: `Attendance Deleted: ${className}`,
+        action: `${isPrivate ? 'Private Attendance Deleted' : 'Attendance Deleted'}: ${className}`,
         details: `Deleted attendance record for ${className} • Subject: ${targetSubject} • Date: ${date}`,
         performedBy: req.user ? req.user.name : 'Teacher',
         role: req.user ? req.user.role : 'teacher',
         entityType: 'attendance',
-        canUndo: false
+        canUndo: false,
+        isPrivate,
+        ownerEmail: isPrivate ? userEmail : ''
       });
     }
 

@@ -2,9 +2,8 @@ const mongoose = require('mongoose');
 
 const studentSchema = new mongoose.Schema({
   studentId: {
-    type: Number,
-    required: true,
-    unique: true
+    type: mongoose.Schema.Types.Mixed,
+    required: true
   },
   photoUrl: {
     type: String,
@@ -47,19 +46,68 @@ const studentSchema = new mongoose.Schema({
     of: mongoose.Schema.Types.Mixed,
     default: {}
   },
+  isPrivate: {
+    type: Boolean,
+    default: false
+  },
+  ownerEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  ownerName: {
+    type: String,
+    default: '',
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Helper static method to get next auto-increment student ID starting at 2000
+studentSchema.index({ studentId: 1, ownerEmail: 1, isPrivate: 1 });
+
+// Helper static method to get next auto-increment student ID for regular institution students starting at 2000
 studentSchema.statics.getNextStudentId = async function() {
-  const highest = await this.findOne().sort({ studentId: -1 }).select('studentId');
-  if (!highest || highest.studentId < 2000) {
+  const publicStudents = await this.find({
+    isPrivate: { $ne: true },
+    studentId: { $type: 'number' }
+  }).sort({ studentId: -1 }).limit(1).select('studentId');
+
+  const highest = publicStudents[0];
+  if (!highest || !highest.studentId || Number(highest.studentId) < 2000) {
     return 2000;
   }
-  return highest.studentId + 1;
+  return Number(highest.studentId) + 1;
+};
+
+// Helper static method to get next auto-increment student ID for private workspace students (starting at P-101)
+studentSchema.statics.getNextPrivateStudentId = async function(ownerEmail) {
+  const email = (ownerEmail || '').trim().toLowerCase();
+  const privateStudents = await this.find({
+    isPrivate: true,
+    ownerEmail: email
+  }).select('studentId');
+
+  let maxNum = 100;
+  for (const st of privateStudents) {
+    const strId = String(st.studentId || '').trim();
+    const match = strId.match(/^P-?(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  return `P-${maxNum + 1}`;
 };
 
 module.exports = mongoose.model('Student', studentSchema);

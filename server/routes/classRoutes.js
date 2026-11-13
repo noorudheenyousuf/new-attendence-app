@@ -8,13 +8,29 @@ const Subject = require('../models/Subject');
 const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 const { caseInsensitiveRegex, escapeRegex } = require('../utils/caseHelper');
 
 // @route   GET /api/classes
-// @desc    Get all classes sorted by custom order
-router.get('/', async (req, res) => {
+// @desc    Get classes (supports ?scope=private, ?scope=public, or default all accessible)
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const classes = await Class.find().sort({ order: 1, createdAt: 1 });
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const { scope } = req.query;
+
+    let query = {};
+    if (scope === 'private') {
+      if (!userEmail) return res.json({ success: true, data: [] });
+      query = { isPrivate: true, ownerEmail: userEmail };
+    } else if (scope === 'public') {
+      query = { isPrivate: { $ne: true } };
+    } else {
+      query = userEmail
+        ? { $or: [{ isPrivate: { $ne: true } }, { isPrivate: true, ownerEmail: userEmail }] }
+        : { isPrivate: { $ne: true } };
+    }
+
+    const classes = await Class.find(query).sort({ order: 1, createdAt: 1 });
     res.json({ success: true, data: classes });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -41,18 +57,37 @@ router.put('/reorder', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/classes
-// @desc    Add a class (name, optional class teacher, and assigned subjects)
+// @desc    Add a class (name, optional class teacher, and assigned subjects; supports isPrivate)
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, classTeacher, assignedSubjects } = req.body;
+    const { name, classTeacher, assignedSubjects, isPrivate } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Class name is required' });
     }
 
     const cleanName = name.trim();
-    const existing = await Class.findOne({ name: caseInsensitiveRegex(cleanName) });
-    if (existing) {
-      return res.status(400).json({ success: false, message: 'Class with this name already exists' });
+    const isPrivateBool = Boolean(isPrivate);
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const userName = req.user ? req.user.name : 'Teacher';
+    const userRole = req.user ? req.user.role : 'teacher';
+
+    if (isPrivateBool) {
+      const existing = await Class.findOne({
+        name: caseInsensitiveRegex(cleanName),
+        isPrivate: true,
+        ownerEmail: userEmail
+      });
+      if (existing) {
+        return res.status(400).json({ success: false, message: `Private class "${cleanName}" already exists in your workspace` });
+      }
+    } else {
+      const existing = await Class.findOne({
+        name: caseInsensitiveRegex(cleanName),
+        isPrivate: { $ne: true }
+      });
+      if (existing) {
+        return res.status(400).json({ success: false, message: 'Class with this name already exists' });
+      }
     }
 
     const subjectsArray = Array.isArray(assignedSubjects)
@@ -61,37 +96,51 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const newClass = await Class.create({
       name: cleanName,
-      classTeacher: classTeacher || 'Not Assigned',
-      assignedSubjects: subjectsArray
+      classTeacher: classTeacher || (isPrivateBool ? userName : 'Not Assigned'),
+      assignedSubjects: subjectsArray,
+      isPrivate: isPrivateBool,
+      ownerEmail: isPrivateBool ? userEmail : '',
+      ownerId: isPrivateBool ? req.user._id : null,
+      ownerName: isPrivateBool ? userName : ''
     });
 
     // Ensure this class has its own dedicated Subject document for each assigned subject
     for (const subName of subjectsArray) {
       const existing = await Subject.findOne({
         name: caseInsensitiveRegex(subName),
-        assignedClasses: cleanName
+        assignedClasses: cleanName,
+        ...(isPrivateBool ? { isPrivate: true, ownerEmail: userEmail } : { isPrivate: { $ne: true } })
       });
       if (!existing) {
-        const template = await Subject.findOne({ name: caseInsensitiveRegex(subName) });
+        const template = await Subject.findOne({
+          name: caseInsensitiveRegex(subName),
+          ...(isPrivateBool ? { ownerEmail: userEmail } : {})
+        });
         await Subject.create({
           name: subName,
           subjectCode: template ? template.subjectCode : '',
-          teacher: template ? template.teacher : '',
-          assignedClasses: [cleanName]
+          teacher: template ? template.teacher : (isPrivateBool ? userName : ''),
+          assignedClasses: [cleanName],
+          isPrivate: isPrivateBool,
+          ownerEmail: isPrivateBool ? userEmail : '',
+          ownerId: isPrivateBool ? req.user._id : null,
+          ownerName: isPrivateBool ? userName : ''
         });
       }
     }
 
     // Log action
     await ActivityLog.create({
-      action: `Class Added: ${cleanName}`,
-      details: `Teacher: ${classTeacher || 'None'} | Subjects: ${subjectsArray.join(', ') || 'All'}`,
-      performedBy: req.user ? req.user.name : 'Admin',
-      role: req.user ? req.user.role : 'admin',
+      action: `${isPrivateBool ? 'Private Class Added' : 'Class Added'}: ${cleanName}`,
+      details: `Teacher: ${classTeacher || (isPrivateBool ? userName : 'None')} | Subjects: ${subjectsArray.join(', ') || 'All'}`,
+      performedBy: userName,
+      role: userRole,
       entityType: 'class',
       entityId: newClass._id.toString(),
       canUndo: true,
-      previousState: null
+      previousState: null,
+      isPrivate: isPrivateBool,
+      ownerEmail: isPrivateBool ? userEmail : ''
     });
 
     res.status(201).json({ success: true, data: newClass });
@@ -110,15 +159,21 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const isAdmin = req.user && req.user.role === 'admin';
+    if (oldClass.isPrivate && !isAdmin && oldClass.ownerEmail !== userEmail) {
+      return res.status(403).json({ success: false, message: 'Access denied to this private class' });
+    }
+
     const cleanName = name ? name.trim() : oldClass.name;
     const oldName = oldClass.name;
 
     // Check if another class exists with this new name (case-insensitive)
     if (name && cleanName.toLowerCase() !== oldName.toLowerCase()) {
-      const duplicate = await Class.findOne({
-        _id: { $ne: req.params.id },
-        name: caseInsensitiveRegex(cleanName)
-      });
+      const duplicateQuery = oldClass.isPrivate
+        ? { _id: { $ne: req.params.id }, name: caseInsensitiveRegex(cleanName), isPrivate: true, ownerEmail: oldClass.ownerEmail }
+        : { _id: { $ne: req.params.id }, name: caseInsensitiveRegex(cleanName), isPrivate: { $ne: true } };
+      const duplicate = await Class.findOne(duplicateQuery);
       if (duplicate) {
         return res.status(400).json({ success: false, message: `Class with name "${cleanName}" already exists` });
       }
@@ -140,15 +195,23 @@ router.put('/:id', authMiddleware, async (req, res) => {
       for (const subName of newSubjects) {
         const existing = await Subject.findOne({
           name: caseInsensitiveRegex(subName),
-          assignedClasses: cleanName
+          assignedClasses: cleanName,
+          ...(oldClass.isPrivate ? { isPrivate: true, ownerEmail: oldClass.ownerEmail } : { isPrivate: { $ne: true } })
         });
         if (!existing) {
-          const template = await Subject.findOne({ name: caseInsensitiveRegex(subName) });
+          const template = await Subject.findOne({
+            name: caseInsensitiveRegex(subName),
+            ...(oldClass.isPrivate ? { ownerEmail: oldClass.ownerEmail } : {})
+          });
           await Subject.create({
             name: subName,
             subjectCode: template ? template.subjectCode : '',
             teacher: template ? template.teacher : '',
-            assignedClasses: [cleanName]
+            assignedClasses: [cleanName],
+            isPrivate: Boolean(oldClass.isPrivate),
+            ownerEmail: oldClass.isPrivate ? oldClass.ownerEmail : '',
+            ownerId: oldClass.isPrivate ? oldClass.ownerId : null,
+            ownerName: oldClass.isPrivate ? oldClass.ownerName : ''
           });
         }
       }
@@ -158,7 +221,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
       for (const remSub of removedSubjects) {
         const subDoc = await Subject.findOne({
           name: caseInsensitiveRegex(remSub),
-          assignedClasses: oldName
+          assignedClasses: oldName,
+          ...(oldClass.isPrivate ? { isPrivate: true, ownerEmail: oldClass.ownerEmail } : { isPrivate: { $ne: true } })
         });
         if (subDoc) {
           if (subDoc.assignedClasses.length <= 1) {
@@ -178,30 +242,27 @@ router.put('/:id', authMiddleware, async (req, res) => {
     );
 
     // CASCADE CLASS NAME RENAME / CASE CHANGE
-    // If the name changed in any way (casing or spelling), migrate all references!
     if (cleanName !== oldName) {
       const oldClassRegex = caseInsensitiveRegex(oldName);
+      const studentQuery = oldClass.isPrivate
+        ? { class: oldClassRegex, isPrivate: true, ownerEmail: oldClass.ownerEmail }
+        : { class: oldClassRegex, isPrivate: { $ne: true } };
 
-      // 1. Cascade to Student models
-      await Student.updateMany(
-        { class: oldClassRegex },
-        { $set: { class: cleanName } }
-      );
+      await Student.updateMany(studentQuery, { $set: { class: cleanName } });
 
-      // 2. Cascade to Attendance documents
-      await Attendance.updateMany(
-        { class: oldClassRegex },
-        { $set: { class: cleanName } }
-      );
+      const attendanceQuery = oldClass.isPrivate
+        ? { class: oldClassRegex, isPrivate: true, ownerEmail: oldClass.ownerEmail }
+        : { class: oldClassRegex, isPrivate: { $ne: true } };
+      await Attendance.updateMany(attendanceQuery, { $set: { class: cleanName } });
 
-      // 3. Cascade to Timetable slots
-      await Timetable.updateMany(
-        { class: oldClassRegex },
-        { $set: { class: cleanName } }
-      );
+      if (!oldClass.isPrivate) {
+        await Timetable.updateMany({ class: oldClassRegex }, { $set: { class: cleanName } });
+      }
 
-      // 4. Cascade to Subject assignedClasses
-      const subjectsWithClass = await Subject.find({ assignedClasses: oldClassRegex });
+      const subjectQuery = oldClass.isPrivate
+        ? { assignedClasses: oldClassRegex, isPrivate: true, ownerEmail: oldClass.ownerEmail }
+        : { assignedClasses: oldClassRegex, isPrivate: { $ne: true } };
+      const subjectsWithClass = await Subject.find(subjectQuery);
       for (const sub of subjectsWithClass) {
         let changed = false;
         sub.assignedClasses = sub.assignedClasses.map(c => {
@@ -214,30 +275,33 @@ router.put('/:id', authMiddleware, async (req, res) => {
         if (changed) await sub.save();
       }
 
-      // 5. Cascade to User assignedClasses
-      const teachersWithClass = await User.find({ assignedClasses: oldClassRegex });
-      for (const t of teachersWithClass) {
-        let changed = false;
-        t.assignedClasses = t.assignedClasses.map(c => {
-          if (c && c.toLowerCase() === oldName.toLowerCase()) {
-            changed = true;
-            return cleanName;
-          }
-          return c;
-        });
-        if (changed) await t.save();
+      if (!oldClass.isPrivate) {
+        const teachersWithClass = await User.find({ assignedClasses: oldClassRegex });
+        for (const t of teachersWithClass) {
+          let changed = false;
+          t.assignedClasses = t.assignedClasses.map(c => {
+            if (c && c.toLowerCase() === oldName.toLowerCase()) {
+              changed = true;
+              return cleanName;
+            }
+            return c;
+          });
+          if (changed) await t.save();
+        }
       }
     }
 
     await ActivityLog.create({
-      action: `Class Updated: ${cleanName}`,
+      action: `${oldClass.isPrivate ? 'Private Class Updated' : 'Class Updated'}: ${cleanName}`,
       details: `Teacher: ${classTeacher || oldClass.classTeacher}`,
-      performedBy: req.user ? req.user.name : 'Admin',
-      role: req.user ? req.user.role : 'admin',
+      performedBy: req.user ? req.user.name : 'Teacher',
+      role: req.user ? req.user.role : 'teacher',
       entityType: 'class',
       entityId: updated._id.toString(),
       canUndo: true,
-      previousState: { name: oldClass.name, classTeacher: oldClass.classTeacher, assignedSubjects: oldClass.assignedSubjects }
+      previousState: { name: oldClass.name, classTeacher: oldClass.classTeacher, assignedSubjects: oldClass.assignedSubjects },
+      isPrivate: Boolean(oldClass.isPrivate),
+      ownerEmail: oldClass.isPrivate ? oldClass.ownerEmail : ''
     });
 
     res.json({ success: true, data: updated });
@@ -255,10 +319,19 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const isAdmin = req.user && req.user.role === 'admin';
+    if (cls.isPrivate && !isAdmin && cls.ownerEmail !== userEmail) {
+      return res.status(403).json({ success: false, message: 'Access denied to this private class' });
+    }
+
     await Class.findByIdAndDelete(req.params.id);
 
     // Clean up subjects that belonged exclusively to this class
-    const classSubjects = await Subject.find({ assignedClasses: cls.name });
+    const subQuery = cls.isPrivate
+      ? { assignedClasses: cls.name, isPrivate: true, ownerEmail: cls.ownerEmail }
+      : { assignedClasses: cls.name, isPrivate: { $ne: true } };
+    const classSubjects = await Subject.find(subQuery);
     for (const sub of classSubjects) {
       if (sub.assignedClasses.length <= 1) {
         await Subject.findByIdAndDelete(sub._id);
@@ -269,14 +342,16 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
 
     await ActivityLog.create({
-      action: `Class Deleted: ${cls.name}`,
+      action: `${cls.isPrivate ? 'Private Class Deleted' : 'Class Deleted'}: ${cls.name}`,
       details: `Teacher: ${cls.classTeacher}`,
-      performedBy: req.user ? req.user.name : 'Admin',
-      role: req.user ? req.user.role : 'admin',
+      performedBy: req.user ? req.user.name : 'Teacher',
+      role: req.user ? req.user.role : 'teacher',
       entityType: 'class',
       entityId: req.params.id,
       canUndo: true,
-      previousState: cls.toObject()
+      previousState: cls.toObject(),
+      isPrivate: Boolean(cls.isPrivate),
+      ownerEmail: cls.isPrivate ? cls.ownerEmail : ''
     });
 
     res.json({ success: true, message: 'Class deleted successfully' });
