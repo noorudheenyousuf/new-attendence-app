@@ -1731,13 +1731,13 @@
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">
-            Assign to Classes
-            <span class="text-[var(--text-sub)] font-normal">(optional — pick one or many)</span>
+            Assign to Class
+            <span class="text-[var(--text-sub)] font-normal">(optional — one class per entry)</span>
           </label>
-          <div id="add-sub-class-checkboxes"
-               class="max-h-36 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] p-2 grid grid-cols-2 gap-1">
-            <span class="col-span-2 text-xs text-[var(--text-sub)] py-1 italic">No classes available. Add classes first.</span>
-          </div>
+          <select id="add-sub-class-select"
+                  class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+            <option value="">— No class (optional) —</option>
+          </select>
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
           Save Subject
@@ -1771,13 +1771,13 @@
         </div>
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">
-            Assign to Classes
-            <span class="text-[var(--text-sub)] font-normal">(optional — pick one or many)</span>
+            Assign to Class
+            <span class="text-[var(--text-sub)] font-normal">(optional — one class per entry)</span>
           </label>
-          <div id="edit-sub-class-checkboxes"
-               class="max-h-36 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] p-2 grid grid-cols-2 gap-1">
-            <span class="col-span-2 text-xs text-[var(--text-sub)] py-1 italic">No classes available.</span>
-          </div>
+          <select id="edit-sub-class-select"
+                  class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+            <option value="">— No class —</option>
+          </select>
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
           Save Changes

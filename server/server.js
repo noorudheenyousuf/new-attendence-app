@@ -18,8 +18,7 @@ if (!fs.existsSync(uploadsDir)) {
 // Connect to MongoDB
 connectDB().then(async () => {
   await seedInitialData();
-  const { ensureSubjectsPerClass } = require('./routes/subjectRoutes');
-  await ensureSubjectsPerClass();
+  // ensureSubjectsPerClass removed — subjects now use one-class-per-entry model
 });
 
 // Middleware

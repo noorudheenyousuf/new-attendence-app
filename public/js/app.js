@@ -1768,11 +1768,9 @@ function renderSubjectsList() {
   (classesList || []).forEach(cls => {
     const clsName = (cls.name || cls || '').trim();
     // Match subjects assigned to this class
-    const classSubs = subjectsList.filter(s => {
-      const inAssignedClasses = Array.isArray(s.assignedClasses) && s.assignedClasses.some(ac => isClassEqual(ac, clsName));
-      const inClassSubjects = Array.isArray(cls.assignedSubjects) && cls.assignedSubjects.some(as => isClassEqual(as, s.name));
-      return inAssignedClasses || inClassSubjects;
-    });
+    const classSubs = subjectsList.filter(s =>
+      Array.isArray(s.assignedClasses) && s.assignedClasses.some(ac => isClassEqual(ac, clsName))
+    );
 
     if (classSubs.length > 0) {
       classSubs.forEach(s => renderedSubjectIds.add(String(s._id)));
@@ -1860,8 +1858,13 @@ async function openSubjectModal() {
   document.getElementById('input-sub-name').value = '';
   document.getElementById('input-sub-code').value = '';
   await populateTeacherDropdowns('input-sub-teacher', '');
-  // Render class checkboxes — public (main) classes only
-  renderTeacherClassCheckboxes('add-sub-class-checkboxes', []);
+  // Populate class dropdown — public (main) classes only, one class per entry
+  const _addSubSel = document.getElementById('add-sub-class-select');
+  if (_addSubSel) {
+    _addSubSel.innerHTML = '<option value="">— No class (optional) —</option>'
+      + (classesList || []).filter(function(c) { return !c.isPrivate; })
+          .map(function(c) { return '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>'; }).join('');
+  }
   document.getElementById('modal-add-subject').classList.remove('hidden');
 }
 
@@ -1875,7 +1878,8 @@ async function handleSaveSubject(e) {
   const subjectCode = document.getElementById('input-sub-code').value.trim();
   const teacherEl = document.getElementById('input-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
-  const assignedClasses = getSelectedTeacherCheckboxes('add-sub-class-checkboxes');
+  const _cls = document.getElementById('add-sub-class-select') ? document.getElementById('add-sub-class-select').value : '';
+  const assignedClasses = _cls ? [_cls] : [];
 
   try {
     const res = await API.addSubject({ name, subjectCode, teacher, assignedClasses });
@@ -1899,13 +1903,15 @@ async function openEditSubjectModal(id, name, code, teacher) {
   document.getElementById('edit-sub-code').value = code || '';
   await populateTeacherDropdowns('edit-sub-teacher', teacher || '');
 
-  // Pre-check ALL classes this subject family is currently assigned to.
-  // A subject named "Maths" may exist as multiple sibling docs (one per class).
-  // We collect assignedClasses from ALL sibling docs with the same name.
-  const siblingClasses = (subjectsList || [])
-    .filter(s => s.name.trim().toLowerCase() === name.trim().toLowerCase() && !s.isPrivate)
-    .flatMap(s => s.assignedClasses || []);
-  renderTeacherClassCheckboxes('edit-sub-class-checkboxes', siblingClasses);
+  // Find this exact subject doc and pre-select its single assigned class
+  const _editSubDoc = (subjectsList || []).find(function(s) { return String(s._id) === String(id); });
+  const _editCurClass = (_editSubDoc && _editSubDoc.assignedClasses && _editSubDoc.assignedClasses[0]) || '';
+  const _editSubSel = document.getElementById('edit-sub-class-select');
+  if (_editSubSel) {
+    _editSubSel.innerHTML = '<option value="">— No class —</option>'
+      + (classesList || []).filter(function(c) { return !c.isPrivate; })
+          .map(function(c) { return '<option value="' + escapeHtml(c.name) + '"' + (c.name === _editCurClass ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join('');
+  }
 
   document.getElementById('modal-edit-subject').classList.remove('hidden');
 }
@@ -1924,7 +1930,8 @@ async function handleUpdateSubject(e) {
   const subjectCode = document.getElementById('edit-sub-code').value.trim();
   const teacherEl = document.getElementById('edit-sub-teacher');
   const teacher = teacherEl ? teacherEl.value.trim() : '';
-  const assignedClasses = getSelectedTeacherCheckboxes('edit-sub-class-checkboxes');
+  const _editCls = document.getElementById('edit-sub-class-select') ? document.getElementById('edit-sub-class-select').value : '';
+  const assignedClasses = _editCls ? [_editCls] : [];
 
   try {
     const res = await API.updateSubject(activeEditSubjectId, { name, subjectCode, teacher, assignedClasses });
