@@ -3817,10 +3817,14 @@ function renderActivityLogsList() {
   const myName = (currentUser && currentUser.name) ? currentUser.name.trim().toLowerCase() : '';
 
   let filteredLogs = logs;
-  if (currentActivityLogFilter === 'mine' && myName) {
+  const myEmail = (currentUser && currentUser.email) ? currentUser.email.trim().toLowerCase() : '';
+  if (currentActivityLogFilter === 'mine' && (myName || myEmail)) {
     filteredLogs = logs.filter(log => {
+      const logEmail = (log.performedByEmail || '').trim().toLowerCase();
       const performed = (log.performedBy || '').trim().toLowerCase();
       const details = (log.details || '').trim().toLowerCase();
+      // Prefer email match for new logs; fall back to name match for old logs without email
+      if (myEmail && logEmail) return logEmail === myEmail;
       return performed === myName || performed.includes(myName) || details.includes(myName);
     });
   }
@@ -3860,7 +3864,7 @@ function renderActivityLogsList() {
           <div class="min-w-0 flex-1">
             <div class="font-bold text-[var(--text-main)] text-xs truncate">${escapeHtml(log.action)}</div>
             <div class="text-[10px] text-[var(--text-sub)] line-clamp-2">${escapeHtml(log.details || '')}</div>
-            <div class="text-[9px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5">by ${escapeHtml(log.performedBy || '')}</div>
+            <div class="text-[9px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5">${(() => { const _le = (log.performedByEmail || '').toLowerCase(); let _dn = log.performedBy || ''; if (_le) { if (currentUser && (currentUser.email || '').toLowerCase() === _le) { _dn = currentUser.name || _dn; } else if (cachedTeachersList) { const _f = cachedTeachersList.find(t => (t.email || '').toLowerCase() === _le); if (_f && _f.name) _dn = _f.name; } } return 'by ' + escapeHtml(_dn); })()}</div>
           </div>
         </div>
         ${log.isUndone ? `

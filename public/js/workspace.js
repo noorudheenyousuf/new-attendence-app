@@ -268,7 +268,7 @@ function renderPWClassesView() {
                <p class="text-xs mt-1">Tap "Add Class" to get started</p>
              </div>`
           : pwClassesList.map(cls => {
-            const subs = cls.assignedSubjects || [];
+            const subs = (pwSubjectsList || []).filter(function(s) { return (s.assignedClasses || []).some(function(ac) { return ac === cls.name; }); }).map(function(s) { return s.name; });
             return `
             <div class="bg-white dark:bg-[#2d1020] rounded-2xl border border-pink-300 dark:border-pink-800 shadow-md overflow-hidden">
               <!-- Dark gradient header -->
@@ -511,7 +511,6 @@ function pwOpenAddClassModal() {
   document.getElementById('pw-class-modal-title').textContent = 'Add Private Class';
   document.getElementById('pw-input-class-name').value = '';
   document.getElementById('pw-input-class-teacher').value = currentUser ? currentUser.name : '';
-  pwRenderClassSubjectCheckboxes([]);
   pwEditClassId = null;
 }
 
@@ -528,21 +527,19 @@ function pwEditClass(id) {
   document.getElementById('pw-class-modal-title').textContent = 'Edit Private Class';
   document.getElementById('pw-input-class-name').value = cls.name;
   document.getElementById('pw-input-class-teacher').value = cls.classTeacher || '';
-  pwRenderClassSubjectCheckboxes(cls.assignedSubjects || []);
 }
 
 async function pwSaveClass(e) {
   e.preventDefault();
   const name = document.getElementById('pw-input-class-name').value.trim();
   const teacher = document.getElementById('pw-input-class-teacher').value.trim();
-  const assignedSubjects = pwGetCheckedSubjects();
   if (!name) return showToast('Class name is required', true);
   try {
     if (pwEditClassId) {
-      await API.request(`/classes/${pwEditClassId}`, { method: 'PUT', body: JSON.stringify({ name, classTeacher: teacher, assignedSubjects }) });
+      await API.request(`/classes/${pwEditClassId}`, { method: 'PUT', body: JSON.stringify({ name, classTeacher: teacher }) });
       showToast(`Class "${name}" updated!`);
     } else {
-      await API.addPrivateClass(name, teacher, assignedSubjects);
+      await API.addPrivateClass(name, teacher, []);
       showToast(`Private class "${name}" created!`);
     }
     pwCloseClassModal();
@@ -596,7 +593,12 @@ function pwOpenAddSubjectModal() {
   document.getElementById('pw-input-subject-name').value = '';
   document.getElementById('pw-input-subject-code').value = '';
   document.getElementById('pw-input-subject-teacher').value = currentUser ? currentUser.name : '';
-  pwRenderSubjectClassCheckboxes([]);
+  var selAdd = document.getElementById('pw-subject-class-select');
+  if (selAdd) {
+    selAdd.innerHTML = '<option value="">— No class (optional) —</option>';
+    (pwClassesList || []).forEach(function(c) { var o = document.createElement('option'); o.value = c.name; o.textContent = c.name; selAdd.appendChild(o); });
+    selAdd.value = '';
+  }
   pwEditSubjectId = null;
 }
 
@@ -614,7 +616,12 @@ function pwEditSubject(id) {
   document.getElementById('pw-input-subject-name').value = sub.name;
   document.getElementById('pw-input-subject-code').value = sub.subjectCode || '';
   document.getElementById('pw-input-subject-teacher').value = sub.teacher || '';
-  pwRenderSubjectClassCheckboxes(sub.assignedClasses || []);
+  var selEdit = document.getElementById('pw-subject-class-select');
+  if (selEdit) {
+    selEdit.innerHTML = '<option value="">— No class (optional) —</option>';
+    (pwClassesList || []).forEach(function(c) { var o = document.createElement('option'); o.value = c.name; o.textContent = c.name; selEdit.appendChild(o); });
+    selEdit.value = (sub.assignedClasses && sub.assignedClasses[0]) || '';
+  }
 }
 
 async function pwSaveSubject(e) {
@@ -622,7 +629,8 @@ async function pwSaveSubject(e) {
   const name = document.getElementById('pw-input-subject-name').value.trim();
   const code = document.getElementById('pw-input-subject-code').value.trim();
   const teacher = document.getElementById('pw-input-subject-teacher').value.trim();
-  const assignedClasses = pwGetCheckedClasses();
+  var pwSelVal = (document.getElementById('pw-subject-class-select') || {}).value || '';
+  const assignedClasses = pwSelVal ? [pwSelVal] : [];
   if (!name) return showToast('Subject name is required', true);
   const data = { name, subjectCode: code, teacher, assignedClasses };
   try {

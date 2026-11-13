@@ -376,6 +376,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
         action: `Profile Updated: ${user.name}`,
         details: `Updated personal details`,
         performedBy: user.name,
+        performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
         role: user.role,
         entityType: 'settings',
         canUndo: false

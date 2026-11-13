@@ -63,6 +63,7 @@ router.get('/export', async (req, res) => {
       action: 'Database Backup Exported',
       details: `${students.length} Students (incl. ${privateStudents.length} private), ${teachers.length} Teachers, ${classes.length} Classes (incl. ${privateClasses.length} private), ${subjects.length} Subjects (incl. ${privateSubjects.length} private), ${attendance.length} Attendance Records`,
       performedBy: (req.user && req.user.name) ? req.user.name : 'Admin',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
       role: (req.user && req.user.role) ? req.user.role : 'admin',
       entityType: 'backup',
       canUndo: false
@@ -214,6 +215,7 @@ router.post('/import', async (req, res) => {
       action: 'Database Backup Restored',
       details: `${students ? students.length : 0} Students (incl. ${privateStudentsCount} private), ${teachers ? teachers.length : 0} Teachers, ${classes ? classes.length : 0} Classes (incl. ${privateClassesCount} private), ${subjects ? subjects.length : 0} Subjects, ${attendance ? attendance.length : 0} Attendance restored`,
       performedBy: (req.user && req.user.name) ? req.user.name : 'Admin',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
       role: (req.user && req.user.role) ? req.user.role : 'admin',
       entityType: 'backup',
       canUndo: false

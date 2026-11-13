@@ -1655,15 +1655,6 @@
             <option value="">-- Select Class Teacher --</option>
           </select>
         </div>
-        <div>
-          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
-            <span>Assigned Subjects</span>
-            <span class="text-[10px] text-[var(--text-sub)] font-normal">Check all that apply</span>
-          </label>
-          <div id="add-class-subjects-container" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-2 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
-            <!-- Populated via renderSubjectCheckboxesForClass() -->
-          </div>
-        </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
           Save Class
         </button>
@@ -1689,15 +1680,6 @@
           <select id="edit-class-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
             <option value="">-- Select Class Teacher --</option>
           </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
-            <span>Assigned Subjects</span>
-            <span class="text-[10px] text-[var(--text-sub)] font-normal">Check all that apply</span>
-          </label>
-          <div id="edit-class-subjects-container" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-2 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
-            <!-- Populated via renderSubjectCheckboxesForClass() -->
-          </div>
         </div>
         <button type="submit" class="touch-btn w-full custom-gradient-btn font-bold text-sm rounded-xl shadow-md mt-1">
           Save Changes
@@ -3204,12 +3186,6 @@
           <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Class Teacher</label>
           <input type="text" id="pw-input-class-teacher" placeholder="Your name or leave blank" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
         </div>
-        <div>
-          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Assign Subjects <span class="ml-1 font-normal text-pink-400 text-[10px]">(optional)</span></label>
-          <div id="pw-class-subject-checkboxes" class="max-h-32 overflow-y-auto rounded-xl border border-pink-200 dark:border-pink-700 bg-pink-50 dark:bg-pink-950/40 p-2 space-y-1">
-            <p class="text-[11px] text-pink-400 italic px-1">No private subjects yet — add subjects first.</p>
-          </div>
-        </div>
         <div class="flex gap-2 pt-1">
           <button type="button" onclick="pwCloseClassModal()" class="flex-1 py-2.5 rounded-xl border border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-300 font-bold text-sm hover:bg-pink-50 transition">Cancel</button>
           <button type="submit" class="flex-1 py-2.5 pw-gradient-btn rounded-xl font-bold text-sm shadow-md">Save</button>
@@ -3245,10 +3221,10 @@
           <input type="text" id="pw-input-subject-teacher" placeholder="Teacher name" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
         </div>
         <div>
-          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Assign to Classes <span class="ml-1 font-normal text-pink-400 text-[10px]">(optional)</span></label>
-          <div id="pw-subject-class-checkboxes" class="max-h-32 overflow-y-auto rounded-xl border border-pink-200 dark:border-pink-700 bg-pink-50 dark:bg-pink-950/40 p-2 space-y-1">
-            <p class="text-[11px] text-pink-400 italic px-1">No private classes yet — add classes first.</p>
-          </div>
+          <label class="block text-xs font-bold text-pink-700 dark:text-pink-300 mb-1">Assign to Class <span class="ml-1 font-normal text-pink-400 text-[10px]">(optional)</span></label>
+          <select id="pw-subject-class-select" class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-4 text-sm font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+            <option value="">— No class (optional) —</option>
+          </select>
         </div>
         <div class="flex gap-2 pt-1">
           <button type="button" onclick="pwCloseSubjectModal()" class="flex-1 py-2.5 rounded-xl border border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-300 font-bold text-sm hover:bg-pink-50 transition">Cancel</button>

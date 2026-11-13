@@ -49,6 +49,12 @@ const activityLogSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  performedByEmail: {
+    type: String,
+    default: '',
+    trim: true,
+    lowercase: true
+  },
   ownerEmail: {
     type: String,
     default: '',
