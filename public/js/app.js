@@ -7024,7 +7024,7 @@ async function handleSaveTimetableSlot(e) {
       const conflictType = selfConflictSlot ? 'self' : 'other';
       const btn0 = e.target.querySelector('button[type="submit"]');
       const saveAction = async () => {
-        const btn2 = document.getElementById('timetable-slot-modal') ? document.getElementById('timetable-slot-modal').querySelector('button[type="submit"]') : null;
+        const btn2 = document.getElementById('modal-add-timetable-slot') ? document.getElementById('modal-add-timetable-slot').querySelector('button[type="submit"]') : null;
         if (btn2) { btn2.disabled = true; btn2.textContent = 'Saving...'; }
         try {
           if (slotId) { await API.updateTimetableSlot(slotId, slotData); showToast('Timetable slot updated!'); }
