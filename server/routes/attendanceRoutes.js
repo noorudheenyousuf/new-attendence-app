@@ -28,6 +28,17 @@ router.get('/', optionalAuth, async (req, res) => {
         if (!userEmail) return res.json({ success: true, data: [] });
         query.isPrivate = true;
         query.ownerEmail = userEmail;
+      } else {
+        // When no explicit scope is passed:
+        // Exclude other users' private attendance records!
+        if (!userEmail) {
+          query.isPrivate = { $ne: true };
+        } else if (req.user?.role !== 'admin') {
+          query.$or = [
+            { isPrivate: { $ne: true } },
+            { isPrivate: true, ownerEmail: userEmail }
+          ];
+        }
       }
       const records = await Attendance.find(query);
       return res.json({ success: true, data: records });

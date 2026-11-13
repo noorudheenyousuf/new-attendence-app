@@ -105,6 +105,26 @@ function getTeacherAssignments(teacherName, teacherEmail) {
     }
   });
 
+  // Merge from currentUser's explicit assignedSubjects/assignedClasses if available
+  if (currentUser && currentUser.email && String(currentUser.email).toLowerCase().trim() === normEmail) {
+    (currentUser.assignedSubjects || []).forEach(sName => {
+      const n = String(sName || '').trim();
+      const k = n.toLowerCase();
+      if (n && !seenSub.has(k)) {
+        seenSub.add(k);
+        assignedSubjects.push(n);
+      }
+    });
+    (currentUser.assignedClasses || []).forEach(cName => {
+      const cTrim = String(cName || '').trim();
+      const k = cTrim.toLowerCase();
+      if (cTrim && !seenCls.has(k)) {
+        seenCls.add(k);
+        assignedClasses.push(cTrim);
+      }
+    });
+  }
+
   // Follow exact order of classes and subjects everywhere, in assigned class also
   assignedClasses.sort((a, b) => {
     const idxA = allClasses.findIndex(c => isClassEqual(c.name, a));
@@ -317,6 +337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       await loadClasses();
       await loadSubjects();
       await loadTeachersData();
+      updateUserUI();
       // Re-render after settings load so canUserEditDelete() uses correct value
       renderClassesList();
       renderSubjectsList();
@@ -969,6 +990,7 @@ async function loadClasses() {
       classesList = res.data;
       populateClassDropdowns();
       renderClassesList();
+      updateUserUI();
     }
   } catch (error) {
     console.log('[Classes Load]', error);
@@ -1546,6 +1568,7 @@ async function loadSubjects() {
       subjectsList = res.data;
       populateSubjectDropdowns();
       renderSubjectsList();
+      updateUserUI();
     }
   } catch (error) {
     console.log('[Subjects Load]', error);
@@ -4173,6 +4196,40 @@ async function loadActivityLogs() {
 }
 
 // Teacher Daily Summary & Today's Status (Profile Card & Merged Dashboard Card)
+function isAttendanceMarkedByCurrentUser(att, user) {
+  if (!att || !user) return false;
+  const myEmail = String(user.email || '').trim().toLowerCase();
+  const myName = String(user.name || '').trim().toLowerCase();
+
+  const markedEmail = String(att.markedByEmail || '').trim().toLowerCase();
+  const ownerEmail = String(att.ownerEmail || '').trim().toLowerCase();
+  const markedName = String(att.markedBy || '').trim().toLowerCase();
+
+  // 1. Primary: if markedByEmail exists, it MUST match the user's email
+  if (markedEmail) {
+    return Boolean(myEmail && markedEmail === myEmail);
+  }
+
+  // 2. If it is a private record, it MUST belong to the user's email
+  if (att.isPrivate) {
+    return Boolean(myEmail && ownerEmail && ownerEmail === myEmail);
+  }
+
+  // 3. If ownerEmail is present on the record, compare ownerEmail
+  if (ownerEmail && myEmail) {
+    return ownerEmail === myEmail;
+  }
+
+  // 4. Fallback for legacy records without markedByEmail:
+  // Must match exact non-generic name
+  if (markedName && myName) {
+    if (markedName === 'admin' || markedName === 'teacher' || markedName === 'administrator') return false;
+    return markedName === myName;
+  }
+
+  return false;
+}
+
 async function updateProfileDashboardKPIs() {
   if (!currentUser) return;
 
@@ -4286,22 +4343,7 @@ async function updateProfileDashboardKPIs() {
     const rawList = (attRes && attRes.data !== undefined) ? attRes.data : attRes;
     const todayAttendances = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
 
-    let myAttendances = todayAttendances;
-    if (!isAdmin) {
-      myAttendances = todayAttendances.filter(att => {
-        const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
-        const markedName = (att.markedBy || '').toLowerCase().trim();
-        // Primary: email match (most reliable)
-        if (markedEmail && myEmail) {
-          return markedEmail === myEmail;
-        }
-        // Fallback: name match (for old records without markedByEmail)
-        if (markedName && myName) {
-          return markedName === myName || markedName.includes(myName) || myName.includes(markedName);
-        }
-        return false;
-      });
-    }
+    const myAttendances = todayAttendances.filter(att => isAttendanceMarkedByCurrentUser(att, currentUser));
     markedEls.forEach(el => el.textContent = String(myAttendances.length));
   } catch (err) {
     console.error('[Marked Today KPI Error]', err);
@@ -4682,6 +4724,7 @@ function selectTab(tab) {
     if (reportReadyToLoad) loadReport();
     else renderReportPlaceholder();
   } else if (tab === 'settings') {
+    updateUserUI();
     loadActivityLogs();
     updateProfileDashboardKPIs();
   } else if (tab === 'classes') {
@@ -8739,22 +8782,7 @@ async function openTodayMarkedModal() {
     const rawList = (attRes && attRes.data !== undefined) ? attRes.data : attRes;
     const todayAttendances = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
 
-    let myAttendances = todayAttendances;
-    if (!isAdmin) {
-      myAttendances = todayAttendances.filter(att => {
-        const markedEmail = (att.markedByEmail || '').toLowerCase().trim();
-        const markedName = (att.markedBy || '').toLowerCase().trim();
-        // Primary: email match (most reliable)
-        if (markedEmail && myEmail) {
-          return markedEmail === myEmail;
-        }
-        // Fallback: name match (for old records without markedByEmail)
-        if (markedName && myName) {
-          return markedName === myName || markedName.includes(myName) || myName.includes(markedName);
-        }
-        return false;
-      });
-    }
+    const myAttendances = todayAttendances.filter(att => isAttendanceMarkedByCurrentUser(att, currentUser));
 
     if (titleEl) {
       titleEl.textContent = 'Marked Sessions Today (' + myAttendances.length + ')';
@@ -8832,19 +8860,29 @@ function jumpToAttendanceSession(className, subjectName, dateStr) {
     updateDateDisplay();
   }
   if (className) {
+    currentClass = className;
     const selClass = document.getElementById('sel-class');
     if (selClass) {
       selClass.value = className;
-      handleClassChange();
     }
+    attendanceReadyToLoad = true;
+    updateAttendanceSubjectsDropdown(currentClass);
   }
-  if (subjectName) {
-    setTimeout(() => {
-      const selSub = document.getElementById('sel-subject');
-      if (selSub) {
-        selSub.value = subjectName;
-        handleSubjectChange();
+  if (subjectName && subjectName !== 'all') {
+    currentSubject = subjectName;
+    const selSub = document.getElementById('sel-subject');
+    if (selSub) {
+      const exists = Array.from(selSub.options).some(opt => opt.value === subjectName);
+      if (!exists) {
+        const newOpt = document.createElement('option');
+        newOpt.value = subjectName;
+        newOpt.textContent = subjectName;
+        selSub.appendChild(newOpt);
       }
-    }, 300);
+      selSub.value = subjectName;
+    }
+  } else {
+    currentSubject = '';
   }
+  loadAttendanceRoster();
 }
