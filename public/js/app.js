@@ -424,6 +424,7 @@ function hideSplashLoader() {
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
+  if (typeof initI18n === 'function') initI18n();
   initServiceWorker();
   updateDateDisplay();
   selectTab('home');
@@ -5682,6 +5683,40 @@ function openNotificationSettingsModal() {
 function closeNotificationSettingsModal() {
   const modal = document.getElementById('modal-notification-settings');
   if (modal) modal.classList.add('hidden');
+}
+
+function openLanguageSettingsModal() {
+  const modal = document.getElementById('modal-language-settings');
+  if (modal) {
+    const lang = (typeof getAppLanguage === 'function') ? getAppLanguage() : (localStorage.getItem('app_language') || 'en');
+    if (typeof updateLanguageModalUI === 'function') {
+      updateLanguageModalUI(lang);
+    }
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeLanguageSettingsModal() {
+  const modal = document.getElementById('modal-language-settings');
+  if (modal) modal.classList.add('hidden');
+}
+
+function selectAppLanguage(lang) {
+  if (typeof applyTranslations === 'function') {
+    applyTranslations(lang);
+  } else {
+    try { localStorage.setItem('app_language', lang); } catch(_) {}
+    document.documentElement.lang = lang;
+  }
+
+  const toastMsg = lang === 'ml' ? 'ഭാഷ മലയാളത്തിലേക്ക് മാറ്റി' : 'Language changed to English';
+  if (typeof showToast === 'function') {
+    showToast(toastMsg);
+  }
+
+  setTimeout(() => {
+    closeLanguageSettingsModal();
+  }, 220);
 }
 
 // Modal triggers

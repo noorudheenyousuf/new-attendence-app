@@ -980,5 +980,18 @@ input:checked + .switch-slider:before {
   box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.45);
 }
 
+/* ==========================================================================
+   MALAYALAM TYPOGRAPHY & i18n
+   ========================================================================== */
+[lang="ml"], .font-malayalam {
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Malayalam', sans-serif;
+  letter-spacing: 0.01em;
+}
+
+[lang="ml"] .leading-tight, .font-malayalam .leading-tight {
+  line-height: 1.35;
+}
+
+
 
 
