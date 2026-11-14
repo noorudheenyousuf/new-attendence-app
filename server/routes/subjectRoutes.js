@@ -13,18 +13,23 @@ const { caseInsensitiveRegex } = require('../utils/caseHelper');
 router.get('/', optionalAuth, async (req, res) => {
   try {
     const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const isAdmin = Boolean(req.user && req.user.role === 'admin');
     const { scope } = req.query;
 
     let query = {};
     if (scope === 'private') {
       if (!userEmail) return res.json({ success: true, data: [] });
-      query = { isPrivate: true, ownerEmail: userEmail };
+      query = isAdmin ? { isPrivate: true } : { isPrivate: true, ownerEmail: userEmail };
     } else if (scope === 'public') {
       query = { isPrivate: { $ne: true } };
     } else {
-      query = userEmail
-        ? { $or: [{ isPrivate: { $ne: true } }, { isPrivate: true, ownerEmail: userEmail }] }
-        : { isPrivate: { $ne: true } };
+      if (isAdmin) {
+        query = {}; // Admins see all subjects
+      } else {
+        query = userEmail
+          ? { $or: [{ isPrivate: { $ne: true } }, { isPrivate: true, ownerEmail: userEmail }] }
+          : { isPrivate: { $ne: true } };
+      }
     }
 
     const subjects = await Subject.find(query).sort({ order: 1, createdAt: 1 });

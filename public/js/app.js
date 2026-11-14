@@ -5211,8 +5211,10 @@ async function selectTab(tab) {
     loadActivityLogs();
     updateProfileDashboardKPIs();
   } else if (tab === 'classes') {
+    loadClasses();
     renderClassesList();
   } else if (tab === 'subjects') {
+    loadSubjects();
     renderSubjectsList();
   } else if (tab === 'students') {
     renderStudentsDirectory();
