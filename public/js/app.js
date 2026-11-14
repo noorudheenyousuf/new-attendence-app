@@ -712,6 +712,7 @@ function updateUserUI() {
   // Reload activity logs & profile dashboard stats
   loadActivityLogs();
   updateProfileDashboardKPIs();
+  if (typeof renderProfileAnnouncementCard === 'function') renderProfileAnnouncementCard();
 }
 
 // Dark Mode Toggle with Sun SVG & persistent storage
@@ -4951,6 +4952,10 @@ function selectTab(tab) {
     updateUserUI();
     loadActivityLogs();
     updateProfileDashboardKPIs();
+    if (typeof renderProfileAnnouncementCard === 'function') renderProfileAnnouncementCard();
+    if (typeof checkUnreadMessages === 'function' && (!cachedMessages || cachedMessages.length === 0)) {
+      checkUnreadMessages();
+    }
   } else if (tab === 'classes') {
     renderClassesList();
   } else if (tab === 'subjects') {
@@ -6721,6 +6726,9 @@ async function checkUnreadMessages() {
     // Backend returns { success, data: [...], unreadCount }
     const messages = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
     cachedMessages = messages;
+    if (typeof renderProfileAnnouncementCard === 'function') {
+      renderProfileAnnouncementCard();
+    }
     const myId = currentUser && (currentUser._id || currentUser.id);
     // Use backend's unreadCount if available, else compute locally
     const unreadCount = (res && res.unreadCount !== undefined) ? res.unreadCount :
@@ -6742,6 +6750,185 @@ async function checkUnreadMessages() {
   } catch (err) {
     // silently fail - not critical
   }
+}
+
+// ================= PROFILE ANNOUNCEMENT & NOTICE SHOWCASE =================
+let profileAnnouncementIndex = 0;
+
+function navigateProfileAnnouncement(step, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const messages = Array.isArray(cachedMessages) ? cachedMessages : [];
+  if (messages.length === 0) return;
+  const sorted = [...messages].reverse(); // newest first
+  profileAnnouncementIndex += step;
+  if (profileAnnouncementIndex < 0) profileAnnouncementIndex = 0;
+  if (profileAnnouncementIndex >= sorted.length) profileAnnouncementIndex = sorted.length - 1;
+  renderProfileAnnouncementCard();
+}
+
+function resolveSenderEmail(m) {
+  if (!m) return '';
+  if (m.senderEmail && m.senderEmail.trim()) return m.senderEmail.trim();
+  if (m.senderId && typeof m.senderId === 'object' && m.senderId.email) return m.senderId.email.trim();
+  const sName = (m.senderName || '').trim();
+  if (typeof teachersList !== 'undefined' && Array.isArray(teachersList)) {
+    const t = teachersList.find(tc => isNameEqual(tc.name, sName));
+    if (t && t.email) return t.email.trim();
+  }
+  if (currentUser && isNameEqual(currentUser.name, sName) && currentUser.email) {
+    return currentUser.email.trim();
+  }
+  return m.senderRole === 'admin' ? 'admin@school.internal' : '';
+}
+
+function renderProfileAnnouncementCard() {
+  const container = document.getElementById('profile-announcement-content');
+  if (!container) return;
+
+  const messages = Array.isArray(cachedMessages) ? cachedMessages : [];
+  if (messages.length === 0) {
+    container.innerHTML = `
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left py-1">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#245b70]/25 to-[#43888a]/35 text-[#245b70] dark:text-cyan-300 flex items-center justify-center shadow-inner flex-shrink-0 border border-[#245b70]/25">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 justify-center sm:justify-start">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-[#245b70] to-[#43888a] text-white shadow-xs">
+                <svg class="w-3 h-3 text-amber-300" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a1 1 0 0 1 1 1v1.07A8.002 8.002 0 0 1 20 12v3l2 2v1H2v-1l2-2v-3a8.002 8.002 0 0 1 7-7.93V3a1 1 0 0 1 1-1zm0 20a3 3 0 0 0 2.83-2H9.17A3 3 0 0 0 12 22z"/></svg>
+                <span>Notice Board & Announcements</span>
+              </span>
+            </div>
+            <p class="text-xs text-[var(--text-sub)] mt-1 font-medium truncate">No announcements posted yet. Broadcast notices or chat with all teachers.</p>
+          </div>
+        </div>
+        <button type="button" onclick="openMessagesModal()" class="touch-btn px-4 py-2 rounded-xl custom-gradient-btn text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition flex-shrink-0">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Post Announcement</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  // Reverse so newest announcements appear first
+  const sorted = [...messages].reverse();
+  if (profileAnnouncementIndex >= sorted.length) profileAnnouncementIndex = 0;
+  if (profileAnnouncementIndex < 0) profileAnnouncementIndex = 0;
+  const m = sorted[profileAnnouncementIndex] || sorted[0];
+
+  const myId = currentUser && (currentUser._id || currentUser.id);
+  const isMine = String(m.senderId) === String(myId);
+  const isUnread = !((m.readBy || []).map(id => String(id)).includes(String(myId)));
+
+  const avatar = m.senderAvatar || DEFAULT_AVATAR;
+  const senderName = m.senderName || 'Anonymous Teacher';
+  const senderEmail = resolveSenderEmail(m);
+
+  const rolePill = m.senderRole === 'admin'
+    ? `<span class="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 font-extrabold text-[10px] border border-amber-500/30">Administrator</span>`
+    : `<span class="px-2 py-0.5 rounded-md bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 font-extrabold text-[10px] border border-[#245b70]/25">Teacher</span>`;
+
+  container.innerHTML = `
+    <!-- Top Bar: Header pill + Time + Open Board link -->
+    <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-gradient-to-r from-[#245b70] to-[#43888a] text-white shadow-xs">
+          <svg class="w-3.5 h-3.5 text-amber-300 animate-bounce" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2a1 1 0 0 1 1 1v1.07A8.002 8.002 0 0 1 20 12v3l2 2v1H2v-1l2-2v-3a8.002 8.002 0 0 1 7-7.93V3a1 1 0 0 1 1-1zm0 20a3 3 0 0 0 2.83-2H9.17A3 3 0 0 0 12 22z"/>
+          </svg>
+          <span>Latest Announcement & Message</span>
+        </span>
+        ${isUnread ? `
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500 text-white shadow-xs animate-pulse">
+            <span class="w-1.5 h-1.5 rounded-full bg-white"></span> NEW
+          </span>
+        ` : ''}
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-bold text-[var(--text-sub)] flex items-center gap-1">
+          <svg class="w-3 h-3 text-[#245b70] dark:text-cyan-400 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>${_timeAgo(m.createdAt)}</span>
+        </span>
+        <button type="button" onclick="openMessagesModal()" class="touch-btn text-xs font-black text-[#245b70] dark:text-cyan-300 hover:underline flex items-center gap-0.5 ml-1" title="Open Notice Board">
+          <span>View All</span>
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sender Profile Info (Avatar + Name + Role + Profile Email) -->
+    <div class="flex items-center gap-3.5 cursor-pointer" onclick="openMessagesModal()" title="Click to view full notice board">
+      <div class="relative flex-shrink-0">
+        <img src="${avatar}" alt="${escapeHtml(senderName)}" class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl object-cover ring-2 ring-[#245b70]/40 dark:ring-cyan-400/40 shadow-sm">
+        <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[var(--card-bg)] flex items-center justify-center shadow-2xs">
+          <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+        </div>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h4 class="font-black text-sm sm:text-base text-[var(--text-main)] truncate leading-tight">${escapeHtml(senderName)}</h4>
+          ${rolePill}
+          ${isMine ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)]">You</span>' : ''}
+        </div>
+        <!-- Profile Email prominently highlighted below profile name -->
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-[#245b70] dark:text-cyan-300 mt-0.5 truncate">
+          <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          <span class="font-mono text-[11px] sm:text-xs truncate">${escapeHtml(senderEmail || 'No email registered')}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message / Announcement Box (Colorful & Theme Related) -->
+    <div onclick="openMessagesModal()" class="cursor-pointer mt-3.5 p-3.5 sm:p-4 rounded-2xl bg-[var(--card-bg)]/90 dark:bg-[#142229]/95 backdrop-blur-sm border-l-4 border-l-[#245b70] dark:border-l-cyan-400 border border-[var(--border-color)] shadow-xs relative overflow-hidden group hover:border-[#245b70]/50 hover:shadow-md transition-all active:scale-[0.99]" title="Click to open notice board & reply">
+      <!-- Watermark icon -->
+      <div class="absolute -top-1 -right-1 text-[#245b70]/10 dark:text-teal-300/10 pointer-events-none group-hover:scale-110 group-hover:text-[#245b70]/15 transition-all">
+        <svg class="w-16 h-16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <!-- Announcement Body -->
+      <div class="relative z-10 space-y-1">
+        <div class="text-[10px] font-black uppercase tracking-wider text-[#245b70] dark:text-cyan-400 flex items-center gap-1.5 opacity-90">
+          <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          <span>Official Announcement</span>
+        </div>
+        <p class="text-xs sm:text-sm font-semibold text-[var(--text-main)] leading-relaxed whitespace-pre-wrap break-words">
+          ${escapeHtml(m.text)}
+        </p>
+        ${m.isEdited ? '<span class="text-[10px] text-[var(--text-sub)] italic opacity-75 block mt-1">(edited)</span>' : ''}
+      </div>
+    </div>
+
+    <!-- Bottom Actions / Mini Pager -->
+    <div class="mt-3 pt-2.5 border-t border-[var(--border-color)]/70 flex items-center justify-between gap-2 flex-wrap">
+      ${sorted.length > 1 ? `
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="navigateProfileAnnouncement(1, event)" class="touch-btn w-7 h-7 rounded-lg bg-white/80 dark:bg-slate-800/80 hover:bg-[#245b70] hover:text-white border border-[var(--border-color)] text-[var(--text-main)] flex items-center justify-center text-xs font-bold transition shadow-2xs ${profileAnnouncementIndex >= sorted.length - 1 ? 'opacity-40 cursor-not-allowed' : ''}" ${profileAnnouncementIndex >= sorted.length - 1 ? 'disabled' : ''} title="Older announcement">
+            ‹
+          </button>
+          <span class="text-[10px] font-black text-[var(--text-sub)] px-1">
+            ${profileAnnouncementIndex + 1} of ${sorted.length}
+          </span>
+          <button type="button" onclick="navigateProfileAnnouncement(-1, event)" class="touch-btn w-7 h-7 rounded-lg bg-white/80 dark:bg-slate-800/80 hover:bg-[#245b70] hover:text-white border border-[var(--border-color)] text-[var(--text-main)] flex items-center justify-center text-xs font-bold transition shadow-2xs ${profileAnnouncementIndex <= 0 ? 'opacity-40 cursor-not-allowed' : ''}" ${profileAnnouncementIndex <= 0 ? 'disabled' : ''} title="Newer announcement">
+            ›
+          </button>
+        </div>
+      ` : '<div class="text-[10px] font-bold text-[var(--text-sub)]">Latest Broadcast</div>'}
+
+      <div class="flex items-center gap-2 ml-auto">
+        <button type="button" onclick="openMessagesModal()" class="touch-btn px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#245b70] to-[#43888a] text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm hover:shadow active:scale-95 transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span>Open Notice Board</span>
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 async function openMessagesModal() {
@@ -6771,6 +6958,9 @@ async function loadMessages() {
     // Backend returns { success: true, data: [...], unreadCount }
     const messages = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
     cachedMessages = messages;
+    if (typeof renderProfileAnnouncementCard === 'function') {
+      renderProfileAnnouncementCard();
+    }
     if (messages.length === 0) {
       container.innerHTML = `<div class="text-center text-xs text-[var(--text-sub)] py-8 italic">No messages yet. Be the first to post!</div>`;
       return;
@@ -6779,19 +6969,21 @@ async function loadMessages() {
     container.innerHTML = messages.map(m => {
       const isMine = String(m.senderId) === String(myId);
       const avatar = m.senderAvatar || DEFAULT_AVATAR;
+      const senderEmail = resolveSenderEmail(m);
       const rolePill = m.senderRole === 'admin'
         ? `<span class="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[10px] border border-amber-500/20">Admin</span>`
         : `<span class="px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)] font-bold text-[10px]">Teacher</span>`;
       return `
         <div class="flex items-start gap-2.5 ${isMine ? 'flex-row-reverse' : ''}">
-          <img src="${avatar}" alt="${escapeHtml(m.senderName)}" class="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-[var(--border-color)]">
+          <img src="${avatar}" alt="${escapeHtml(m.senderName)}" class="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-[var(--border-color)] ring-1 ring-[#245b70]/20 shadow-2xs">
           <div class="max-w-[78%] space-y-1 ${isMine ? 'items-end flex flex-col' : ''}">
-            <div class="flex items-center gap-1.5 ${isMine ? 'flex-row-reverse' : ''}">
+            <div class="flex items-baseline gap-1.5 ${isMine ? 'flex-row-reverse' : ''} flex-wrap">
               <span class="font-extrabold text-xs text-[var(--text-main)]">${escapeHtml(m.senderName)}</span>
+              ${senderEmail ? `<span class="text-[10px] text-[#245b70] dark:text-cyan-400 font-mono font-medium truncate max-w-[160px] opacity-90">${escapeHtml(senderEmail)}</span>` : ''}
               ${rolePill}
               <span class="text-[10px] text-[var(--text-sub)]">${_timeAgo(m.createdAt)}</span>
             </div>
-            <div class="${isMine ? 'bg-[#245b70] text-white' : 'bg-[var(--bg-page)] text-[var(--text-main)]'} px-3 py-2 rounded-2xl ${isMine ? 'rounded-tr-md' : 'rounded-tl-md'} text-xs font-medium border ${isMine ? 'border-[#245b70]' : 'border-[var(--border-color)]'} shadow-sm cursor-pointer select-none active:scale-98 transition relative"
+            <div class="${isMine ? 'bg-gradient-to-r from-[#245b70] to-[#1a4454] text-white border-[#245b70]' : 'bg-[var(--card-bg)] text-[var(--text-main)] border-[var(--border-color)] border-l-4 border-l-[#245b70] dark:border-l-cyan-400'} px-3.5 py-2.5 rounded-2xl ${isMine ? 'rounded-tr-md' : 'rounded-tl-md'} text-xs font-medium border shadow-sm cursor-pointer select-none active:scale-98 transition relative"
               onmousedown="handleMsgStartHold(event, '${m._id}')"
               onmouseup="handleMsgEndHold(event)"
               onmouseleave="handleMsgEndHold(event)"
@@ -6827,6 +7019,10 @@ async function handleSendMessage(e) {
     await API.sendMessage(text);
     input.value = '';
     await loadMessages();
+    if (typeof renderProfileAnnouncementCard === 'function') {
+      profileAnnouncementIndex = 0; // reset to newest
+      renderProfileAnnouncementCard();
+    }
   } catch (err) {
     showToast('Failed to send message: ' + err.message, true);
   } finally {
