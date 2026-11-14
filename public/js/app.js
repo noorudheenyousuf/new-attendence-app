@@ -7840,6 +7840,10 @@ function selectPrintOption(type) {
     openStudentExportModal();
   } else if (type === 'attendance') {
     openAttendanceExportModal();
+  } else if (type === 'teacher-activity') {
+    openTeacherActivityExportModal();
+  } else if (type === 'timetable') {
+    printTimetableSchedule();
   }
 }
 
@@ -7860,7 +7864,18 @@ async function openStudentExportModal() {
     classSelect.value = currentVal;
   }
 
+  // USER DIRECTIVE: "fistly all check boxes are unticked"
+  const container = document.getElementById('export-fields-container');
+  if (container) {
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(c => c.checked = false);
+  }
+
   modal.classList.remove('hidden');
+}
+
+function _hasAnySelectedExportField(fields) {
+  return fields && Object.values(fields).some(Boolean);
 }
 
 function closeStudentExportModal() {
@@ -7900,6 +7915,11 @@ function _getSelectedExportFields() {
 async function executeStudentPrintA4() {
   const classFilter = document.getElementById('export-student-class')?.value || 'all';
   const fields = _getSelectedExportFields();
+
+  if (!_hasAnySelectedExportField(fields)) {
+    showToast('Please select at least one field to include', true);
+    return;
+  }
 
   try {
     showToast('Preparing A4 Printable Sheet...');
@@ -8037,6 +8057,11 @@ async function executeStudentExportCSV() {
   const classFilter = document.getElementById('export-student-class')?.value || 'all';
   const fields = _getSelectedExportFields();
 
+  if (!_hasAnySelectedExportField(fields)) {
+    showToast('Please select at least one field to include', true);
+    return;
+  }
+
   try {
     showToast('Generating CSV file...');
     const res = await API.getStudents(classFilter === 'all' ? 'all' : classFilter);
@@ -8111,6 +8136,114 @@ async function executeStudentExportCSV() {
     closeStudentExportModal();
   } catch (err) {
     showToast('CSV Export failed: ' + err.message, true);
+  }
+}
+
+async function executeStudentRosterPrintA4() {
+  const classFilter = document.getElementById('export-student-class')?.value || 'all';
+  const fields = _getSelectedExportFields();
+
+  if (!_hasAnySelectedExportField(fields)) {
+    showToast('Please select at least one field to include in the roster', true);
+    return;
+  }
+
+  try {
+    showToast('Generating Printable Student Roster...');
+    const res = await API.getStudents(classFilter === 'all' ? 'all' : classFilter);
+    const students = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+
+    if (students.length === 0) {
+      showToast('No students found for selected class', true);
+      return;
+    }
+
+    const schoolTitle = (appSettings && appSettings.schoolName)
+      ? appSettings.schoolName
+      : (appSettings && appSettings.appName ? appSettings.appName : 'REGISTERLY');
+
+    const printContainer = document.getElementById('student-roster-print-sheet');
+    if (!printContainer) return;
+
+    // Build dynamic column headers & cell renderers based exclusively on ticked checkboxes
+    const cols = [];
+    cols.push({ label: '#', align: 'center', width: '35px', render: (st, idx) => idx + 1 });
+    if (fields.photo) cols.push({ label: 'Photo', align: 'center', width: '45px', render: st => {
+      const p = isCustomPhoto(st.photoUrl) ? st.photoUrl : getInitialsAvatar(st.name, '245b70');
+      return `<img src="${p}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;display:inline-block;border:1px solid #cbd5e1;">`;
+    }});
+    if (fields.id) cols.push({ label: 'ID', align: 'left', render: st => st.studentId || st._id || '-' });
+    if (fields.roll) cols.push({ label: 'Roll', align: 'center', width: '45px', render: st => st.roll !== undefined ? st.roll : '-' });
+    if (fields.name) cols.push({ label: 'Student Name', align: 'left', render: st => `<b>${escapeHtml(st.name || '-')}</b>` });
+    if (fields.class) cols.push({ label: 'Class', align: 'center', render: st => escapeHtml(st.class || classFilter) });
+    if (fields.mobile) cols.push({ label: "Father's No.", align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.fatherMobile) || '-') });
+    if (fields.father) cols.push({ label: "Father's Name", align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.fatherName) || '-') });
+    if (fields.mother) cols.push({ label: "Mother's Name", align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.motherName) || '-') });
+    if (fields.place) cols.push({ label: 'Place', align: 'left', render: st => escapeHtml((st.address && st.address.place) || '-') });
+    if (fields.district) cols.push({ label: 'District', align: 'left', render: st => escapeHtml((st.address && st.address.district) || '-') });
+    if (fields.state) cols.push({ label: 'State', align: 'left', render: st => escapeHtml((st.address && st.address.state) || '-') });
+    if (fields.address) cols.push({ label: 'Address', align: 'left', render: st => escapeHtml((st.address && st.address.fullAddress) || '-') });
+    if (fields.year) cols.push({ label: 'Year Joined', align: 'center', render: st => escapeHtml((st.academicStatus && st.academicStatus.yearJoined) || '-') });
+    if (fields.rank) cols.push({ label: 'Rank', align: 'center', render: st => escapeHtml((st.academicStatus && st.academicStatus.rank) || '-') });
+    if (fields.college) cols.push({ label: 'Previous College', align: 'left', render: st => escapeHtml((st.academicStatus && st.academicStatus.previousCollege) || '-') });
+    cols.push({ label: 'Remarks / Sign', align: 'center', width: '90px', render: () => '' });
+
+    const classLabel = classFilter === 'all' ? 'All Classes' : classFilter;
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    let html = `
+      <div style="font-family: Arial, sans-serif; padding: 15px 20px; color: #0f172a; max-width: 900px; margin: 0 auto; background:#fff;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #245b70; padding-bottom: 10px; margin-bottom: 12px;">
+          <div>
+            <h1 style="font-size: 18px; font-weight: 900; margin: 0; color: #245b70; letter-spacing: 0.5px;">${escapeHtml(schoolTitle)}</h1>
+            <h2 style="font-size: 13px; font-weight: 700; margin: 2px 0 0; color: #334155;">STUDENT ROSTER / REGISTER SHEET</h2>
+          </div>
+          <div style="text-align: right; font-size: 11px; color: #64748b; font-weight: 600;">
+            <div>Class: <b style="color:#0f172a;">${escapeHtml(classLabel)}</b></div>
+            <div>Total Students: <b style="color:#0f172a;">${students.length}</b></div>
+            <div>Date: ${dateStr}</div>
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background-color: #f1f5f9; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #94a3b8;">
+              ${cols.map(c => `<th style="padding: 6px 8px; text-align: ${c.align}; font-weight: 800; color: #1e293b; ${c.width ? `width:${c.width};` : ''}">${c.label}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${students.map((st, idx) => `
+              <tr style="border-bottom: 1px solid #e2e8f0; ${idx % 2 === 1 ? 'background-color: #fafafa;' : ''}">
+                ${cols.map(c => `<td style="padding: 5px 8px; text-align: ${c.align}; vertical-align: middle;">${c.render(st, idx)}</td>`).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div style="margin-top: 35px; display: flex; justify-content: space-between; font-size: 11px; color: #475569; page-break-inside: avoid;">
+          <div style="border-top: 1px dashed #94a3b8; width: 200px; padding-top: 5px; text-align: center;">
+            Class Teacher Signature
+          </div>
+          <div style="border-top: 1px dashed #94a3b8; width: 200px; padding-top: 5px; text-align: center;">
+            Principal / Admin Signature
+          </div>
+        </div>
+      </div>
+    `;
+
+    printContainer.innerHTML = html;
+    closeStudentExportModal();
+
+    document.body.classList.add('printing-student-roster');
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing-student-roster');
+      printContainer.innerHTML = '';
+    }, { once: true });
+
+    setTimeout(() => { window.print(); }, 250);
+
+  } catch (err) {
+    showToast('Failed to prepare student roster: ' + (err.message || 'Error'), true);
   }
 }
 
@@ -8246,6 +8379,368 @@ async function executeAttendanceExportCSV() {
     closeAttendanceExportModal();
   } catch (err) {
     showToast('Attendance Export failed: ' + (err.message || 'Unknown error'), true);
+  }
+}
+
+async function executeAttendancePrintA4() {
+  const classVal = document.getElementById('export-att-class')?.value || 'all';
+  const subjectVal = document.getElementById('export-att-subject')?.value || 'whole';
+  const yearVal = document.getElementById('export-att-year')?.value || 'all';
+  const monthVal = document.getElementById('export-att-month')?.value || 'all-year';
+
+  try {
+    showToast('Preparing A4 Attendance Sheet...');
+    const res = await API.getClassReport(classVal, yearVal, monthVal, subjectVal);
+    const data = (res && res.data) ? res.data : [];
+
+    if (!data || data.length === 0) {
+      showToast('No attendance records found for selected filters', true);
+      return;
+    }
+
+    const monthNames = {
+      'all-year': 'All Months',
+      '01': 'January', '02': 'February', '03': 'March', '04': 'April',
+      '05': 'May', '06': 'June', '07': 'July', '08': 'August',
+      '09': 'September', '10': 'October', '11': 'November', '12': 'December',
+      '1': 'January', '2': 'February', '3': 'March', '4': 'April',
+      '5': 'May', '6': 'June', '7': 'July', '8': 'August', '9': 'September'
+    };
+    const monthDisplay = monthNames[monthVal] || (monthVal === 'all-year' ? 'All Months' : monthVal);
+    const subjectDisplay = (subjectVal === 'whole' || subjectVal === 'all') ? 'All Subjects' : subjectVal;
+    const classDisplay = (classVal === 'all') ? 'All Classes' : classVal;
+    const yearDisplay = (yearVal === 'all') ? 'All Years' : yearVal;
+
+    const schoolTitle = (appSettings && appSettings.schoolName)
+      ? appSettings.schoolName
+      : (appSettings && appSettings.appName ? appSettings.appName : 'REGISTERLY');
+
+    const totalStudents = data.length;
+    const totalSessions = data[0]?.sessions || (res.summary?.totalSessions || 0);
+    const avgPercent = res.summary?.classAverage !== undefined
+      ? res.summary.classAverage
+      : Math.round(data.reduce((acc, r) => acc + (r.percent || 0), 0) / (totalStudents || 1));
+
+    const totalPresent = data.reduce((acc, r) => acc + (r.present || 0), 0);
+    const totalAbsent = data.reduce((acc, r) => acc + (r.absent || 0), 0);
+    const totalLeave = data.reduce((acc, r) => acc + (r.leave || r.late || 0), 0);
+
+    const printContainer = document.getElementById('attendance-print-sheet');
+    if (!printContainer) return;
+
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    let html = `
+      <div style="font-family: Arial, sans-serif; padding: 15px 20px; color: #0f172a; max-width: 900px; margin: 0 auto; background: #fff;">
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #245b70; padding-bottom: 10px; margin-bottom: 12px;">
+          <div>
+            <h1 style="font-size: 18px; font-weight: 900; margin: 0; color: #245b70; letter-spacing: 0.5px;">${escapeHtml(schoolTitle)}</h1>
+            <h2 style="font-size: 13px; font-weight: 700; margin: 2px 0 0; color: #334155;">MONTHLY ATTENDANCE REPORT</h2>
+          </div>
+          <div style="text-align: right; font-size: 11px; color: #64748b; font-weight: 600;">
+            <div>Class: <b style="color:#0f172a;">${escapeHtml(classDisplay)}</b></div>
+            <div>Subject: <b style="color:#0f172a;">${escapeHtml(subjectDisplay)}</b></div>
+            <div>Period: <b style="color:#0f172a;">${escapeHtml(monthDisplay)} ${escapeHtml(yearDisplay)}</b></div>
+            <div>Printed: ${dateStr}</div>
+          </div>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px;">
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Average Attendance</div>
+            <div style="font-size: 16px; font-weight: 900; color: #245b70; margin-top: 2px;">${avgPercent}%</div>
+          </div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Students</div>
+            <div style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 2px;">${totalStudents}</div>
+          </div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Sessions</div>
+            <div style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 2px;">${totalSessions}</div>
+          </div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Present / Absent / Leave</div>
+            <div style="font-size: 13px; font-weight: 900; color: #0f172a; margin-top: 4px;">
+              <span style="color:#16a34a;">${totalPresent}</span> / <span style="color:#dc2626;">${totalAbsent}</span> / <span style="color:#d97706;">${totalLeave}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendance Table -->
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background-color: #f1f5f9; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #94a3b8;">
+              <th style="padding: 6px 8px; text-align: center; width: 40px; font-weight: 800;">Roll</th>
+              <th style="padding: 6px 8px; text-align: left; font-weight: 800;">Student Name</th>
+              <th style="padding: 6px 6px; text-align: center; width: 60px; font-weight: 800;">Sessions</th>
+              <th style="padding: 6px 6px; text-align: center; width: 60px; font-weight: 800; color: #16a34a;">Present</th>
+              <th style="padding: 6px 6px; text-align: center; width: 60px; font-weight: 800; color: #dc2626;">Absent</th>
+              <th style="padding: 6px 6px; text-align: center; width: 55px; font-weight: 800; color: #d97706;">Leave</th>
+              <th style="padding: 6px 6px; text-align: center; width: 65px; font-weight: 800;">Percent</th>
+              <th style="padding: 6px 8px; text-align: center; width: 75px; font-weight: 800;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((row, idx) => {
+              const effStatus = row.status || (row.percent >= 90 ? 'Excellent' : row.percent >= 75 ? 'Regular' : row.percent >= 60 ? 'Warning' : 'Critical');
+              const statusColor = effStatus === 'Excellent' ? '#16a34a' : effStatus === 'Regular' ? '#2563eb' : effStatus === 'Warning' ? '#d97706' : '#dc2626';
+              return `
+                <tr style="border-bottom: 1px solid #e2e8f0; ${idx % 2 === 1 ? 'background-color: #fafafa;' : ''}">
+                  <td style="padding: 5px 8px; text-align: center; font-weight: 700;">${row.roll !== undefined ? row.roll : '-'}</td>
+                  <td style="padding: 5px 8px; text-align: left; font-weight: 700;">${escapeHtml(row.name || '-')}</td>
+                  <td style="padding: 5px 6px; text-align: center;">${row.sessions !== undefined ? row.sessions : 0}</td>
+                  <td style="padding: 5px 6px; text-align: center; font-weight: 700; color: #16a34a;">${row.present !== undefined ? row.present : 0}</td>
+                  <td style="padding: 5px 6px; text-align: center; font-weight: 700; color: #dc2626;">${row.absent !== undefined ? row.absent : 0}</td>
+                  <td style="padding: 5px 6px; text-align: center; color: #d97706;">${row.leave !== undefined ? row.leave : (row.late !== undefined ? row.late : 0)}</td>
+                  <td style="padding: 5px 6px; text-align: center; font-weight: 800;">${row.percent !== undefined ? row.percent : 100}%</td>
+                  <td style="padding: 5px 8px; text-align: center; font-weight: 700; color: ${statusColor};">${effStatus}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <!-- Sign-off Footer -->
+        <div style="margin-top: 35px; display: flex; justify-content: space-between; font-size: 11px; color: #475569; page-break-inside: avoid;">
+          <div style="border-top: 1px dashed #94a3b8; width: 200px; padding-top: 5px; text-align: center;">
+            Class Teacher Signature
+          </div>
+          <div style="border-top: 1px dashed #94a3b8; width: 200px; padding-top: 5px; text-align: center;">
+            Principal / Head Signature
+          </div>
+        </div>
+      </div>
+    `;
+
+    printContainer.innerHTML = html;
+    closeAttendanceExportModal();
+
+    document.body.classList.add('printing-attendance-sheet');
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing-attendance-sheet');
+      printContainer.innerHTML = '';
+    }, { once: true });
+
+    setTimeout(() => { window.print(); }, 250);
+
+  } catch (err) {
+    showToast('Failed to prepare attendance sheet: ' + (err.message || 'Error'), true);
+  }
+}
+
+// ================= TEACHER ACTIVITY & SESSION REPORT =================
+async function openTeacherActivityExportModal() {
+  const modal = document.getElementById('modal-teacher-activity-export');
+  if (!modal) return;
+
+  if (!classesList || classesList.length === 0) {
+    try { await loadClasses(); } catch(_) {}
+  }
+
+  const classSelect = document.getElementById('export-tlog-class');
+  if (classSelect) {
+    const currentVal = classSelect.value || 'all';
+    classSelect.innerHTML = `<option value="all">All Classes</option>` +
+      classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
+    classSelect.value = currentVal;
+  }
+
+  const yearSelect = document.getElementById('export-tlog-year');
+  if (yearSelect && !yearSelect.value) {
+    yearSelect.value = String(new Date().getFullYear());
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeTeacherActivityExportModal() {
+  const modal = document.getElementById('modal-teacher-activity-export');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function executeTeacherActivityPrintA4() {
+  if (!currentUser) {
+    showToast('Please sign in first', true);
+    return;
+  }
+
+  const teacherId = currentUser._id || currentUser.id;
+  if (!teacherId) {
+    showToast('User profile ID not found', true);
+    return;
+  }
+
+  const classVal = document.getElementById('export-tlog-class')?.value || 'all';
+  const yearVal = document.getElementById('export-tlog-year')?.value || 'all';
+
+  try {
+    showToast('Fetching teacher activity records...');
+    const res = await API.getTeacherLogs(teacherId, yearVal, classVal);
+    if (!res || !res.success) {
+      showToast('No activity records found', true);
+      return;
+    }
+
+    const teacher = res.teacher || currentUser;
+    const stats = res.stats || {};
+    const sessions = res.sessions || [];
+
+    if (sessions.length === 0) {
+      showToast('No teaching sessions recorded for selected filters', true);
+      return;
+    }
+
+    const schoolTitle = (appSettings && appSettings.schoolName)
+      ? appSettings.schoolName
+      : (appSettings && appSettings.appName ? appSettings.appName : 'REGISTERLY');
+
+    const printContainer = document.getElementById('teacher-activity-print-sheet');
+    if (!printContainer) return;
+
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    let html = `
+      <div style="font-family: Arial, sans-serif; padding: 15px 20px; color: #0f172a; max-width: 900px; margin: 0 auto; background: #fff;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #245b70; padding-bottom: 10px; margin-bottom: 12px;">
+          <div>
+            <h1 style="font-size: 18px; font-weight: 900; margin: 0; color: #245b70; letter-spacing: 0.5px;">${escapeHtml(schoolTitle)}</h1>
+            <h2 style="font-size: 13px; font-weight: 700; margin: 2px 0 0; color: #334155;">TEACHER ACTIVITY & ATTENDANCE LOG</h2>
+          </div>
+          <div style="text-align: right; font-size: 11px; color: #64748b; font-weight: 600;">
+            <div>Teacher: <b style="color:#0f172a;">${escapeHtml(teacher.name || '')}</b></div>
+            <div>Email: ${escapeHtml(teacher.email || '-')}</div>
+            <div>Year: <b style="color:#0f172a;">${escapeHtml(yearVal === 'all' ? 'All Years' : yearVal)}</b></div>
+            <div>Printed: ${dateStr}</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px;">
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Sessions</div>
+            <div style="font-size: 16px; font-weight: 900; color: #245b70; margin-top: 2px;">${stats.totalSessions || sessions.length}</div>
+          </div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Active Days</div>
+            <div style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 2px;">${stats.totalDays || '-'}</div>
+          </div>
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase;">Classes Handled</div>
+            <div style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 2px;">${stats.classesCount || '-'}</div>
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background-color: #f1f5f9; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #94a3b8;">
+              <th style="padding: 6px 8px; text-align: center; width: 35px; font-weight: 800;">#</th>
+              <th style="padding: 6px 8px; text-align: left; width: 90px; font-weight: 800;">Date</th>
+              <th style="padding: 6px 8px; text-align: left; font-weight: 800;">Class</th>
+              <th style="padding: 6px 8px; text-align: left; font-weight: 800;">Subject</th>
+              <th style="padding: 6px 8px; text-align: center; width: 70px; font-weight: 800;">Students</th>
+              <th style="padding: 6px 8px; text-align: center; width: 65px; font-weight: 800; color: #16a34a;">Present</th>
+              <th style="padding: 6px 8px; text-align: center; width: 65px; font-weight: 800; color: #dc2626;">Absent</th>
+              <th style="padding: 6px 8px; text-align: center; width: 60px; font-weight: 800; color: #d97706;">Leave</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sessions.map((s, idx) => `
+              <tr style="border-bottom: 1px solid #e2e8f0; ${idx % 2 === 1 ? 'background-color: #fafafa;' : ''}">
+                <td style="padding: 5px 8px; text-align: center; color: #64748b;">${idx + 1}</td>
+                <td style="padding: 5px 8px; font-weight: 700;">${escapeHtml(s.date || '-')}</td>
+                <td style="padding: 5px 8px; font-weight: 700;">${escapeHtml(s.class || '-')}</td>
+                <td style="padding: 5px 8px;">${escapeHtml(s.subject || '-')}</td>
+                <td style="padding: 5px 8px; text-align: center;">${s.totalStudents !== undefined ? s.totalStudents : '-'}</td>
+                <td style="padding: 5px 8px; text-align: center; font-weight: 700; color: #16a34a;">${s.presentCount !== undefined ? s.presentCount : 0}</td>
+                <td style="padding: 5px 8px; text-align: center; font-weight: 700; color: #dc2626;">${s.absentCount !== undefined ? s.absentCount : 0}</td>
+                <td style="padding: 5px 8px; text-align: center; color: #d97706;">${s.leaveCount !== undefined ? s.leaveCount : 0}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div style="margin-top: 35px; display: flex; justify-content: space-between; font-size: 11px; color: #475569; page-break-inside: avoid;">
+          <div style="border-top: 1px dashed #94a3b8; width: 200px; padding-top: 5px; text-align: center;">
+            Teacher Signature
+          </div>
+          <div style="border-top: 1px dashed #94a3b8; width: 200px; padding-top: 5px; text-align: center;">
+            Principal Verification
+          </div>
+        </div>
+      </div>
+    `;
+
+    printContainer.innerHTML = html;
+    closeTeacherActivityExportModal();
+
+    document.body.classList.add('printing-teacher-activity');
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing-teacher-activity');
+      printContainer.innerHTML = '';
+    }, { once: true });
+
+    setTimeout(() => { window.print(); }, 250);
+
+  } catch (err) {
+    showToast('Failed to prepare teacher activity report: ' + (err.message || 'Error'), true);
+  }
+}
+
+async function executeTeacherActivityExportCSV() {
+  if (!currentUser) {
+    showToast('Please sign in first', true);
+    return;
+  }
+  const teacherId = currentUser._id || currentUser.id;
+  const classVal = document.getElementById('export-tlog-class')?.value || 'all';
+  const yearVal = document.getElementById('export-tlog-year')?.value || 'all';
+
+  try {
+    showToast('Preparing Activity CSV...');
+    const res = await API.getTeacherLogs(teacherId, yearVal, classVal);
+    const sessions = (res && res.sessions) ? res.sessions : [];
+
+    if (sessions.length === 0) {
+      showToast('No sessions found to export', true);
+      return;
+    }
+
+    const teacherName = (res.teacher && res.teacher.name) || currentUser.name || 'Teacher';
+    const csvRows = [
+      `"Teacher","${teacherName.replace(/"/g, '""')}"`,
+      `"Year","${yearVal}"`,
+      `"Class Filter","${classVal}"`,
+      `""`,
+      `"Date","Class","Subject","Period","Total Students","Present","Absent","Leave"`
+    ];
+
+    sessions.forEach(s => {
+      csvRows.push([
+        `"${s.date || ''}"`,
+        `"${(s.class || '').replace(/"/g, '""')}"`,
+        `"${(s.subject || '').replace(/"/g, '""')}"`,
+        `"${(s.period || '').replace(/"/g, '""')}"`,
+        `"${s.totalStudents !== undefined ? s.totalStudents : 0}"`,
+        `"${s.presentCount !== undefined ? s.presentCount : 0}"`,
+        `"${s.absentCount !== undefined ? s.absentCount : 0}"`,
+        `"${s.leaveCount !== undefined ? s.leaveCount : 0}"`
+      ].join(','));
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join("\n"));
+    const downloadAnchor = document.createElement('a');
+    const dateTag = new Date().toISOString().slice(0, 10);
+    downloadAnchor.setAttribute("href", csvContent);
+    downloadAnchor.setAttribute("download", `Teacher_Activity_${teacherName.replace(/\s+/g, '_')}_${dateTag}.csv`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    showToast('Teacher Activity CSV downloaded successfully!');
+    closeTeacherActivityExportModal();
+  } catch (err) {
+    showToast('Export failed: ' + (err.message || 'Error'), true);
   }
 }
 

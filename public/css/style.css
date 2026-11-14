@@ -818,10 +818,16 @@ input:checked + .switch-slider:before {
 
 /* Printable Timetable Grid Styles */
 @media print {
-  body.printing-timetable > *:not(#timetable-print-sheet) {
+  body.printing-timetable > *:not(#timetable-print-sheet),
+  body.printing-attendance-sheet > *:not(#attendance-print-sheet),
+  body.printing-student-roster > *:not(#student-roster-print-sheet),
+  body.printing-teacher-activity > *:not(#teacher-activity-print-sheet) {
     display: none !important;
   }
-  #timetable-print-sheet {
+  #timetable-print-sheet,
+  #attendance-print-sheet,
+  #student-roster-print-sheet,
+  #teacher-activity-print-sheet {
     display: block !important;
     position: absolute;
     top: 0;

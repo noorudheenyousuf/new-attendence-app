@@ -2425,7 +2425,31 @@
           </div>
           <div class="min-w-0 flex-1">
             <div class="text-xs font-black text-[var(--text-main)]">Attendance Record</div>
-            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">Filter by class, subject, year & month for CSV report</div>
+            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">Print A4 monthly sheet or download CSV</div>
+          </div>
+          <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+
+        <!-- Option 3: Teacher Activity Report -->
+        <button type="button" onclick="selectPrintOption('teacher-activity')" class="touch-btn w-full bg-[var(--bg-page)] hover:bg-[#245b70]/10 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-xs flex items-center gap-3 transition active:scale-98 group text-left">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-[var(--text-main)]">Teacher Activity Report</div>
+            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">Sessions conducted, classes taught & attendance log</div>
+          </div>
+          <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+
+        <!-- Option 4: Timetable Schedule -->
+        <button type="button" onclick="selectPrintOption('timetable')" class="touch-btn w-full bg-[var(--bg-page)] hover:bg-[#245b70]/10 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-xs flex items-center gap-3 transition active:scale-98 group text-left">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-[var(--text-main)]">My Timetable Schedule</div>
+            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">Print or PDF export weekly timetable schedule</div>
           </div>
           <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
@@ -2468,57 +2492,57 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)] text-xs font-semibold text-[var(--text-main)] max-h-56 overflow-y-auto" id="export-fields-container">
           <!-- 1. Photo -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-photo" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-photo" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Photo</span>
           </label>
           <!-- 2. ID -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-id" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-id" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Student ID</span>
           </label>
           <!-- 3. Name -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-name" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-name" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Name</span>
           </label>
           <!-- 4. Class -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-class" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-class" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Class</span>
           </label>
           <!-- 5. Roll No -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-roll" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-roll" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Roll No</span>
           </label>
           <!-- 6. Address -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-address" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-address" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Address</span>
           </label>
           <!-- 7. Place -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-place" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-place" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Place</span>
           </label>
           <!-- 8. District -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-district" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-district" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>District</span>
           </label>
           <!-- 9. State -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-state" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-state" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>State</span>
           </label>
           <!-- 10. Father's Name -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-father" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-father" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Father's Name</span>
           </label>
           <!-- 11. Father's Number -->
           <label class="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--card-bg)] transition">
-            <input type="checkbox" id="chk-export-mobile" checked class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
+            <input type="checkbox" id="chk-export-mobile" class="rounded border-slate-300 text-[#245b70] focus:ring-[#245b70]">
             <span>Father's Number</span>
           </label>
           <!-- 12. Mother's Name -->
@@ -2544,15 +2568,19 @@
         </div>
       </div>
 
-      <!-- Step 3: Choose Format (Print A4 18-card Grid OR CSV) -->
+      <!-- Step 3: Choose Format (Print Table Roster, Print A4 ID Cards OR CSV) -->
       <div class="pt-2 border-t border-[var(--border-color)]">
         <label class="block text-xs font-bold text-[var(--text-main)] mb-2">Export As:</label>
-        <div class="grid grid-cols-2 gap-2.5">
-          <button type="button" onclick="executeStudentPrintA4()" class="touch-btn bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition p-3 text-center">
-            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            <span>Print A4 Cards (18/Page)</span>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button type="button" onclick="executeStudentRosterPrintA4()" class="touch-btn bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-2.5 text-center" title="Print tabular list of students with chosen columns">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+            <span>Print Table Roster</span>
           </button>
-          <button type="button" onclick="executeStudentExportCSV()" class="touch-btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition p-3 text-center">
+          <button type="button" onclick="executeStudentPrintA4()" class="touch-btn bg-[#1e4d5f] hover:bg-[#163a48] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-2.5 text-center" title="Print photo ID cards grid (18 per A4 page)">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            <span>Print ID Cards</span>
+          </button>
+          <button type="button" onclick="executeStudentExportCSV()" class="touch-btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-2.5 text-center">
             <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Download CSV</span>
           </button>
@@ -2642,12 +2670,85 @@
         </div>
       </div>
 
-      <!-- Action Button -->
+      <!-- Action Buttons -->
       <div class="pt-2 border-t border-[var(--border-color)]">
-        <button type="button" onclick="executeAttendanceExportCSV()" class="touch-btn w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition p-3 text-center">
-          <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          <span>Download Attendance CSV</span>
-        </button>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="executeAttendancePrintA4()" class="touch-btn bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition p-3 text-center">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            <span>Print Attendance Sheet</span>
+          </button>
+          <button type="button" onclick="executeAttendanceExportCSV()" class="touch-btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition p-3 text-center">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Download CSV</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TEACHER ACTIVITY REPORT MODAL ================= -->
+  <div id="modal-teacher-activity-export" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 shadow-2xl border border-[var(--border-color)] my-auto space-y-4">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base text-[var(--text-main)]">Teacher Activity Report</h3>
+            <p class="text-[10px] text-[var(--text-sub)]">Teaching sessions conducted & attendance logs</p>
+          </div>
+        </div>
+        <button onclick="closeTeacherActivityExportModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <!-- Filters Form -->
+      <div class="space-y-3">
+        <!-- Filter 1: Class Filter -->
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Filter by Class</label>
+          <select id="export-tlog-class" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <option value="all">All Classes</option>
+          </select>
+        </div>
+
+        <!-- Filter 2: Year -->
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Year</label>
+          <select id="export-tlog-year" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+            <option value="all">All Years</option>
+            <option value="2026" selected>2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+            <option value="2023">2023</option>
+          </select>
+        </div>
+
+        <!-- Summary Note -->
+        <div class="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-700 dark:text-purple-300">
+          <div class="font-bold flex items-center gap-1.5 mb-0.5">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Report Content:</span>
+          </div>
+          <div class="text-[10px] opacity-90 leading-relaxed">
+            Detailed breakdown of every teaching session conducted, class, subject, date & time, student attendance statistics, and signature verification blocks.
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="pt-2 border-t border-[var(--border-color)]">
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="executeTeacherActivityPrintA4()" class="touch-btn bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition p-3 text-center">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            <span>Print Activity Sheet</span>
+          </button>
+          <button type="button" onclick="executeTeacherActivityExportCSV()" class="touch-btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition p-3 text-center">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Download CSV</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -3035,6 +3136,15 @@
 
   <!-- TIMETABLE PRINT SHEET -->
   <div id="timetable-print-sheet" class="hidden"></div>
+
+  <!-- ATTENDANCE PRINT SHEET -->
+  <div id="attendance-print-sheet" class="hidden"></div>
+
+  <!-- STUDENT ROSTER PRINT SHEET -->
+  <div id="student-roster-print-sheet" class="hidden"></div>
+
+  <!-- TEACHER ACTIVITY PRINT SHEET -->
+  <div id="teacher-activity-print-sheet" class="hidden"></div>
 
 
   <!-- PERSONAL WORKSPACE MODALS -->
