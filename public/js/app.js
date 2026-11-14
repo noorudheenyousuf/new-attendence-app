@@ -2390,6 +2390,11 @@ function renderAttendancePlaceholder() {
   const container = document.getElementById('attendance-list');
   if (!container) return;
 
+  const isMl = (typeof getAppLanguage === 'function' ? getAppLanguage() : (localStorage.getItem('app_language') || 'en')) === 'ml';
+  const title = isMl ? 'ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക' : 'Select Class & Subject';
+  const desc = isMl ? 'വിദ്യാർത്ഥികളുടെ പട്ടിക ലഭ്യമാക്കാനും ഹാജർ രേഖപ്പെടുത്താനും മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.' : 'Choose a class and subject from the filters above to load the student roster and take attendance.';
+  const badge = isMl ? 'മുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക' : 'Choose class & subject above';
+
   container.innerHTML = `
     <div class="flex flex-col items-center justify-center py-12 px-6 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-xs my-1 relative overflow-hidden transition-all duration-300">
       <!-- Standard Crisp Clipboard-Check Badge with Ambient Ring -->
@@ -2400,13 +2405,13 @@ function renderAttendancePlaceholder() {
           <path d="m9 14 2 2 4-4"></path>
         </svg>
       </div>
-      <h3 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight mb-1.5">Select Class &amp; Subject</h3>
-      <p class="text-xs sm:text-sm text-[var(--text-sub)] font-medium max-w-xs leading-relaxed mx-auto">
-        Choose a class and subject from the filters above to load the student roster and take attendance.
+      <h3 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight mb-1.5" data-i18n="placeholder_select_class_subject">${title}</h3>
+      <p class="text-xs sm:text-sm text-[var(--text-sub)] font-medium max-w-xs leading-relaxed mx-auto" data-i18n="placeholder_att_desc">
+        ${desc}
       </p>
       <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-page)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-sub)] mt-4 select-none">
         <span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-cyan-400 animate-pulse"></span>
-        <span>Choose class &amp; subject above</span>
+        <span data-i18n="placeholder_choose_badge">${badge}</span>
       </div>
     </div>
   `;
@@ -2429,6 +2434,11 @@ function renderReportPlaceholder() {
   const container = document.getElementById('report-placeholder');
   if (!container) return;
 
+  const isMl = (typeof getAppLanguage === 'function' ? getAppLanguage() : (localStorage.getItem('app_language') || 'en')) === 'ml';
+  const title = isMl ? 'ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക' : 'Select Class & Subject';
+  const desc = isMl ? 'സമ്പൂർണ്ണ ഹാജർ വിശകലനങ്ങളും ഷീറ്റുകളും തയ്യാറാക്കാൻ മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.' : 'Choose a class and subject from the filters above to generate full attendance analytics and sheets.';
+  const badge = isMl ? 'മുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക' : 'Choose class & subject above';
+
   container.innerHTML = `
     <div class="flex flex-col items-center justify-center py-12 px-6 bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] text-center shadow-xs my-1 relative overflow-hidden transition-all duration-300">
       <!-- Standard Crisp Analytics / Bar-Chart Badge with Ambient Ring -->
@@ -2440,13 +2450,13 @@ function renderReportPlaceholder() {
           <path d="M3 20h18"></path>
         </svg>
       </div>
-      <h3 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight mb-1.5">Select Class &amp; Subject</h3>
-      <p class="text-xs sm:text-sm text-[var(--text-sub)] font-medium max-w-xs leading-relaxed mx-auto">
-        Choose a class and subject from the filters above to generate full attendance analytics and sheets.
+      <h3 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight mb-1.5" data-i18n="placeholder_select_class_subject">${title}</h3>
+      <p class="text-xs sm:text-sm text-[var(--text-sub)] font-medium max-w-xs leading-relaxed mx-auto" data-i18n="placeholder_rep_desc">
+        ${desc}
       </p>
       <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-page)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-sub)] mt-4 select-none">
         <span class="w-1.5 h-1.5 rounded-full bg-[#245b70] dark:bg-cyan-400 animate-pulse"></span>
-        <span>Choose class &amp; subject above</span>
+        <span data-i18n="placeholder_choose_badge">${badge}</span>
       </div>
     </div>
   `;

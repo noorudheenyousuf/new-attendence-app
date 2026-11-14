@@ -84,7 +84,24 @@ const APP_TRANSLATIONS = {
     total: "Total",
     loading: "Loading...",
     success: "Success",
-    error: "Error"
+    error: "Error",
+
+    // Academic & Quick Tools
+    quick_tools: "Quick Tools",
+    timetable: "Timetable",
+    my_schedule: "My Schedule",
+    messages: "Messages",
+    teacher_notice: "Teacher Notice",
+    print_reports: "Print Reports",
+    students_data: "Students & Data",
+    profile_logs: "Profile Logs",
+    my_activity_log: "My Activity Log",
+
+    // Placeholders
+    placeholder_select_class_subject: "Select Class & Subject",
+    placeholder_att_desc: "Choose a class and subject from the filters above to load the student roster and take attendance.",
+    placeholder_rep_desc: "Choose a class and subject from the filters above to generate full attendance analytics and sheets.",
+    placeholder_choose_badge: "Choose class & subject above"
   },
 
   ml: {
@@ -167,7 +184,24 @@ const APP_TRANSLATIONS = {
     total: "ആകെ",
     loading: "ലഭ്യമാക്കുന്നു...",
     success: "വിജയകരം",
-    error: "തകരാർ സംഭവിച്ചു"
+    error: "തകരാർ സംഭവിച്ചു",
+
+    // Academic & Quick Tools
+    quick_tools: "ദ്രുത ടൂളുകൾ",
+    timetable: "ടൈംടേബിൾ",
+    my_schedule: "എന്റെ ഷെഡ്യൂൾ",
+    messages: "സന്ദേശങ്ങൾ",
+    teacher_notice: "അധ്യാപക നോട്ടീസ്",
+    print_reports: "റിപ്പോർട്ടുകൾ പ്രിന്റ് ചെയ്യുക",
+    students_data: "വിദ്യാർത്ഥികളും വിവരങ്ങളും",
+    profile_logs: "പ്രൊഫൈൽ ലോഗുകൾ",
+    my_activity_log: "എന്റെ ലോഗുകൾ",
+
+    // Placeholders
+    placeholder_select_class_subject: "ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക",
+    placeholder_att_desc: "വിദ്യാർത്ഥികളുടെ പട്ടിക ലഭ്യമാക്കാനും ഹാജർ രേഖപ്പെടുത്താനും മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.",
+    placeholder_rep_desc: "സമ്പൂർണ്ണ ഹാജർ വിശകലനങ്ങളും ഷീറ്റുകളും തയ്യാറാക്കാൻ മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.",
+    placeholder_choose_badge: "മുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക"
   }
 };
 
@@ -363,6 +397,22 @@ const APP_PHRASES_ML = {
   "Assigned Classes": "നിങ്ങൾക്ക് നൽകിയ ക്ലാസുകൾ",
   "Assigned Subjects": "നിങ്ങൾക്ക് നൽകിയ വിഷയങ്ങൾ",
   "Class Teacher Of": "ക്ലാസ് അധ്യാപകൻ",
+  "Quick Tools": "ദ്രുത ടൂളുകൾ",
+  "Timetable": "ടൈംടേബിൾ",
+  "My Schedule": "എന്റെ ഷെഡ്യൂൾ",
+  "Messages": "സന്ദേശങ്ങൾ",
+  "Teacher Notice": "അധ്യാപക നോട്ടീസ്",
+  "Open your personal timetable schedule": "നിങ്ങളുടെ വ്യക്തിഗത ടൈംടേബിൾ ഷെഡ്യൂൾ തുറക്കുക",
+  "Open teacher notifications & chat": "അധ്യാപക നോട്ടീസുകളും ചാറ്റും തുറക്കുക",
+  "Print students data & export attendance report": "വിദ്യാർത്ഥി വിവരങ്ങളും ഹാജർ റിപ്പോർട്ടും പ്രിന്റ് ചെയ്യുക",
+
+  // Second Divs / Placeholders in Attendance & Report
+  "Select Class & Subject": "ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക",
+  "Select Class &amp; Subject": "ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക",
+  "Choose a class and subject from the filters above to load the student roster and take attendance.": "വിദ്യാർത്ഥികളുടെ പട്ടിക ലഭ്യമാക്കാനും ഹാജർ രേഖപ്പെടുത്താനും മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.",
+  "Choose a class and subject from the filters above to generate full attendance analytics and sheets.": "സമ്പൂർണ്ണ ഹാജർ വിശകലനങ്ങളും ഷീറ്റുകളും തയ്യാറാക്കാൻ മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.",
+  "Choose class & subject above": "മുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക",
+  "Choose class &amp; subject above": "മുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക",
 
   // Modals & Popups
   "Select Language": "ഭാഷ തിരഞ്ഞെടുക്കുക",
