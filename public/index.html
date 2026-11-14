@@ -975,63 +975,69 @@
 
       <!-- 6. STUDENTS VIEW -->
       <section id="view-students" class="hidden space-y-3.5">
-        <div class="flex items-center justify-between gap-2 flex-wrap">
-          <div class="flex items-center gap-2 flex-wrap">
-            <button type="button" onclick="selectTab('home')" class="touch-btn px-2.5 py-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-bold text-[var(--text-sub)] hover:text-[#245b70] hover:border-[#245b70] flex items-center gap-1 transition shadow-xs">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              <span>Dashboard</span>
-            </button>
-            <h2 class="text-base font-extrabold text-[var(--text-main)]">Students</h2>
-            <!-- Total & Selected Class Student Counters -->
-            <div class="flex items-center gap-1.5 text-xs font-bold">
-              <!-- Total students: round square small color fill div -->
-              <div id="students-count-total-container" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-sm font-semibold select-none">
-                <span>Total:</span>
-                <span id="students-count-total" class="font-black text-white">0</span>
-              </div>
-              <!-- Selected class count: hidden if selected class is 'all' -->
-              <div id="students-count-class-container" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-200 dark:bg-slate-700/80 text-[var(--text-main)] shadow-sm font-semibold select-none">
-                <span id="students-count-class-name">Class</span>:
-                <span id="students-count-class" class="text-[#245b70] dark:text-cyan-400 font-black">0</span>
+        <!-- Unified Attractive Themed Header & Controls Container -->
+        <div class="bg-gradient-to-b from-[#245b70]/[0.10] via-[#245b70]/[0.05] to-[var(--card-bg)] dark:from-[#245b70]/[0.22] dark:via-[var(--card-bg)] dark:to-[var(--card-bg)] p-3.5 sm:p-4 rounded-3xl border border-[#245b70]/25 shadow-sm space-y-3 transition-all">
+          
+          <!-- Top Row: Navigation, Title, Counts & Add Student Button -->
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap">
+              <button type="button" onclick="selectTab('home')" class="touch-btn px-2.5 py-1.5 rounded-xl bg-[var(--card-bg)] hover:bg-[#245b70] text-[var(--text-sub)] hover:text-white border border-[var(--border-color)] hover:border-[#245b70] text-xs font-bold flex items-center gap-1 transition shadow-2xs">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span>Dashboard</span>
+              </button>
+              <h2 class="text-base font-black text-[var(--text-main)] tracking-tight">Students</h2>
+              
+              <!-- Total & Selected Class Counters -->
+              <div class="flex items-center gap-1.5 text-xs font-bold">
+                <div id="students-count-total-container" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-2xs font-semibold select-none">
+                  <span class="opacity-90">Total:</span>
+                  <span id="students-count-total" class="font-black text-white">0</span>
+                </div>
+                <div id="students-count-class-container" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70]/15 dark:bg-cyan-950/40 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/25 shadow-2xs font-semibold select-none">
+                  <span id="students-count-class-name" class="opacity-90">Class</span>:
+                  <span id="students-count-class" class="font-black">0</span>
+                </div>
               </div>
             </div>
-          </div>
-          <button onclick="openStudentModal()" class="touch-btn px-3.5 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md flex-shrink-0">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            <span>Add Student</span>
-          </button>
-        </div>
 
-        <!-- Search Bar + Class Filter in Students View -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div class="sm:col-span-2 relative">
-            <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="student-search-input" oninput="renderStudentsDirectory()" placeholder="Search students..." class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl pl-9 pr-3 text-xs sm:text-sm font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-sm">
+            <button onclick="openStudentModal()" class="touch-btn px-3.5 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm hover:shadow transition active:scale-95 flex-shrink-0">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Add Student</span>
+            </button>
           </div>
-          <div>
-            <!-- Class Filter (Clean names only) -->
-            <select id="student-class-filter" onchange="renderStudentsDirectory()" class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-3 text-xs sm:text-sm font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-sm">
-              <option value="all">All Classes</option>
-            </select>
-          </div>
-        </div>
 
-        <!-- Sort Control Toolbar right below Class Filter -->
-        <div class="flex items-center justify-between gap-2 pt-0.5 pb-1">
-          <span class="text-[11px] font-bold text-[var(--text-sub)] hidden sm:inline-block">Student Directory</span>
-          <div class="flex items-center gap-1.5 ml-auto">
-            <span class="text-[11px] font-bold text-[var(--text-sub)] flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="11" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="11" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>
-              <span>Sort:</span>
-            </span>
-            <select id="student-sort-order" onchange="renderStudentsDirectory()" class="touch-input bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-2xs cursor-pointer">
-              <option value="roll-asc" selected>Roll Number (Ascending 1 → 9)</option>
-              <option value="roll-desc">Roll Number (Descending 9 → 1)</option>
-              <option value="name-asc">Name (Ascending A → Z)</option>
-              <option value="name-desc">Name (Descending Z → A)</option>
-              <option value="id-asc">Student ID (Ascending)</option>
-              <option value="id-desc">Student ID (Descending)</option>
-            </select>
+          <!-- Bottom Control Bar: Search + Class Filter + Compact Sort Dropdown -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-0.5">
+            <!-- Search bar -->
+            <div class="relative flex-1 min-w-0">
+              <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-sub)] opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="student-search-input" oninput="renderStudentsDirectory()" placeholder="Search students..." class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl pl-9 pr-3 text-xs sm:text-sm font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-2xs h-9">
+            </div>
+
+            <!-- Compact Dropdowns Row -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <!-- Class Filter (Clean names only) -->
+              <div class="relative flex-1 sm:w-36 sm:flex-initial">
+                <select id="student-class-filter" onchange="renderStudentsDirectory()" class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-2xs cursor-pointer h-9 truncate">
+                  <option value="all">All Classes</option>
+                </select>
+              </div>
+
+              <!-- Compact Sort Dropdown with Theme Icon -->
+              <div class="relative flex-1 sm:w-36 sm:flex-initial">
+                <div class="flex items-center gap-1 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-2 shadow-2xs h-9 focus-within:ring-2 focus-within:ring-[#245b70]">
+                  <svg class="w-3.5 h-3.5 text-[#245b70] dark:text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="11" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="11" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>
+                  <select id="student-sort-order" onchange="renderStudentsDirectory()" class="touch-input w-full bg-transparent border-0 text-xs font-bold text-[var(--text-main)] focus:outline-none cursor-pointer pr-1 truncate" title="Sort Students">
+                    <option value="roll-asc" selected>Roll: 1 → 9</option>
+                    <option value="roll-desc">Roll: 9 → 1</option>
+                    <option value="name-asc">Name: A → Z</option>
+                    <option value="name-desc">Name: Z → A</option>
+                    <option value="id-asc">ID: 1 → 9</option>
+                    <option value="id-desc">ID: 9 → 1</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

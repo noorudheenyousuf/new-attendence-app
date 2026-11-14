@@ -15,13 +15,14 @@ function isCustomPhoto(url) {
 }
 
 // Generate theme-colored initials avatar (SVG Data-URI, rounded-square compatible)
-// If 1 word: first letter. If 2+ words: two letters of two parts. Fully fills the frame.
-function getInitialsAvatar(name = '', bgColor = '245b70', textColor = 'ffffff') {
+// USER DIRECTIVE: Students name default avatar always only show first letter (whether 1 part or 2 parts).
+// Teachers avatar shows 1 letter if 1 word, or 2 letters of 2 parts if 2+ words (forTeacher = true).
+function getInitialsAvatar(name = '', bgColor = '245b70', textColor = 'ffffff', forTeacher = false) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   let initials = '';
-  if (parts.length >= 2) {
+  if (forTeacher && parts.length >= 2) {
     initials = (parts[0][0] + parts[1][0]).toUpperCase();
-  } else if (parts.length === 1 && parts[0].length > 0) {
+  } else if (parts.length > 0 && parts[0].length > 0) {
     initials = parts[0][0].toUpperCase();
   }
 
@@ -33,7 +34,7 @@ function getInitialsAvatar(name = '', bgColor = '245b70', textColor = 'ffffff') 
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
 
-  const fontSize = initials.length > 1 ? 40 : 46;
+  const fontSize = initials.length > 1 ? 40 : 48;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><rect width="100" height="100" fill="#${cleanBg}"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#${cleanText}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="900" font-size="${fontSize}">${initials}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
@@ -6363,7 +6364,7 @@ async function populateTeacherDropdowns(targetSelectId, selectedValue = '') {
 // Generate friendly fallback avatar (theme color rounded square)
 function getEmailAvatarPreview(email, name = '') {
   const label = (name || email || 'Teacher').trim();
-  return getInitialsAvatar(label, '245b70');
+  return getInitialsAvatar(label, '245b70', 'ffffff', true);
 }
 
 // Live email typing avatar preview
@@ -6656,7 +6657,7 @@ async function renderTeachersList() {
     const selectedClass = classEl ? classEl.value : 'all';
 
     container.innerHTML = teachers.map((t, index) => {
-      const avatar = isCustomPhoto(t.avatarUrl) ? t.avatarUrl : getInitialsAvatar(t.name || t.email, '245b70');
+      const avatar = isCustomPhoto(t.avatarUrl) ? t.avatarUrl : getInitialsAvatar(t.name || t.email, '245b70', 'ffffff', true);
       const isPlaced = recentlyPlacedTeacherId === t._id ? ' drag-item-placed' : '';
       const canManage = canUserEditDelete();
       const isGoogleLinked = Boolean(t.googleConnected);
@@ -6790,7 +6791,7 @@ async function renderTeachersList() {
 function openAddTeacherModal() {
   newTeacherPhotoUrl = '';
   const preview = document.getElementById('new-teacher-preview-photo');
-  if (preview) preview.src = getInitialsAvatar('', '245b70');
+  if (preview) preview.src = getInitialsAvatar('', '245b70', 'ffffff', true);
 
   document.getElementById('new-teacher-name').value = '';
   document.getElementById('new-teacher-email').value = '';
