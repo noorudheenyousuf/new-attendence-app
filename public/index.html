@@ -977,19 +977,20 @@
         <div class="bg-gradient-to-br from-[#245b70]/25 via-[#245b70]/15 to-[var(--card-bg)] dark:from-[#245b70]/35 dark:via-[#245b70]/20 dark:to-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[#245b70]/35 dark:border-[#245b70]/40 shadow-md space-y-3.5 transition-all">
           
           <!-- Top Row: Title, Counts & Add Student Button (All on First Line, No Back Button) -->
-          <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <h2 class="text-base font-black text-[var(--text-main)] tracking-tight flex-shrink-0">Students</h2>
+          <div class="flex items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2.5 min-w-0 flex-wrap">
+              <h2 class="text-base sm:text-lg font-black text-[var(--text-main)] tracking-tight flex-shrink-0">Students</h2>
               
               <!-- Total & Selected Class Badges -->
               <div class="flex items-center gap-1.5 text-xs font-bold flex-shrink-0">
-                <div id="students-count-total-container" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70] text-white shadow-2xs font-semibold select-none">
+                <div id="students-count-total-container" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#245b70] text-white shadow-2xs font-bold select-none text-xs border border-teal-600/30">
                   <span class="opacity-90">Total:</span>
                   <span id="students-count-total" class="font-black text-white">0</span>
                 </div>
-                <div id="students-count-class-container" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#245b70]/25 dark:bg-cyan-950/60 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/30 shadow-2xs font-semibold select-none">
-                  <span id="students-count-class-name" class="opacity-90">Class</span>:
-                  <span id="students-count-class" class="font-black">0</span>
+                <div id="students-count-class-container" class="hidden items-center gap-1.5 px-3 py-1 rounded-xl bg-[#245b70] text-white shadow-2xs font-bold select-none text-xs border border-teal-600/30">
+                  <span id="students-count-class-name" class="font-black tracking-wide uppercase">CLASS</span>
+                  <span class="opacity-90 font-black">:</span>
+                  <span id="students-count-class" class="font-black text-white">0</span>
                 </div>
               </div>
             </div>

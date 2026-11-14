@@ -2885,7 +2885,8 @@ async function renderStudentsDirectory() {
       : allStudents.filter(s => isClassEqual(s.class, filterClass)).length;
 
     // Update Live Count Badges in Students Header
-    // USER DIRECTIVE: "Make students total div with round square small color fill div...dont show second div if selected class is all"
+    // When a class is selected, undisplay Total and show CLASS : COUNT (e.g. PLUS ONE : 6)
+    const totalCountContainerEl = document.getElementById('students-count-total-container');
     const totalCountEl = document.getElementById('students-count-total');
     const classCountEl = document.getElementById('students-count-class');
     const classNameEl = document.getElementById('students-count-class-name');
@@ -2894,16 +2895,24 @@ async function renderStudentsDirectory() {
     if (totalCountEl) totalCountEl.innerText = allStudents.length;
 
     if (filterClass === 'all') {
+      if (totalCountContainerEl) {
+        totalCountContainerEl.classList.remove('hidden');
+        totalCountContainerEl.classList.add('inline-flex');
+      }
       if (classContainerEl) {
         classContainerEl.classList.add('hidden');
         classContainerEl.classList.remove('inline-flex', 'flex');
       }
     } else {
+      if (totalCountContainerEl) {
+        totalCountContainerEl.classList.add('hidden');
+        totalCountContainerEl.classList.remove('inline-flex', 'flex');
+      }
       if (classContainerEl) {
         classContainerEl.classList.remove('hidden');
         classContainerEl.classList.add('inline-flex');
       }
-      if (classNameEl) classNameEl.innerText = filterClass;
+      if (classNameEl) classNameEl.innerText = String(filterClass).toUpperCase();
       if (classCountEl) classCountEl.innerText = classCount;
     }
 
@@ -6767,7 +6776,8 @@ async function renderTeachersList(skipFetch = false) {
 
     container.innerHTML = teachers.map((t, index) => {
       const avatar = isCustomPhoto(t.avatarUrl) ? t.avatarUrl : getInitialsAvatar(t.name || t.email, '245b70', 'ffffff', true);
-      const isPlaced = recentlyPlacedTeacherId === t._id ? ' drag-item-placed' : '';
+      const isPlaced = recentlyPlacedTeacherId && String(recentlyPlacedTeacherId) === String(t._id);
+      const placedClass = isPlaced ? ' drag-item-placed' : '';
       const canManage = canUserEditDelete();
       const isGoogleLinked = Boolean(t.googleConnected);
       const roleBadge = t.role === 'admin'
