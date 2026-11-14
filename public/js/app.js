@@ -519,7 +519,8 @@ function showToast(message, isError = false) {
   const toastText = document.getElementById('toast-text');
   if (!toast || !toastText) return;
 
-  toastText.innerText = message;
+  const translated = (typeof tPhrase === 'function') ? tPhrase(message) : message;
+  toastText.innerText = translated;
   toast.classList.remove('-translate-y-20', 'opacity-0');
   toast.classList.add('translate-y-0', 'opacity-100');
   setTimeout(() => {
