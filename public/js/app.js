@@ -5422,8 +5422,8 @@ function openAuthModal() {
   renderGoogleButton();
 }
 
-function closeAuthModal() {
-  if (!currentUser) {
+function closeAuthModal(force = false) {
+  if (!force && !currentUser) {
     showToast('Please sign in to access REGISTERLY', true);
     return;
   }
@@ -5624,20 +5624,28 @@ async function handleGoogleTokenResponse(tokenResponse) {
 
   try {
     const res = await API.googleLogin({ access_token: tokenResponse.access_token });
-    if (res.success) {
+    if (res.success && res.user) {
+      currentUser = res.user;
+      currentRole = res.user.role;
+      updateUserUI();
+      closeAuthModal(true);
       showToast(res.message || `Welcome, ${res.user.name}!`);
-      closeAuthModal();
-      await loadCurrentUser();
-      await loadAppSettings();
-      await loadClasses();
-      await loadSubjects();
-      await loadTeachersData();
-      await loadAttendanceRoster();
-      await loadReport();
-      await loadActivityLogs();
-      _applyTeachersTabVisibility();
-      await loadHomeDashboard();
       selectTab('home');
+
+      try {
+        await loadCurrentUser();
+        await loadAppSettings();
+        await loadClasses();
+        await loadSubjects();
+        await loadTeachersData();
+        await loadAttendanceRoster();
+        await loadReport();
+        await loadActivityLogs();
+        _applyTeachersTabVisibility();
+        await loadHomeDashboard();
+      } catch (postSyncErr) {
+        console.warn('[Google Post-Login Sync Warning]', postSyncErr);
+      }
     }
   } catch (error) {
     showAuthAlert('Google Authentication Failed: ' + (error.message || 'Verification rejected'), true);
@@ -5656,20 +5664,28 @@ async function handleGoogleCredentialResponse(response) {
 
   try {
     const res = await API.googleLogin({ credential: response.credential });
-    if (res.success) {
+    if (res.success && res.user) {
+      currentUser = res.user;
+      currentRole = res.user.role;
+      updateUserUI();
+      closeAuthModal(true);
       showToast(res.message || `Welcome, ${res.user.name}!`);
-      closeAuthModal();
-      await loadCurrentUser();
-      await loadAppSettings();
-      await loadClasses();
-      await loadSubjects();
-      await loadTeachersData();
-      await loadAttendanceRoster();
-      await loadReport();
-      await loadActivityLogs();
-      _applyTeachersTabVisibility();
-      await loadHomeDashboard();
       selectTab('home');
+
+      try {
+        await loadCurrentUser();
+        await loadAppSettings();
+        await loadClasses();
+        await loadSubjects();
+        await loadTeachersData();
+        await loadAttendanceRoster();
+        await loadReport();
+        await loadActivityLogs();
+        _applyTeachersTabVisibility();
+        await loadHomeDashboard();
+      } catch (postSyncErr) {
+        console.warn('[Google Post-Login Sync Warning]', postSyncErr);
+      }
     }
   } catch (error) {
     showAuthAlert('Google Authentication Failed: ' + (error.message || 'Verification rejected'), true);
@@ -5700,20 +5716,28 @@ async function handleEmailLogin(e) {
 
   try {
     const res = await API.login(email, password);
-    if (res.success) {
+    if (res.success && res.user) {
+      currentUser = res.user;
+      currentRole = res.user.role;
+      updateUserUI();
+      closeAuthModal(true);
       showToast(res.message || `Welcome back, ${res.user.name}!`);
-      closeAuthModal();
-      await loadCurrentUser();
-      await loadAppSettings();
-      await loadClasses();
-      await loadSubjects();
-      await loadTeachersData();
-      await loadAttendanceRoster();
-      await loadReport();
-      await loadActivityLogs();
-      _applyTeachersTabVisibility();
-      await loadHomeDashboard();
       selectTab('home');
+
+      try {
+        await loadCurrentUser();
+        await loadAppSettings();
+        await loadClasses();
+        await loadSubjects();
+        await loadTeachersData();
+        await loadAttendanceRoster();
+        await loadReport();
+        await loadActivityLogs();
+        _applyTeachersTabVisibility();
+        await loadHomeDashboard();
+      } catch (postSyncErr) {
+        console.warn('[Email Post-Login Sync Warning]', postSyncErr);
+      }
     }
   } catch (error) {
     showAuthAlert(error.message || 'Invalid username/email or password', true);
@@ -5764,20 +5788,28 @@ async function handleEmailRegister(e) {
 
   try {
     const res = await API.register(name, email, password);
-    if (res.success) {
+    if (res.success && res.user) {
+      currentUser = res.user;
+      currentRole = res.user.role;
+      updateUserUI();
+      closeAuthModal(true);
       showToast(res.message || 'Account created successfully!');
-      closeAuthModal();
-      await loadCurrentUser();
-      await loadAppSettings();
-      await loadClasses();
-      await loadSubjects();
-      await loadTeachersData();
-      await loadAttendanceRoster();
-      await loadReport();
-      await loadActivityLogs();
-      _applyTeachersTabVisibility();
-      await loadHomeDashboard();
       selectTab('home');
+
+      try {
+        await loadCurrentUser();
+        await loadAppSettings();
+        await loadClasses();
+        await loadSubjects();
+        await loadTeachersData();
+        await loadAttendanceRoster();
+        await loadReport();
+        await loadActivityLogs();
+        _applyTeachersTabVisibility();
+        await loadHomeDashboard();
+      } catch (postSyncErr) {
+        console.warn('[Register Post-Login Sync Warning]', postSyncErr);
+      }
     }
   } catch (error) {
     showAuthAlert(error.message || 'Registration failed', true);
