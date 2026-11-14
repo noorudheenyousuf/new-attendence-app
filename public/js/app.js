@@ -6429,17 +6429,64 @@ async function handleTeacherPhotoUpload(e, type) {
 }
 
 // ================================================================
-// TEACHER DRAG & DROP SORTING
+// TEACHER DRAG & DROP SORTING (Only active after long press / hold or drag handle)
 // ================================================================
 let draggedTeacherIndex = null;
 let touchDraggedTeacherIndex = null;
 let touchTeacherElement = null;
+let recentlyPlacedTeacherId = null;
 let teacherHoldTimer = null;
 let teacherHoldActive = false;
-let recentlyPlacedTeacherId = null;
+let teacherHoldStartX = 0;
+let teacherHoldStartY = 0;
+
+function handleTeacherPointerDown(e, index) {
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+  const card = e.currentTarget;
+  teacherHoldActive = false;
+  teacherHoldStartX = e.clientX || 0;
+  teacherHoldStartY = e.clientY || 0;
+
+  if (teacherHoldTimer) clearTimeout(teacherHoldTimer);
+  teacherHoldTimer = setTimeout(() => {
+    teacherHoldActive = true;
+    card.setAttribute('draggable', 'true');
+    card.classList.add('drag-activated');
+    triggerNavHaptic('medium');
+  }, 250);
+}
+
+function handleTeacherPointerMove(e) {
+  if (!teacherHoldTimer && !teacherHoldActive) return;
+  const currentX = e.clientX || 0;
+  const currentY = e.clientY || 0;
+  const diffX = Math.abs(currentX - teacherHoldStartX);
+  const diffY = Math.abs(currentY - teacherHoldStartY);
+
+  if (!teacherHoldActive && (diffX > 8 || diffY > 8)) {
+    if (teacherHoldTimer) {
+      clearTimeout(teacherHoldTimer);
+      teacherHoldTimer = null;
+    }
+  }
+}
+
+function handleTeacherPointerUp(e) {
+  if (teacherHoldTimer) {
+    clearTimeout(teacherHoldTimer);
+    teacherHoldTimer = null;
+  }
+  teacherHoldActive = false;
+  const card = e.currentTarget;
+  if (card) {
+    card.classList.remove('drag-activated');
+    card.setAttribute('draggable', 'false');
+  }
+}
 
 function handleTeacherDragStart(e, index) {
-  if (!canUserEditDelete()) {
+  const fromHandle = Boolean(e.target.closest('.drag-handle'));
+  if (!teacherHoldActive && !fromHandle) {
     e.preventDefault();
     return;
   }
@@ -6476,9 +6523,15 @@ function handleTeacherDragLeave(e) {
 }
 
 function handleTeacherDragEnd(e) {
+  if (teacherHoldTimer) {
+    clearTimeout(teacherHoldTimer);
+    teacherHoldTimer = null;
+  }
+  teacherHoldActive = false;
   draggedTeacherIndex = null;
   document.querySelectorAll('#teachers-cards-container .drag-item').forEach(el => {
     el.classList.remove('dragging', 'drag-over', 'drag-activated');
+    el.setAttribute('draggable', 'false');
   });
 }
 
@@ -6506,7 +6559,7 @@ async function handleTeacherDrop(e, targetIndex) {
   recentlyPlacedTeacherId = movedTeacher._id;
   triggerNavHaptic('strong');
 
-  await renderTeachersList();
+  renderTeachersList(true);
 
   setTimeout(() => {
     if (recentlyPlacedTeacherId === movedTeacher._id) {
@@ -6520,50 +6573,77 @@ async function handleTeacherDrop(e, targetIndex) {
   try {
     const orderedIds = cachedTeachersList.map(t => t._id);
     await API.reorderTeachers(orderedIds);
-    showToast('Teachers reordered successfully');
+    showToast('Teacher order updated!');
   } catch (err) {
     console.error('[Reorder Teachers Error]', err);
     showToast('Failed to save teacher order', true);
   }
 }
 
-function touchTeacherStart(e, index) {
-  if (!canUserEditDelete()) return;
+function handleTeacherContainerDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function handleTeacherContainerDrop(e) {
+  if (e.target.closest('.drag-item')) return;
+  e.preventDefault();
+  if (draggedTeacherIndex === null || !cachedTeachersList) return;
+  handleTeacherDrop(e, Math.max(0, cachedTeachersList.length - 1));
+}
+
+// Mobile & Tablet Touch Long-Press Hold-to-Drag for Teachers
+function handleTeacherTouchStart(e, index) {
+  if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
   const searchInput = document.getElementById('teacher-search-input');
   if (searchInput && searchInput.value.trim()) return;
 
-  const handle = e.target.closest('.drag-handle');
+  const touch = e.touches[0];
+  teacherHoldStartX = touch.clientX;
+  teacherHoldStartY = touch.clientY;
+  teacherHoldActive = false;
+  touchDraggedTeacherIndex = null;
   touchTeacherElement = e.currentTarget;
-  touchDraggedTeacherIndex = index;
 
+  const handle = e.target.closest('.drag-handle');
   if (handle) {
     teacherHoldActive = true;
-    touchTeacherElement.classList.add('drag-activated', 'dragging');
+    touchDraggedTeacherIndex = index;
+    if (touchTeacherElement) {
+      touchTeacherElement.classList.add('drag-activated', 'dragging');
+    }
     triggerNavHaptic('medium');
     return;
   }
 
-  teacherHoldActive = false;
+  if (teacherHoldTimer) clearTimeout(teacherHoldTimer);
   teacherHoldTimer = setTimeout(() => {
     teacherHoldActive = true;
+    touchDraggedTeacherIndex = index;
     if (touchTeacherElement) {
       touchTeacherElement.classList.add('drag-activated', 'dragging');
-      triggerNavHaptic('medium');
     }
-  }, 350);
+    triggerNavHaptic('medium');
+  }, 250);
 }
 
-function touchTeacherMove(e) {
-  if (!teacherHoldActive || touchDraggedTeacherIndex === null) {
-    if (teacherHoldTimer) {
-      clearTimeout(teacherHoldTimer);
-      teacherHoldTimer = null;
-    }
-    return;
-  }
-  if (e.cancelable) e.preventDefault();
-
+function handleTeacherTouchMove(e) {
   const touch = e.touches[0];
+  const diffX = Math.abs(touch.clientX - teacherHoldStartX);
+  const diffY = Math.abs(touch.clientY - teacherHoldStartY);
+
+  if (!teacherHoldActive) {
+    if (diffX > 8 || diffY > 8) {
+      if (teacherHoldTimer) {
+        clearTimeout(teacherHoldTimer);
+        teacherHoldTimer = null;
+      }
+    }
+    return; // Allow native page scroll
+  }
+
+  // Active dragging after hold: prevent page scroll
+  e.preventDefault();
   const target = document.elementFromPoint(touch.clientX, touch.clientY);
   const card = target ? target.closest('#teachers-cards-container .drag-item') : null;
 
@@ -6573,12 +6653,14 @@ function touchTeacherMove(e) {
   }
 }
 
-async function touchTeacherEnd(e) {
+async function handleTeacherTouchEnd(e) {
   if (teacherHoldTimer) {
     clearTimeout(teacherHoldTimer);
     teacherHoldTimer = null;
   }
+
   if (!teacherHoldActive || touchDraggedTeacherIndex === null) {
+    teacherHoldActive = false;
     touchDraggedTeacherIndex = null;
     if (touchTeacherElement) {
       touchTeacherElement.classList.remove('drag-activated', 'dragging');
@@ -6588,60 +6670,69 @@ async function touchTeacherEnd(e) {
   }
 
   teacherHoldActive = false;
-  const changedTouch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
-  const target = changedTouch ? document.elementFromPoint(changedTouch.clientX, changedTouch.clientY) : null;
+  const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+  const target = touch ? document.elementFromPoint(touch.clientX, touch.clientY) : null;
   const card = target ? target.closest('#teachers-cards-container .drag-item') : null;
+
   const sourceIndex = touchDraggedTeacherIndex;
   touchDraggedTeacherIndex = null;
-
   if (touchTeacherElement) {
     touchTeacherElement.classList.remove('drag-activated', 'dragging');
     touchTeacherElement = null;
   }
+
   document.querySelectorAll('#teachers-cards-container .drag-item').forEach(el => {
     el.classList.remove('dragging', 'drag-over', 'drag-activated');
   });
 
-  if (!card) return;
-  const targetIndex = parseInt(card.getAttribute('data-index'), 10);
-  if (isNaN(targetIndex) || sourceIndex === null || sourceIndex === targetIndex) return;
+  if (card && cachedTeachersList && cachedTeachersList.length > 1) {
+    const targetIdx = parseInt(card.getAttribute('data-index'), 10);
+    if (!isNaN(targetIdx) && targetIdx !== sourceIndex) {
+      const movedTeacher = cachedTeachersList.splice(sourceIndex, 1)[0];
+      if (!movedTeacher) return;
+      cachedTeachersList.splice(targetIdx, 0, movedTeacher);
 
-  const movedTeacher = cachedTeachersList.splice(sourceIndex, 1)[0];
-  if (!movedTeacher) return;
-  cachedTeachersList.splice(targetIndex, 0, movedTeacher);
+      recentlyPlacedTeacherId = movedTeacher._id;
+      triggerNavHaptic('strong');
 
-  recentlyPlacedTeacherId = movedTeacher._id;
-  triggerNavHaptic('strong');
-  await renderTeachersList();
+      renderTeachersList(true);
 
-  setTimeout(() => {
-    if (recentlyPlacedTeacherId === movedTeacher._id) {
-      recentlyPlacedTeacherId = null;
-      document.querySelectorAll('#teachers-cards-container .drag-item-placed').forEach(el => {
-        el.classList.remove('drag-item-placed');
-      });
+      setTimeout(() => {
+        if (recentlyPlacedTeacherId === movedTeacher._id) {
+          recentlyPlacedTeacherId = null;
+          document.querySelectorAll('#teachers-cards-container .drag-item-placed').forEach(el => {
+            el.classList.remove('drag-item-placed');
+          });
+        }
+      }, 600);
+
+      try {
+        const orderedIds = cachedTeachersList.map(t => t._id);
+        await API.reorderTeachers(orderedIds);
+        showToast('Teacher order updated!');
+      } catch (err) {
+        console.error('[Reorder Teachers Error]', err);
+        showToast('Failed to save teacher order', true);
+      }
     }
-  }, 600);
-
-  try {
-    const orderedIds = cachedTeachersList.map(t => t._id);
-    await API.reorderTeachers(orderedIds);
-    showToast('Teachers reordered successfully');
-  } catch (err) {
-    console.error('[Reorder Teachers Error]', err);
-    showToast('Failed to save teacher order', true);
   }
 }
 
+const touchTeacherStart = handleTeacherTouchStart;
+const touchTeacherMove = handleTeacherTouchMove;
+const touchTeacherEnd = handleTeacherTouchEnd;
+
 // USER DIRECTIVE: Render teachers cards in the 4th tab
-async function renderTeachersList() {
+async function renderTeachersList(skipFetch = false) {
   const container = document.getElementById('teachers-cards-container');
   const countEl = document.getElementById('teachers-count-total');
   const searchInput = document.getElementById('teacher-search-input');
   const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
   try {
-    await loadTeachersData();
+    if (!skipFetch || !cachedTeachersList) {
+      await loadTeachersData();
+    }
     let teachers = cachedTeachersList || [];
 
     if (countEl) countEl.innerText = teachers.length;
@@ -6712,16 +6803,24 @@ async function renderTeachersList() {
         : `Log (${currentSessions} in ${selectedYear})`;
 
       return `
-        <div id="teacher-card-${t._id}" data-index="${index}" class="drag-item bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition overflow-hidden ${isPlaced}"
-             draggable="${canManage ? 'true' : 'false'}"
+        <div id="teacher-card-${t._id}"
+             data-index="${index}"
+             data-id="${t._id}"
+             class="drag-item bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col ${placedClass}"
+             draggable="false"
+             onmousedown="handleTeacherPointerDown(event, ${index})"
+             onmousemove="handleTeacherPointerMove(event)"
+             onmouseup="handleTeacherPointerUp(event)"
+             onmouseleave="handleTeacherPointerUp(event)"
+             ontouchstart="handleTeacherTouchStart(event, ${index})"
+             ontouchmove="handleTeacherTouchMove(event)"
+             ontouchend="handleTeacherTouchEnd(event)"
+             ontouchcancel="handleTeacherTouchEnd(event)"
              ondragstart="handleTeacherDragStart(event, ${index})"
              ondragover="handleTeacherDragOver(event, ${index})"
              ondragleave="handleTeacherDragLeave(event)"
-             ondrop="handleTeacherDrop(event, ${index})"
              ondragend="handleTeacherDragEnd(event)"
-             ontouchstart="touchTeacherStart(event, ${index})"
-             ontouchmove="touchTeacherMove(event)"
-             ontouchend="touchTeacherEnd(event)">
+             ondrop="handleTeacherDrop(event, ${index})">
           <!-- Main row: avatar left, content right -->
           <div class="flex gap-0">
             <!-- Left: Avatar column -->
@@ -6743,8 +6842,8 @@ async function renderTeachersList() {
                 </div>
                 ${canManage ? `
                 <div class="flex items-center gap-1 flex-shrink-0">
-                  <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] p-1 flex-shrink-0 cursor-grab active:cursor-grabbing select-none" title="Hold or drag to reorder">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <div class="drag-handle text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 flex-shrink-0 cursor-grab active:cursor-grabbing select-none transition" title="Hold card or drag handle to reorder">
+                    <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
                       <circle cx="9" cy="6" r="1.5"></circle>
                       <circle cx="15" cy="6" r="1.5"></circle>
                       <circle cx="9" cy="12" r="1.5"></circle>
