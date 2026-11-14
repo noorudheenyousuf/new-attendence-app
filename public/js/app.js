@@ -2875,14 +2875,24 @@ function closeStudentLogModal() {
   document.getElementById('modal-student-log').classList.add('hidden');
 }
 
-function printReport() {
+async function printReport() {
   const printable = document.getElementById('printable-report');
   if (!printable || printable.classList.contains('hidden')) {
     showToast('Please select a class and subject to load a report first.', true);
     return;
   }
-  document.body.classList.add('print-report-active');
-  window.print();
+
+  const repClass = document.getElementById('report-class')?.value || (currentClass || 'all');
+  const repYear = document.getElementById('report-year')?.value || 'all';
+  const repPeriod = document.getElementById('report-period')?.value || 'all-year';
+  const repSubject = document.getElementById('report-subject')?.value || 'whole';
+
+  await generateAndPrintAttendanceSheet({
+    classVal: repClass,
+    subjectVal: repSubject,
+    yearVal: repYear,
+    monthVal: repPeriod
+  });
 }
 
 // ================= STUDENTS DIRECTORY =================
@@ -8443,9 +8453,15 @@ function triggerStudentCardsPrint() {
 }
 
 window.addEventListener('beforeprint', () => {
+  const isDedicatedPrint = document.body.classList.contains('printing-attendance-sheet') ||
+    document.body.classList.contains('printing-student-roster') ||
+    document.body.classList.contains('printing-timetable') ||
+    document.body.classList.contains('printing-teacher-activity') ||
+    document.body.classList.contains('print-cards-active');
+
   const reportView = document.getElementById('view-report');
   const printable = document.getElementById('printable-report');
-  if (reportView && !reportView.classList.contains('hidden') && printable && !printable.classList.contains('hidden') && !document.body.classList.contains('print-cards-active')) {
+  if (!isDedicatedPrint && reportView && !reportView.classList.contains('hidden') && printable && !printable.classList.contains('hidden')) {
     document.body.classList.add('print-report-active');
   }
 });
@@ -8453,6 +8469,9 @@ window.addEventListener('beforeprint', () => {
 window.addEventListener('afterprint', () => {
   document.body.classList.remove('print-cards-active');
   document.body.classList.remove('print-report-active');
+  document.body.classList.remove('printing-attendance-sheet');
+  const printContainer = document.getElementById('attendance-print-sheet');
+  if (printContainer) printContainer.innerHTML = '';
 });
 
 // CSV Export in the exact order requested by user:
@@ -8786,12 +8805,7 @@ async function executeAttendanceExportCSV() {
   }
 }
 
-async function executeAttendancePrintA4() {
-  const classVal = document.getElementById('export-att-class')?.value || 'all';
-  const subjectVal = document.getElementById('export-att-subject')?.value || 'whole';
-  const yearVal = document.getElementById('export-att-year')?.value || 'all';
-  const monthVal = document.getElementById('export-att-month')?.value || 'all-year';
-
+async function generateAndPrintAttendanceSheet({ classVal = 'all', subjectVal = 'whole', yearVal = 'all', monthVal = 'all-year' } = {}) {
   try {
     showToast('Preparing A4 Attendance Sheet...');
     const res = await API.getClassReport(classVal, yearVal, monthVal, subjectVal);
@@ -8919,7 +8933,6 @@ async function executeAttendancePrintA4() {
     `;
 
     printContainer.innerHTML = html;
-    closeAttendanceExportModal();
 
     document.body.classList.add('printing-attendance-sheet');
     window.addEventListener('afterprint', () => {
@@ -8932,6 +8945,16 @@ async function executeAttendancePrintA4() {
   } catch (err) {
     showToast('Failed to prepare attendance sheet: ' + (err.message || 'Error'), true);
   }
+}
+
+async function executeAttendancePrintA4() {
+  const classVal = document.getElementById('export-att-class')?.value || 'all';
+  const subjectVal = document.getElementById('export-att-subject')?.value || 'whole';
+  const yearVal = document.getElementById('export-att-year')?.value || 'all';
+  const monthVal = document.getElementById('export-att-month')?.value || 'all-year';
+
+  closeAttendanceExportModal();
+  await generateAndPrintAttendanceSheet({ classVal, subjectVal, yearVal, monthVal });
 }
 
 // ================= TEACHER ACTIVITY & SESSION REPORT =================

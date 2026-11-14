@@ -2458,7 +2458,7 @@
           </div>
           <div class="min-w-0 flex-1">
             <div class="text-xs font-black text-[var(--text-main)]">Student Details</div>
-            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">A4 Student Table Roster, ID Cards, or CSV</div>
+            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">A4 Student Table Roster or CSV</div>
           </div>
           <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
@@ -2613,19 +2613,15 @@
         </div>
       </div>
 
-      <!-- Step 3: Choose Format (Print Table Roster, Print A4 ID Cards OR CSV) -->
+      <!-- Step 3: Choose Format (Print Table Roster OR CSV) -->
       <div class="pt-2 border-t border-[var(--border-color)]">
         <label class="block text-xs font-bold text-[var(--text-main)] mb-2">Export As:</label>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <button type="button" onclick="executeStudentRosterPrintA4()" class="touch-btn bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-2.5 text-center" title="Print tabular list of students with chosen columns">
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="executeStudentRosterPrintA4()" class="touch-btn bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-3 text-center" title="Print tabular list of students with chosen columns">
             <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
             <span>Print Table Roster</span>
           </button>
-          <button type="button" onclick="executeStudentPrintA4()" class="touch-btn bg-[#1e4d5f] hover:bg-[#163a48] text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-2.5 text-center" title="Print photo ID cards grid (18 per A4 page)">
-            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            <span>Print ID Cards</span>
-          </button>
-          <button type="button" onclick="executeStudentExportCSV()" class="touch-btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-2.5 text-center">
+          <button type="button" onclick="executeStudentExportCSV()" class="touch-btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition p-3 text-center">
             <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Download CSV</span>
           </button>
