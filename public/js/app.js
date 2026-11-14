@@ -132,7 +132,7 @@ function getTeacherAssignments(teacherName, teacherEmail) {
   });
 
   const seenSub = new Set();
-  const assignedSubjects = [];
+  let assignedSubjects = [];
   matchedSubjects.forEach(s => {
     const n = (s.name || '').trim();
     const k = n.toLowerCase();
@@ -143,7 +143,7 @@ function getTeacherAssignments(teacherName, teacherEmail) {
   });
 
   const seenCls = new Set();
-  const assignedClasses = [];
+  let assignedClasses = [];
   matchedSubjects.forEach(s => {
     (s.assignedClasses || []).forEach(cName => {
       const cTrim = String(cName || '').trim();
