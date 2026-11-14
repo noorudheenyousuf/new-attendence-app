@@ -1016,6 +1016,25 @@
           </div>
         </div>
 
+        <!-- Sort Control Toolbar right below Class Filter -->
+        <div class="flex items-center justify-between gap-2 pt-0.5 pb-1">
+          <span class="text-[11px] font-bold text-[var(--text-sub)] hidden sm:inline-block">Student Directory</span>
+          <div class="flex items-center gap-1.5 ml-auto">
+            <span class="text-[11px] font-bold text-[var(--text-sub)] flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="11" y2="6"></line><line x1="4" y1="12" x2="11" y2="12"></line><line x1="4" y1="18" x2="11" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>
+              <span>Sort:</span>
+            </span>
+            <select id="student-sort-order" onchange="renderStudentsDirectory()" class="touch-input bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-2.5 py-1 text-xs font-bold text-[var(--text-main)] focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-2xs cursor-pointer">
+              <option value="roll-asc" selected>Roll Number (Ascending 1 → 9)</option>
+              <option value="roll-desc">Roll Number (Descending 9 → 1)</option>
+              <option value="name-asc">Name (Ascending A → Z)</option>
+              <option value="name-desc">Name (Descending Z → A)</option>
+              <option value="id-asc">Student ID (Ascending)</option>
+              <option value="id-desc">Student ID (Descending)</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Students Cards (With Edit & Delete) -->
         <div class="space-y-2.5" id="student-directory-cards">
           <!-- Populated via renderStudentsDirectory() -->
@@ -1855,7 +1874,7 @@
 
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Teacher Full Name</label>
-          <input type="text" id="new-teacher-name" required placeholder="e.g. John Doe" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+          <input type="text" id="new-teacher-name" oninput="handleTeacherEmailInput('new')" required placeholder="e.g. John Doe" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
         </div>
 
         <div>
@@ -1904,7 +1923,7 @@
 
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Teacher Full Name</label>
-          <input type="text" id="edit-teacher-name" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
+          <input type="text" id="edit-teacher-name" oninput="handleTeacherEmailInput('edit')" required class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-4 text-sm font-bold text-[var(--text-main)]">
         </div>
 
         <div>
@@ -1970,11 +1989,11 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div class="sm:col-span-1">
             <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Name</label>
-            <input type="text" id="new-student-name" required placeholder="Full Name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <input type="text" id="new-student-name" oninput="handleStudentNameInput('new')" required placeholder="Full Name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
           </div>
           <div>
             <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Class</label>
-            <select id="new-student-class" onchange="updateModalStudentCounts()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+            <select id="new-student-class" onchange="updateModalStudentCounts(); handleNewStudentClassChanged()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
               <!-- Populated via loadClasses() -->
             </select>
           </div>
@@ -2095,7 +2114,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div class="sm:col-span-1">
             <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Name</label>
-            <input type="text" id="edit-student-name" required placeholder="Full Name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <input type="text" id="edit-student-name" oninput="handleStudentNameInput('edit')" required placeholder="Full Name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
           </div>
           <div>
             <label class="block text-[10px] font-bold text-[var(--text-main)] mb-0.5">Class</label>
@@ -3440,7 +3459,7 @@
         <div class="grid grid-cols-3 gap-2">
           <div class="col-span-1">
             <label class="block text-[10px] font-bold text-pink-700 dark:text-pink-300 mb-0.5">Name *</label>
-            <input type="text" id="pw-input-student-name" required placeholder="Full Name"
+            <input type="text" id="pw-input-student-name" oninput="pwHandleStudentNameInput()" required placeholder="Full Name"
                    class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-3 text-xs font-bold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
           </div>
           <div>

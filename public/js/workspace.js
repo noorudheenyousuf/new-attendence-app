@@ -470,7 +470,7 @@ function renderPWStudentsView(filterClass = 'all', searchText = '') {
              </div>`
           : filtered.map(st => `
             <div class="bg-white/80 dark:bg-pink-950/30 rounded-2xl p-3 border border-pink-200 dark:border-pink-800 shadow-sm flex items-center gap-3">
-              <img src="${escapeHtml(st.photoUrl || DEFAULT_AVATAR)}" class="w-10 h-10 rounded-xl object-cover border-2 border-pink-200 dark:border-pink-700 flex-shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition" alt="${escapeHtml(st.name)}" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view full student details">
+              <img src="${(typeof isCustomPhoto === 'function' && isCustomPhoto(st.photoUrl)) ? escapeHtml(st.photoUrl) : getInitialsAvatar(st.name, 'db2777')}" class="w-10 h-10 rounded-xl object-cover border-2 border-pink-200 dark:border-pink-700 flex-shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition" alt="${escapeHtml(st.name)}" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view full student details">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1 flex-wrap">
                   ${lockSVG('12')}
@@ -653,9 +653,21 @@ async function pwHandlePhotoUpload(event) {
 }
 
 // Helper: reset all PW student modal fields
+function pwHandleStudentNameInput() {
+  if (pwStudentPhotoUrl) return;
+  const nameInput = document.getElementById('pw-input-student-name');
+  const preview = document.getElementById('pw-preview-photo');
+  if (!nameInput || !preview) return;
+  if (typeof getInitialsAvatar === 'function') {
+    preview.src = getInitialsAvatar(nameInput.value.trim(), 'db2777');
+  }
+}
+
 function pwResetStudentModal() {
   pwStudentPhotoUrl = '';
-  const DEFAULT_PW_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f9a8d4'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E";
+  const DEFAULT_PW_AVATAR = (typeof getInitialsAvatar === 'function')
+    ? getInitialsAvatar('', 'db2777')
+    : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f9a8d4'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E";
   const preview = document.getElementById('pw-preview-photo');
   if (preview) preview.src = DEFAULT_PW_AVATAR;
   const fileInput = document.getElementById('pw-student-photo-file');
@@ -715,10 +727,16 @@ async function pwEditStudent(id) {
   document.getElementById('pw-input-student-previousCollege').value = st.previousCollege || '';
 
   // Load existing photo
-  if (st.photoUrl) {
+  if (st.photoUrl && (typeof isCustomPhoto !== 'function' || isCustomPhoto(st.photoUrl))) {
     pwStudentPhotoUrl = st.photoUrl;
     const preview = document.getElementById('pw-preview-photo');
     if (preview) preview.src = st.photoUrl;
+  } else {
+    pwStudentPhotoUrl = '';
+    const preview = document.getElementById('pw-preview-photo');
+    if (preview && typeof getInitialsAvatar === 'function') {
+      preview.src = getInitialsAvatar(st.name, 'db2777');
+    }
   }
 
   // Populate class dropdown

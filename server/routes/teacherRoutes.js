@@ -32,7 +32,7 @@ function getGravatarUrl(email) {
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const { year, class: classFilter } = req.query;
-    const teachers = await User.find().select('-password').sort({ createdAt: -1 }).lean();
+    const teachers = await User.find().select('-password').sort({ order: 1, createdAt: -1 }).lean();
 
     // Fetch distinct dates to extract all available academic years in attendance
     const allDates = await Attendance.distinct('date');
@@ -367,6 +367,30 @@ router.post('/', authMiddleware, async (req, res) => {
         sessionCount: 0
       }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/teachers/reorder
+// @desc    Update teachers display order via drag-and-drop
+router.put('/reorder', authMiddleware, async (req, res) => {
+  try {
+    const allowed = await canUserManage(req.user);
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'Permission denied: Cannot reorder teachers' });
+    }
+
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ success: false, message: 'orderedIds array required' });
+    }
+
+    const updatePromises = orderedIds.map((id, index) =>
+      User.findByIdAndUpdate(id, { order: index })
+    );
+    await Promise.all(updatePromises);
+    res.json({ success: true, message: 'Teachers reordered successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

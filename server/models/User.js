@@ -54,6 +54,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  order: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

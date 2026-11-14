@@ -315,6 +315,13 @@ const API = {
     });
   },
 
+  async reorderTeachers(orderedIds) {
+    return this.request('/teachers/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ orderedIds })
+    });
+  },
+
   async deleteTeacher(id) {
     return this.request(`/teachers/${id}`, {
       method: 'DELETE'

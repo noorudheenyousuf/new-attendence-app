@@ -1,5 +1,42 @@
 // Main Application Controller for REGISTERLY
 const DEFAULT_AVATAR = "/default_avatar.jpg";
+
+// Check if a photo URL is an uploaded custom image rather than default avatar / placeholder
+function isCustomPhoto(url) {
+  if (!url || typeof url !== 'string') return false;
+  const clean = url.trim();
+  if (!clean) return false;
+  if (clean === DEFAULT_AVATAR || clean === '/default_avatar.jpg') return false;
+  if (clean.includes('default_avatar.jpg')) return false;
+  if (clean.includes('unsplash.com')) return false;
+  if (clean.startsWith("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'") ||
+      clean.startsWith('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"')) return false;
+  return true;
+}
+
+// Generate theme-colored initials avatar (SVG Data-URI, rounded-square compatible)
+// If 1 word: first letter. If 2+ words: two letters of two parts. Fully fills the frame.
+function getInitialsAvatar(name = '', bgColor = '245b70', textColor = 'ffffff') {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  let initials = '';
+  if (parts.length >= 2) {
+    initials = (parts[0][0] + parts[1][0]).toUpperCase();
+  } else if (parts.length === 1 && parts[0].length > 0) {
+    initials = parts[0][0].toUpperCase();
+  }
+
+  const cleanBg = (bgColor || '245b70').replace('#', '');
+  const cleanText = (textColor || 'ffffff').replace('#', '');
+
+  if (!initials) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><rect width="100" height="100" fill="#${cleanBg}"/><path d="M50 48c7.18 0 13-5.82 13-13s-5.82-13-13-13-13 5.82-13 13 5.82 13 13 13zm0 8c-9.33 0-28 4.67-28 14v6h56v-6c0-9.33-18.67-14-28-14z" fill="#${cleanText}"/></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+
+  const fontSize = initials.length > 1 ? 40 : 46;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><rect width="100" height="100" fill="#${cleanBg}"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#${cleanText}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="900" font-size="${fontSize}">${initials}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 let currentUser = null;
 let currentRole = 'admin'; // 'admin' or 'teacher'
 let isDarkMode = false;
@@ -2470,7 +2507,7 @@ function renderAttendanceList() {
         <!-- Student Info: Photo & Name ONLY (No ID and No Roll) - Click Photo to View Details -->
         <div class="flex items-center gap-3 min-w-0">
           <div class="relative flex-shrink-0 cursor-pointer group" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view student details">
-            <img src="${st.photoUrl || DEFAULT_AVATAR}" alt="${st.name}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] group-hover:scale-105 transition shadow-sm">
+            <img src="${isCustomPhoto(st.photoUrl) ? st.photoUrl : getInitialsAvatar(st.name, '245b70')}" alt="${escapeHtml(st.name)}" class="w-11 h-11 rounded-2xl object-cover border border-[#245b70] group-hover:scale-105 transition shadow-sm">
             <span class="absolute -bottom-1 -right-1 text-[9px] font-black px-1.5 py-0.2 rounded-md ${
               isP ? 'bg-emerald-600 text-white' : isA ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'
             }">${record.status}</span>
@@ -2717,7 +2754,7 @@ function renderReportTable(data, summary) {
       </td>
       <td class="py-2.5 px-2 font-bold">
         <div class="flex items-center gap-2">
-          <img src="${row.photoUrl || DEFAULT_AVATAR}" class="w-7 h-7 rounded-lg object-cover border border-[#245b70] shadow-sm">
+          <img src="${isCustomPhoto(row.photoUrl) ? row.photoUrl : getInitialsAvatar(row.name, '245b70')}" class="w-7 h-7 rounded-lg object-cover border border-[#245b70] shadow-sm">
           <div>${row.name}</div>
         </div>
       </td>
@@ -2873,6 +2910,38 @@ async function renderStudentsDirectory() {
       );
     }
 
+    // Sort order handling
+    const sortSelect = document.getElementById('student-sort-order');
+    const savedSort = localStorage.getItem('student_sort_order') || 'roll-asc';
+    if (sortSelect) {
+      if (!sortSelect.dataset.initialized) {
+        sortSelect.value = savedSort;
+        sortSelect.dataset.initialized = 'true';
+      }
+      localStorage.setItem('student_sort_order', sortSelect.value);
+    }
+    const currentSort = sortSelect ? sortSelect.value : savedSort;
+
+    const sortStudentsList = (list) => {
+      return [...list].sort((a, b) => {
+        switch (currentSort) {
+          case 'roll-desc':
+            return (Number(b.roll) || 0) - (Number(a.roll) || 0);
+          case 'name-asc':
+            return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+          case 'name-desc':
+            return (b.name || '').localeCompare(a.name || '', undefined, { sensitivity: 'base' });
+          case 'id-asc':
+            return (Number(a.studentId) || 0) - (Number(b.studentId) || 0);
+          case 'id-desc':
+            return (Number(b.studentId) || 0) - (Number(a.studentId) || 0);
+          case 'roll-asc':
+          default:
+            return (Number(a.roll) || 0) - (Number(b.roll) || 0);
+        }
+      });
+    };
+
     if (!container) return;
 
     if (students.length === 0) {
@@ -2884,7 +2953,7 @@ async function renderStudentsDirectory() {
       <div id="student-card-${st.studentId}" class="bg-[var(--card-bg)] p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm space-y-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2.5 min-w-0 select-none">
-            <img src="${st.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(st.name)}" class="w-11 h-11 rounded-xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view full student details">
+            <img src="${isCustomPhoto(st.photoUrl) ? st.photoUrl : getInitialsAvatar(st.name, '245b70')}" alt="${escapeHtml(st.name)}" class="w-11 h-11 rounded-2xl object-cover border border-[#245b70] flex-shrink-0 shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition" onclick="openStudentDetailsModal('${escapeQuotes(String(st.studentId))}')" title="Click to view full student details">
             <div class="truncate">
               <div class="flex items-center gap-1.5">
                 <span class="font-extrabold text-[var(--text-main)] text-sm truncate">${st.isPrivate ? '<svg style="display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' : ''}${st.name}</span>
@@ -2920,7 +2989,8 @@ async function renderStudentsDirectory() {
 
       classesList.forEach(cls => {
         const clsName = cls.name || cls;
-        const clsStudents = students.filter(s => isClassEqual(s.class, clsName));
+        let clsStudents = students.filter(s => isClassEqual(s.class, clsName));
+        clsStudents = sortStudentsList(clsStudents);
         if (clsStudents.length > 0) {
           clsStudents.forEach(s => accountedFor.add(String(s._id || s.studentId)));
           groupsHtml.push(`
@@ -2939,7 +3009,8 @@ async function renderStudentsDirectory() {
       });
 
       // Any students whose class is not in classesList
-      const remainingStudents = students.filter(s => !accountedFor.has(String(s._id || s.studentId)));
+      let remainingStudents = students.filter(s => !accountedFor.has(String(s._id || s.studentId)));
+      remainingStudents = sortStudentsList(remainingStudents);
       if (remainingStudents.length > 0) {
         groupsHtml.push(`
           <div class="class-student-group space-y-2">
@@ -2957,6 +3028,7 @@ async function renderStudentsDirectory() {
 
       container.innerHTML = groupsHtml.length > 0 ? groupsHtml.join('') : students.map(st => renderStudentCardItem(st)).join('');
     } else {
+      students = sortStudentsList(students);
       container.innerHTML = students.map(st => renderStudentCardItem(st)).join('');
     }
   } catch (error) {
@@ -3873,6 +3945,35 @@ async function saveAdminStudentFieldsConfig() {
   }
 }
 
+// Live student name typing avatar preview
+function handleStudentNameInput(type) {
+  const nameInput = document.getElementById(`${type}-student-name`);
+  const preview = document.getElementById(`${type}-preview-photo`);
+  if (!nameInput || !preview) return;
+
+  if (type === 'new' && (newStudentPhotoUrl || newStudentBase64Photo)) return;
+  if (type === 'edit' && editStudentPhotoUrl) return;
+
+  const nameVal = nameInput.value.trim();
+  preview.src = getInitialsAvatar(nameVal, '245b70');
+}
+
+// Auto-suggest next roll number in ascending order for chosen class
+function handleNewStudentClassChanged() {
+  const classSelect = document.getElementById('new-student-class');
+  const rollInput = document.getElementById('new-student-roll');
+  if (!classSelect || !rollInput) return;
+  const selClass = classSelect.value;
+  if (!selClass) return;
+
+  const inClass = (cachedAllStudents || []).filter(s => isClassEqual(s.class, selClass));
+  const maxRoll = inClass.reduce((max, s) => {
+    const r = parseInt(s.roll, 10);
+    return (!isNaN(r) && r > max) ? r : max;
+  }, 0);
+  rollInput.value = maxRoll > 0 ? (maxRoll + 1) : 1;
+}
+
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
   const titleEl = document.getElementById('modal-add-student-title');
@@ -3884,7 +3985,7 @@ async function openStudentModal() {
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
   const preview = document.getElementById('new-preview-photo');
-  if (preview) preview.src = DEFAULT_AVATAR;
+  if (preview) preview.src = getInitialsAvatar('', '245b70');
 
   // Clear all inputs
   const clearIds = [
@@ -3910,6 +4011,7 @@ async function openStudentModal() {
   }
 
   await updateModalStudentCounts();
+  handleNewStudentClassChanged();
 
   try {
     const res = await API.getNextStudentId();
@@ -3986,7 +4088,7 @@ async function openEditStudentModal(id) {
     editStudentBase64Photo = student.photoUrl || '';
     document.getElementById('edit-student-modal-title').innerText = `Edit Student: ${student.name}`;
     document.getElementById('edit-student-id').value = student.studentId;
-    document.getElementById('edit-preview-photo').src = student.photoUrl || DEFAULT_AVATAR;
+    document.getElementById('edit-preview-photo').src = isCustomPhoto(student.photoUrl) ? student.photoUrl : getInitialsAvatar(student.name, '245b70');
 
     // Populate class options in select
     const classSelect = document.getElementById('edit-student-class');
@@ -4115,7 +4217,7 @@ async function openStudentDetailsModal(studentId) {
     return;
   }
 
-  const photo = student.photoUrl || DEFAULT_AVATAR;
+  const photo = isCustomPhoto(student.photoUrl) ? student.photoUrl : getInitialsAvatar(student.name, '245b70');
   document.getElementById('details-student-photo').src = photo;
   document.getElementById('details-student-name').innerText = student.name;
   document.getElementById('details-student-id').innerText = `ID: ${student.studentId}`;
@@ -6258,11 +6360,10 @@ async function populateTeacherDropdowns(targetSelectId, selectedValue = '') {
 
 
 
-// Generate friendly fallback avatar
+// Generate friendly fallback avatar (theme color rounded square)
 function getEmailAvatarPreview(email, name = '') {
-  if (!email && !name) return DEFAULT_AVATAR;
   const label = (name || email || 'Teacher').trim();
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=245b70&color=ffffff&bold=true&rounded=true`;
+  return getInitialsAvatar(label, '245b70');
 }
 
 // Live email typing avatar preview
@@ -6308,6 +6409,211 @@ async function handleTeacherPhotoUpload(e, type) {
   }
 }
 
+// ================================================================
+// TEACHER DRAG & DROP SORTING
+// ================================================================
+let draggedTeacherIndex = null;
+let touchDraggedTeacherIndex = null;
+let touchTeacherElement = null;
+let teacherHoldTimer = null;
+let teacherHoldActive = false;
+let recentlyPlacedTeacherId = null;
+
+function handleTeacherDragStart(e, index) {
+  if (!canUserEditDelete()) {
+    e.preventDefault();
+    return;
+  }
+  const searchInput = document.getElementById('teacher-search-input');
+  if (searchInput && searchInput.value.trim()) {
+    e.preventDefault();
+    showToast('Clear search filter to reorder teachers');
+    return;
+  }
+  draggedTeacherIndex = index;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(index));
+  try {
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'teacher', index }));
+  } catch (_) {}
+  e.currentTarget.classList.add('dragging');
+  triggerNavHaptic('light');
+}
+
+function handleTeacherDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const item = e.currentTarget;
+  if (!item.classList.contains('drag-over') && draggedTeacherIndex !== index) {
+    item.classList.add('drag-over');
+  }
+}
+
+function handleTeacherDragLeave(e) {
+  const item = e.currentTarget;
+  if (!item.contains(e.relatedTarget)) {
+    item.classList.remove('drag-over');
+  }
+}
+
+function handleTeacherDragEnd(e) {
+  draggedTeacherIndex = null;
+  document.querySelectorAll('#teachers-cards-container .drag-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over', 'drag-activated');
+  });
+}
+
+async function handleTeacherDrop(e, targetIndex) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+
+  let sourceIndex = draggedTeacherIndex;
+  if (sourceIndex === null) {
+    const rawData = e.dataTransfer ? e.dataTransfer.getData('text/plain') : null;
+    if (rawData !== null && rawData !== '') {
+      sourceIndex = parseInt(rawData, 10);
+    }
+  }
+
+  handleTeacherDragEnd(e);
+
+  if (sourceIndex === null || isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+  if (!cachedTeachersList || cachedTeachersList.length <= 1) return;
+
+  const movedTeacher = cachedTeachersList.splice(sourceIndex, 1)[0];
+  if (!movedTeacher) return;
+  cachedTeachersList.splice(targetIndex, 0, movedTeacher);
+
+  recentlyPlacedTeacherId = movedTeacher._id;
+  triggerNavHaptic('strong');
+
+  await renderTeachersList();
+
+  setTimeout(() => {
+    if (recentlyPlacedTeacherId === movedTeacher._id) {
+      recentlyPlacedTeacherId = null;
+      document.querySelectorAll('#teachers-cards-container .drag-item-placed').forEach(el => {
+        el.classList.remove('drag-item-placed');
+      });
+    }
+  }, 600);
+
+  try {
+    const orderedIds = cachedTeachersList.map(t => t._id);
+    await API.reorderTeachers(orderedIds);
+    showToast('Teachers reordered successfully');
+  } catch (err) {
+    console.error('[Reorder Teachers Error]', err);
+    showToast('Failed to save teacher order', true);
+  }
+}
+
+function touchTeacherStart(e, index) {
+  if (!canUserEditDelete()) return;
+  const searchInput = document.getElementById('teacher-search-input');
+  if (searchInput && searchInput.value.trim()) return;
+
+  const handle = e.target.closest('.drag-handle');
+  touchTeacherElement = e.currentTarget;
+  touchDraggedTeacherIndex = index;
+
+  if (handle) {
+    teacherHoldActive = true;
+    touchTeacherElement.classList.add('drag-activated', 'dragging');
+    triggerNavHaptic('medium');
+    return;
+  }
+
+  teacherHoldActive = false;
+  teacherHoldTimer = setTimeout(() => {
+    teacherHoldActive = true;
+    if (touchTeacherElement) {
+      touchTeacherElement.classList.add('drag-activated', 'dragging');
+      triggerNavHaptic('medium');
+    }
+  }, 350);
+}
+
+function touchTeacherMove(e) {
+  if (!teacherHoldActive || touchDraggedTeacherIndex === null) {
+    if (teacherHoldTimer) {
+      clearTimeout(teacherHoldTimer);
+      teacherHoldTimer = null;
+    }
+    return;
+  }
+  if (e.cancelable) e.preventDefault();
+
+  const touch = e.touches[0];
+  const target = document.elementFromPoint(touch.clientX, touch.clientY);
+  const card = target ? target.closest('#teachers-cards-container .drag-item') : null;
+
+  document.querySelectorAll('#teachers-cards-container .drag-item').forEach(el => el.classList.remove('drag-over'));
+  if (card && card !== touchTeacherElement) {
+    card.classList.add('drag-over');
+  }
+}
+
+async function touchTeacherEnd(e) {
+  if (teacherHoldTimer) {
+    clearTimeout(teacherHoldTimer);
+    teacherHoldTimer = null;
+  }
+  if (!teacherHoldActive || touchDraggedTeacherIndex === null) {
+    touchDraggedTeacherIndex = null;
+    if (touchTeacherElement) {
+      touchTeacherElement.classList.remove('drag-activated', 'dragging');
+      touchTeacherElement = null;
+    }
+    return;
+  }
+
+  teacherHoldActive = false;
+  const changedTouch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+  const target = changedTouch ? document.elementFromPoint(changedTouch.clientX, changedTouch.clientY) : null;
+  const card = target ? target.closest('#teachers-cards-container .drag-item') : null;
+  const sourceIndex = touchDraggedTeacherIndex;
+  touchDraggedTeacherIndex = null;
+
+  if (touchTeacherElement) {
+    touchTeacherElement.classList.remove('drag-activated', 'dragging');
+    touchTeacherElement = null;
+  }
+  document.querySelectorAll('#teachers-cards-container .drag-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over', 'drag-activated');
+  });
+
+  if (!card) return;
+  const targetIndex = parseInt(card.getAttribute('data-index'), 10);
+  if (isNaN(targetIndex) || sourceIndex === null || sourceIndex === targetIndex) return;
+
+  const movedTeacher = cachedTeachersList.splice(sourceIndex, 1)[0];
+  if (!movedTeacher) return;
+  cachedTeachersList.splice(targetIndex, 0, movedTeacher);
+
+  recentlyPlacedTeacherId = movedTeacher._id;
+  triggerNavHaptic('strong');
+  await renderTeachersList();
+
+  setTimeout(() => {
+    if (recentlyPlacedTeacherId === movedTeacher._id) {
+      recentlyPlacedTeacherId = null;
+      document.querySelectorAll('#teachers-cards-container .drag-item-placed').forEach(el => {
+        el.classList.remove('drag-item-placed');
+      });
+    }
+  }, 600);
+
+  try {
+    const orderedIds = cachedTeachersList.map(t => t._id);
+    await API.reorderTeachers(orderedIds);
+    showToast('Teachers reordered successfully');
+  } catch (err) {
+    console.error('[Reorder Teachers Error]', err);
+    showToast('Failed to save teacher order', true);
+  }
+}
+
 // USER DIRECTIVE: Render teachers cards in the 4th tab
 async function renderTeachersList() {
   const container = document.getElementById('teachers-cards-container');
@@ -6349,8 +6655,10 @@ async function renderTeachersList() {
     const selectedYear = yearEl ? yearEl.value : 'all';
     const selectedClass = classEl ? classEl.value : 'all';
 
-    container.innerHTML = teachers.map(t => {
-      const avatar = t.avatarUrl || getEmailAvatarPreview(t.email, t.name);
+    container.innerHTML = teachers.map((t, index) => {
+      const avatar = isCustomPhoto(t.avatarUrl) ? t.avatarUrl : getInitialsAvatar(t.name || t.email, '245b70');
+      const isPlaced = recentlyPlacedTeacherId === t._id ? ' drag-item-placed' : '';
+      const canManage = canUserEditDelete();
       const isGoogleLinked = Boolean(t.googleConnected);
       const roleBadge = t.role === 'admin'
         ? `<span class="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[10px] border border-amber-500/20">Admin</span>`
@@ -6385,7 +6693,16 @@ async function renderTeachersList() {
         : `Log (${currentSessions} in ${selectedYear})`;
 
       return `
-        <div class="bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition overflow-hidden">
+        <div id="teacher-card-${t._id}" data-index="${index}" class="drag-item bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-sm hover:shadow-md transition overflow-hidden ${isPlaced}"
+             draggable="${canManage ? 'true' : 'false'}"
+             ondragstart="handleTeacherDragStart(event, ${index})"
+             ondragover="handleTeacherDragOver(event, ${index})"
+             ondragleave="handleTeacherDragLeave(event)"
+             ondrop="handleTeacherDrop(event, ${index})"
+             ondragend="handleTeacherDragEnd(event)"
+             ontouchstart="touchTeacherStart(event, ${index})"
+             ontouchmove="touchTeacherMove(event)"
+             ontouchend="touchTeacherEnd(event)">
           <!-- Main row: avatar left, content right -->
           <div class="flex gap-0">
             <!-- Left: Avatar column -->
@@ -6396,7 +6713,7 @@ async function renderTeachersList() {
             <!-- Right: Content column -->
             <div class="flex-1 min-w-0 pt-3 pb-3 pr-3 flex flex-col gap-2">
 
-              <!-- Row 1: Name + role badge + google badge | Edit + Delete -->
+              <!-- Row 1: Name + role badge + google badge | Drag Handle + Edit + Delete -->
               <div class="flex items-start justify-between gap-1.5">
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1.5 flex-wrap">
@@ -6405,8 +6722,18 @@ async function renderTeachersList() {
                   </div>
                   <div class="mt-0.5">${googleStatusBadge}</div>
                 </div>
-                ${canUserEditDelete() ? `
+                ${canManage ? `
                 <div class="flex items-center gap-1 flex-shrink-0">
+                  <div class="drag-handle text-[var(--text-sub)] hover:text-[#245b70] p-1 flex-shrink-0 cursor-grab active:cursor-grabbing select-none" title="Hold or drag to reorder">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="9" cy="6" r="1.5"></circle>
+                      <circle cx="15" cy="6" r="1.5"></circle>
+                      <circle cx="9" cy="12" r="1.5"></circle>
+                      <circle cx="15" cy="12" r="1.5"></circle>
+                      <circle cx="9" cy="18" r="1.5"></circle>
+                      <circle cx="15" cy="18" r="1.5"></circle>
+                    </svg>
+                  </div>
                   <button onclick="openProfileEditPage('${t._id}')" title="Edit Teacher"
                     class="w-7 h-7 rounded-xl bg-[var(--bg-page)] text-[var(--text-sub)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition border border-[var(--border-color)]">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -6463,7 +6790,7 @@ async function renderTeachersList() {
 function openAddTeacherModal() {
   newTeacherPhotoUrl = '';
   const preview = document.getElementById('new-teacher-preview-photo');
-  if (preview) preview.src = DEFAULT_AVATAR;
+  if (preview) preview.src = getInitialsAvatar('', '245b70');
 
   document.getElementById('new-teacher-name').value = '';
   document.getElementById('new-teacher-email').value = '';
@@ -7920,7 +8247,7 @@ async function executeStudentPrintA4() {
     pages.forEach((pageStudents, pageIdx) => {
       html += `<div class="a4-page">`;
       pageStudents.forEach(st => {
-        const photo = st.photoUrl || DEFAULT_AVATAR;
+        const photo = isCustomPhoto(st.photoUrl) ? st.photoUrl : getInitialsAvatar(st.name, '245b70');
         const fatherName = (st.familyDetails && st.familyDetails.fatherName) || '-';
         const fatherMobile = (st.familyDetails && st.familyDetails.fatherMobile) || '-';
         const motherName = (st.familyDetails && st.familyDetails.motherName) || '-';
