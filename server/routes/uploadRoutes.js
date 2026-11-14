@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
 const uploadService = require('../services/uploadService');
 
@@ -84,6 +85,77 @@ router.post('/photo', authMiddleware, upload.single('photo'), async (req, res) =
       success: false,
       message: error.message || 'Failed to upload photo'
     });
+  }
+});
+
+/**
+ * GET /api/upload/download-proxy?url=...&name=...
+ * Streams local or remote image files as an attachment with high clarity
+ * Avoids browser CORS / cross-origin blocking when saving to device gallery/downloads
+ */
+router.get('/download-proxy', async (req, res) => {
+  try {
+    const rawUrl = req.query.url;
+    let fileName = req.query.name || 'student_photo.jpg';
+
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      return res.status(400).send('Missing url parameter');
+    }
+
+    // Sanitize filename to prevent header injection or directory traversal
+    fileName = fileName.replace(/[/\\?%*:|"<>]/g, '_').trim();
+    if (!/\.(jpe?g|png|webp|svg)$/i.test(fileName)) {
+      fileName += '.jpg';
+    }
+
+    // 1. Handle local file paths (/uploads/...)
+    if (rawUrl.startsWith('/uploads/')) {
+      const sanitizedRelative = path.normalize(rawUrl).replace(/^(\.\.[\/\\])+/, '');
+      const localFilePath = path.join(__dirname, '../../public', sanitizedRelative);
+
+      const uploadsDir = path.resolve(__dirname, '../../public/uploads');
+      const resolvedPath = path.resolve(localFilePath);
+      if (!resolvedPath.startsWith(uploadsDir) || !fs.existsSync(resolvedPath)) {
+        return res.status(404).send('Photo file not found');
+      }
+
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      return res.sendFile(resolvedPath);
+    }
+
+    // 2. Handle remote URLs (Cloudinary, Unsplash, etc.)
+    if (/^https?:\/\//i.test(rawUrl)) {
+      let fetchUrl = rawUrl;
+      // Strip Cloudinary transformations to get original camera-quality master image
+      if (fetchUrl.includes('cloudinary.com') && fetchUrl.includes('/image/upload/')) {
+        fetchUrl = fetchUrl.replace(/\/image\/upload\/(?:c_[^/]+,)*w_\d+[^/]*\//i, '/image/upload/');
+      } else if (fetchUrl.includes('images.unsplash.com')) {
+        try {
+          const u = new URL(fetchUrl);
+          u.searchParams.set('w', '1600');
+          u.searchParams.set('q', '95');
+          fetchUrl = u.toString();
+        } catch (_) {}
+      }
+
+      const remoteRes = await fetch(fetchUrl);
+      if (!remoteRes.ok) {
+        return res.status(remoteRes.status).send('Failed to fetch remote image');
+      }
+
+      const contentType = remoteRes.headers.get('content-type') || 'image/jpeg';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      const arrayBuffer = await remoteRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      return res.send(buffer);
+    }
+
+    return res.status(400).send('Invalid url format');
+  } catch (error) {
+    console.error('[Download Proxy Error]', error);
+    res.status(500).send('Error streaming photo download');
   }
 });
 

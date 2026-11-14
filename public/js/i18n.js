@@ -101,7 +101,16 @@ const APP_TRANSLATIONS = {
     placeholder_select_class_subject: "Select Class & Subject",
     placeholder_att_desc: "Choose a class and subject from the filters above to load the student roster and take attendance.",
     placeholder_rep_desc: "Choose a class and subject from the filters above to generate full attendance analytics and sheets.",
-    placeholder_choose_badge: "Choose class & subject above"
+    placeholder_choose_badge: "Choose class & subject above",
+
+    // Student Photo & Download
+    download_photo: "Download Photo",
+    downloading_photo: "Downloading photo in full clarity...",
+    photo_downloaded: "Photo downloaded successfully!",
+    photo_download_failed: "Failed to download photo",
+    enlarged_student_photo: "Enlarged Student Photo",
+    tap_photo_to_enlarge: "(Tap photo to view large & download)",
+    hd_clarity: "HD Original Clarity"
   },
 
   ml: {
@@ -201,7 +210,16 @@ const APP_TRANSLATIONS = {
     placeholder_select_class_subject: "ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക",
     placeholder_att_desc: "വിദ്യാർത്ഥികളുടെ പട്ടിക ലഭ്യമാക്കാനും ഹാജർ രേഖപ്പെടുത്താനും മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.",
     placeholder_rep_desc: "സമ്പൂർണ്ണ ഹാജർ വിശകലനങ്ങളും ഷീറ്റുകളും തയ്യാറാക്കാൻ മുകളിലുള്ള ഫിൽട്ടറുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക.",
-    placeholder_choose_badge: "മുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക"
+    placeholder_choose_badge: "മുകളിൽ നിന്ന് ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക",
+
+    // Student Photo & Download
+    download_photo: "ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുക",
+    downloading_photo: "പൂർണ്ണ വ്യക്തതയോടെ ഡൗൺലോഡ് ചെയ്യുന്നു...",
+    photo_downloaded: "ഫോട്ടോ വിജയകരമായി ഡൗൺലോഡ് ചെയ്തു!",
+    photo_download_failed: "ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യാനായില്ല",
+    enlarged_student_photo: "വലുതാക്കിയ വിദ്യാർത്ഥി ഫോട്ടോ",
+    tap_photo_to_enlarge: "(വലുതായി കാണാനും ഡൗൺലോഡ് ചെയ്യാനും ഫോട്ടോയിൽ തൊടുക)",
+    hd_clarity: "ഉയർന്ന വ്യക്തതയുള്ള ഫോട്ടോ"
   }
 };
 
@@ -216,6 +234,13 @@ const APP_PHRASES_ML = {
   "Notice Board & Notifications": "അറിയിപ്പ് ബോർഡും സന്ദേശങ്ങളും",
   "Search students, classes, subjects...": "വിദ്യാർത്ഥികൾ, ക്ലാസുകൾ, വിഷയങ്ങൾ എന്നിവ തിരയുക...",
   "One-Click PWA Install Button": "ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
+  "Download Photo": "ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുക",
+  "Downloading photo...": "ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുന്നു...",
+  "(Tap photo to view large)": "(വലുതായി കാണാനും ഡൗൺലോഡ് ചെയ്യാനും ഫോട്ടോയിൽ തൊടുക)",
+  "(Tap photo to view large & download)": "(വലുതായി കാണാനും ഡൗൺലോഡ് ചെയ്യാനും ഫോട്ടോയിൽ തൊടുക)",
+  "HD Original Clarity": "ഉയർന്ന വ്യക്തതയുള്ള ഫോട്ടോ",
+  "Enlarged Student Photo": "വലുതാക്കിയ വിദ്യാർത്ഥി ഫോട്ടോ",
+  "Student Profile (Read-Only)": "വിദ്യാർത്ഥി പ്രൊഫൈൽ (കാണാൻ മാത്രം)",
 
   // Dashboard - Greetings & KPIs
   "Academic Year": "അധ്യയന വർഷം",

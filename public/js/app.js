@@ -4252,6 +4252,33 @@ async function handleSaveEditedStudent(e) {
 // ================= READ-ONLY STUDENT DETAILS & PHOTO ENLARGE =================
 // USER DIRECTIVE:
 // "when click the photo from taking attendence show sudents details fully ....only to read not edit...one more click to photo show largly...."
+let currentDetailsStudent = null;
+let activeEnlargedStudent = null;
+
+// Utility to resolve full native camera-quality / original resolution image URL
+function getHighClarityPhotoUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  let cleanUrl = url.trim();
+
+  // 1. Cloudinary: strip any downscaling/transformations from URL path
+  if (cleanUrl.includes('cloudinary.com') && cleanUrl.includes('/image/upload/')) {
+    // Strip transforms like /c_thumb,w_...,h_.../ or /w_100,h_100/
+    cleanUrl = cleanUrl.replace(/\/image\/upload\/(?:[a-zA-Z0-9_-]+:[a-zA-Z0-9_.-]+,?|[a-zA-Z0-9_-]+_[a-zA-Z0-9_.-]+,?)+\//i, '/image/upload/');
+  }
+  // 2. Unsplash: upgrade low resolution thumbnails to high resolution
+  else if (cleanUrl.includes('images.unsplash.com')) {
+    try {
+      const u = new URL(cleanUrl);
+      u.searchParams.set('w', '1600');
+      u.searchParams.set('q', '95');
+      u.searchParams.delete('crop');
+      cleanUrl = u.toString();
+    } catch (_) {}
+  }
+
+  return cleanUrl;
+}
+
 async function openStudentDetailsModal(studentId) {
   const targetId = String(studentId);
   // Look in main students list first, then PW students list
@@ -4287,6 +4314,9 @@ async function openStudentDetailsModal(studentId) {
     return;
   }
 
+  // Store active student reference for enlargement and download actions
+  currentDetailsStudent = student;
+
   const photo = isCustomPhoto(student.photoUrl) ? student.photoUrl : getInitialsAvatar(student.name, '245b70');
   document.getElementById('details-student-photo').src = photo;
   document.getElementById('details-student-name').innerText = student.name;
@@ -4316,19 +4346,164 @@ function closeStudentDetailsModal() {
   document.getElementById('modal-student-details').classList.add('hidden');
 }
 
-// Lightbox: One more click to photo shows largely!
-function openEnlargedPhoto(photoUrl, name) {
+// Triggered when teacher taps photo in the Details Modal
+function triggerEnlargeFromDetails() {
+  if (currentDetailsStudent) {
+    openEnlargedPhoto(currentDetailsStudent.photoUrl, currentDetailsStudent.name, currentDetailsStudent);
+  } else {
+    const photoSrc = document.getElementById('details-student-photo').src;
+    const name = document.getElementById('details-student-name').innerText;
+    openEnlargedPhoto(photoSrc, name);
+  }
+}
+
+// Lightbox: Enlarges photo in high clarity and displays download SVG button
+function openEnlargedPhoto(photoUrl, name, studentObj = null) {
   const modal = document.getElementById('modal-photo-enlarged');
   const img = document.getElementById('enlarged-photo-img');
-  const cap = document.getElementById('enlarged-photo-caption');
-  if (img) img.src = photoUrl;
-  if (cap) cap.innerText = name || 'Student Photo';
+  const nameEl = document.getElementById('enlarged-photo-name');
+  const metaEl = document.getElementById('enlarged-photo-meta');
+  const spinner = document.getElementById('enlarged-photo-spinner');
+
+  // Match or build student record
+  let student = studentObj || currentDetailsStudent;
+  if (!student && name) {
+    student = (studentsList || []).find(s => s.name === name);
+  }
+  if (!student) {
+    student = {
+      name: name || 'Student Photo',
+      photoUrl: photoUrl || '',
+      studentId: '',
+      class: '',
+      roll: ''
+    };
+  }
+
+  activeEnlargedStudent = student;
+
+  if (nameEl) nameEl.innerText = student.name || 'Student Photo';
+  if (metaEl) {
+    const metaParts = [];
+    if (student.class) metaParts.push(`Class: ${student.class}`);
+    if (student.roll) metaParts.push(`Roll #${student.roll}`);
+    if (student.studentId) metaParts.push(`ID: ${student.studentId}`);
+    metaEl.innerText = metaParts.join(' · ');
+  }
+
+  const hasCustom = isCustomPhoto(student.photoUrl || photoUrl);
+  const highClarityUrl = hasCustom
+    ? getHighClarityPhotoUrl(student.photoUrl || photoUrl)
+    : getInitialsAvatar(student.name || 'S', '245b70');
+
+  if (spinner) spinner.classList.remove('hidden');
+  if (img) {
+    img.onload = () => { if (spinner) spinner.classList.add('hidden'); };
+    img.onerror = () => { if (spinner) spinner.classList.add('hidden'); };
+    img.src = highClarityUrl;
+  }
+
   if (modal) modal.classList.remove('hidden');
 }
 
 function closeEnlargedPhoto() {
   const modal = document.getElementById('modal-photo-enlarged');
   if (modal) modal.classList.add('hidden');
+}
+
+// Downloads the currently enlarged student photo with maximum clarity
+async function downloadCurrentEnlargedPhoto() {
+  if (!activeEnlargedStudent) {
+    showToast(typeof t === 'function' ? (t('photo_download_failed') || 'Failed to download photo') : 'Failed to download photo', true);
+    return;
+  }
+
+  const st = activeEnlargedStudent;
+  const studentName = (st.name || 'Student').trim();
+  const cleanName = studentName.replace(/[^a-zA-Z0-9_\u0D00-\u0D7F-]/g, '_');
+  const studentId = st.studentId ? `_ID${st.studentId}` : '';
+  const className = st.class ? `_${String(st.class).replace(/[^a-zA-Z0-9_\u0D00-\u0D7F-]/g, '_')}` : '';
+  const filename = `${cleanName}${studentId}${className}.jpg`;
+
+  const hasCustom = isCustomPhoto(st.photoUrl);
+  const photoUrl = hasCustom ? getHighClarityPhotoUrl(st.photoUrl) : getInitialsAvatar(st.name || 'S', '245b70');
+
+  const downloadingMsg = typeof t === 'function' ? (t('downloading_photo') || 'Downloading photo in full clarity...') : 'Downloading photo in full clarity...';
+  const successMsg = typeof t === 'function' ? (t('photo_downloaded') || 'Photo downloaded in full clarity!') : 'Photo downloaded in full clarity!';
+  const failMsg = typeof t === 'function' ? (t('photo_download_failed') || 'Failed to download photo') : 'Failed to download photo';
+
+  showToast(downloadingMsg);
+
+  // 1. If SVG initials avatar, render onto high-resolution 1024x1024 canvas
+  if (photoUrl.startsWith('data:image/svg+xml')) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, 1024, 1024);
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            showToast(failMsg, true);
+            return;
+          }
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+          showToast(successMsg);
+        }, 'image/jpeg', 0.95);
+      };
+      img.onerror = () => {
+        showToast(failMsg, true);
+      };
+      img.src = photoUrl;
+      return;
+    } catch (err) {
+      console.warn('[Avatar Canvas Download Error]', err);
+    }
+  }
+
+  // 2. Direct client-side fetch (fastest & full native clarity)
+  try {
+    const res = await fetch(photoUrl, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+      showToast(successMsg);
+      return;
+    }
+  } catch (fetchErr) {
+    console.log('[Direct Download Fallback to Server Proxy]', fetchErr);
+  }
+
+  // 3. Robust Server Download Proxy (bypasses browser CORS restrictions completely)
+  try {
+    const proxyUrl = `/api/upload/download-proxy?url=${encodeURIComponent(photoUrl)}&name=${encodeURIComponent(filename)}`;
+    const a = document.createElement('a');
+    a.href = proxyUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast(successMsg);
+  } catch (proxyErr) {
+    console.error('[Download Proxy Failed]', proxyErr);
+    showToast(failMsg, true);
+  }
 }
 
 async function confirmDeleteStudent(id, name, studentId) {
