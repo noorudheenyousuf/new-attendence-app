@@ -6995,6 +6995,22 @@ function resolveSenderEmail(m) {
   return m.senderRole === 'admin' ? 'admin@school.internal' : '';
 }
 
+function getMessageFontSizeClass(text) {
+  const len = (text || '').trim().length;
+  // If chat is few: letters are big, very big! As letters increase, bigness decreases
+  if (len <= 15) {
+    return 'text-2xl sm:text-3xl font-black leading-snug tracking-tight';
+  } else if (len <= 45) {
+    return 'text-lg sm:text-xl font-extrabold leading-snug';
+  } else if (len <= 95) {
+    return 'text-base sm:text-lg font-bold leading-normal';
+  } else if (len <= 180) {
+    return 'text-sm sm:text-base font-semibold leading-relaxed';
+  } else {
+    return 'text-xs sm:text-sm font-medium leading-relaxed';
+  }
+}
+
 async function openMessagesModal() {
   selectTab('messages');
   const mainViewport = document.querySelector('main');
@@ -7063,7 +7079,7 @@ async function loadMessages() {
             </div>
           </div>
 
-          <!-- Content Block: Profile Name, Email, and Announcement Box Below -->
+          <!-- Content Block: Profile Name, Email, and Message Box Below -->
           <div class="max-w-[85%] sm:max-w-[80%] space-y-1.5 ${isMine ? 'items-end flex flex-col' : ''}">
             <!-- Profile Name + Role + Time -->
             <div class="flex items-center gap-2 ${isMine ? 'flex-row-reverse' : ''} flex-wrap">
@@ -7082,11 +7098,11 @@ async function loadMessages() {
               <span class="font-mono truncate">${escapeHtml(senderEmail || 'No email registered')}</span>
             </div>
 
-            <!-- BELOW THAT: THE MESSAGE LIKE AN ANNOUNCEMENT (Attractive, Beautiful, Colorful, Theme Related) -->
+            <!-- BELOW THAT: THE MESSAGE (Only chat text, dynamic font sizing) -->
             <div class="${isMine
               ? 'bg-gradient-to-br from-[#245b70] via-[#1b4859] to-[#14323d] text-white border border-[#245b70]/60 shadow-md rounded-2xl rounded-tr-xs'
-              : 'bg-gradient-to-br from-[var(--bg-page)] via-[var(--card-bg)] to-[#245b70]/5 dark:to-[#245b70]/15 text-[var(--text-main)] border border-[var(--border-color)] border-l-4 border-l-[#245b70] dark:border-l-cyan-400 shadow-sm rounded-2xl rounded-tl-xs'
-            } p-3.5 sm:p-4 text-xs sm:text-sm font-medium relative select-none cursor-pointer active:scale-98 transition group-hover:shadow-md overflow-hidden"
+              : 'bg-gradient-to-br from-[var(--bg-page)] via-[var(--card-bg)] to-[#245b70]/10 dark:to-[#245b70]/20 text-[var(--text-main)] border border-[var(--border-color)] border-l-4 border-l-[#245b70] dark:border-l-cyan-400 shadow-sm rounded-2xl rounded-tl-xs'
+            } px-3.5 py-2.5 sm:px-4 sm:py-3 relative select-none cursor-pointer active:scale-98 transition group-hover:shadow-md"
               onmousedown="handleMsgStartHold(event, '${m._id}')"
               onmouseup="handleMsgEndHold(event)"
               onmouseleave="handleMsgEndHold(event)"
@@ -7097,27 +7113,12 @@ async function loadMessages() {
               title="Click & hold to edit or delete"
               style="white-space:pre-wrap;word-break:break-word;">
 
-              <!-- Decorative subtle background icon -->
-              <div class="absolute -top-1 -right-1 ${isMine ? 'text-white/10' : 'text-[#245b70]/10 dark:text-cyan-400/10'} pointer-events-none group-hover:scale-110 transition-transform">
-                <svg class="w-14 h-14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-              </div>
-
-              <!-- Mini announcement header banner inside bubble -->
-              <div class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider mb-1.5 ${isMine ? 'text-teal-200' : 'text-[#245b70] dark:text-cyan-400'} opacity-90 relative z-10">
-                <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                </svg>
-                <span>${isMine ? 'Your Broadcast' : (m.senderRole === 'admin' ? 'Official School Announcement' : 'Teacher Notice')}</span>
-              </div>
-
-              <!-- Message Text -->
-              <p class="relative z-10 leading-relaxed font-semibold ${isMine ? 'text-white' : 'text-[var(--text-main)]'}">
+              <!-- Chat Text Only with Dynamic Font Scaling -->
+              <p class="${getMessageFontSizeClass(m.text)} ${isMine ? 'text-white' : 'text-[var(--text-main)]'}">
                 ${escapeHtml(m.text)}
               </p>
 
-              ${m.isEdited ? `<span class="relative z-10 text-[9px] ${isMine ? 'text-teal-200/80' : 'text-[var(--text-sub)]'} italic block mt-1.5">(edited)</span>` : ''}
+              ${m.isEdited ? `<span class="text-[9px] ${isMine ? 'text-teal-200/80' : 'text-[var(--text-sub)]'} italic block mt-1">(edited)</span>` : ''}
             </div>
           </div>
         </div>
