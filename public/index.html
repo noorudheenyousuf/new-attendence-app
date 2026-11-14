@@ -2892,6 +2892,66 @@
     </div>
   </div>
 
+  <!-- ================= UNASSIGNED TIMETABLE ATTENDANCE WARNING MODAL (6:00 AM STYLE) ================= -->
+  <div id="modal-unassigned-timetable-warning" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print transition-all duration-300" onclick="if (event.target === this) closeUnassignedTimetableModal();">
+    <div class="relative w-full max-w-xl rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/20 bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white overflow-hidden my-auto space-y-4 max-h-[90vh] flex flex-col">
+      <!-- Decorative Background Bubbles -->
+      <div class="absolute -top-12 -right-12 w-36 h-36 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-rose-400/15 rounded-full blur-xl pointer-events-none"></div>
+      <div class="absolute top-1/2 right-1/4 w-20 h-20 bg-white/10 rounded-full blur-lg pointer-events-none"></div>
+
+      <!-- Header -->
+      <div class="relative flex items-center justify-between pb-3 border-b border-white/15 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-amber-400/20 backdrop-blur-sm border border-amber-400/30 flex items-center justify-center shadow-inner text-amber-300 flex-shrink-0">
+            <!-- Alert SVG Icon -->
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <div>
+            <div id="unassigned-tt-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[10px] font-black uppercase tracking-wider mb-0.5">
+              <span>⚠️ Timetable Warning</span>
+            </div>
+            <h3 id="unassigned-tt-title" class="font-black text-lg text-white">Attendance Restricted</h3>
+          </div>
+        </div>
+        <button type="button" onclick="closeUnassignedTimetableModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold text-xs transition">✕</button>
+      </div>
+
+      <!-- Content Area -->
+      <div class="relative space-y-3 max-h-[500px] max-h-[60vh] overflow-y-auto pr-1 flex-1">
+        <div class="p-4 rounded-2xl bg-white/10 border border-white/15 text-center space-y-2">
+          <div class="text-sm font-extrabold text-amber-300">You didn't assign a class or subject</div>
+          <p id="unassigned-tt-description" class="text-xs text-cyan-100/90 leading-relaxed">
+            Your timetable has classes or subjects that are not assigned to your account. You cannot enter the Attendance page until you assign the class or subject properly.
+          </p>
+        </div>
+
+        <div id="unassigned-tt-slots-section" class="space-y-2">
+          <p class="text-[11px] text-cyan-100/80 font-bold uppercase tracking-wider">Unassigned Timetable Items:</p>
+          <div id="unassigned-tt-slots-list" class="space-y-1.5">
+            <!-- Dynamic unassigned items list -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="relative pt-2 border-t border-white/15 grid grid-cols-2 gap-2.5 flex-shrink-0">
+        <button type="button" onclick="handleFixTimetableFromWarning()" class="touch-btn py-2.5 px-4 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white font-bold text-xs border border-white/20 flex items-center justify-center gap-1.5 transition">
+          <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span>Fix in Timetable</span>
+        </button>
+        <button type="button" onclick="closeUnassignedTimetableModal()" class="touch-btn py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>OK / Understood</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= TODAY'S SCHEDULE & ATTENDANCE STATUS MODAL ================= -->
   <div id="modal-today-schedule" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print transition-all duration-300">
     <div class="relative w-full max-w-xl rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/20 bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white overflow-hidden my-auto space-y-4 max-h-[90vh] flex flex-col">

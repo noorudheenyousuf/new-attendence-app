@@ -4889,9 +4889,235 @@ function goBackFromSubPage(fallbackTab = 'settings') {
   selectTab(target);
 }
 
+// ================= UNASSIGNED TIMETABLE & ATTENDANCE ACCESS VALIDATION =================
+let checkingAttendanceAccess = false;
+
+async function checkUnassignedTimetableForAttendance() {
+  if (!currentUser) return null;
+  const myEmail = (currentUser.email || '').trim().toLowerCase();
+  const myName = (currentUser.name || '').trim().toLowerCase();
+  const isTeacher = currentUser.role !== 'admin';
+
+  // Get user's assigned classes and subjects
+  const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
+  const userAssignedClasses = new Set((myAssign.assignedClasses || []).map(c => c.trim().toLowerCase()));
+  const userAssignedSubjects = new Set((myAssign.assignedSubjects || []).map(s => s.trim().toLowerCase()));
+
+  if (currentUser.classTeacherOf) {
+    userAssignedClasses.add(currentUser.classTeacherOf.trim().toLowerCase());
+  }
+  if (Array.isArray(currentUser.assignedClasses)) {
+    currentUser.assignedClasses.forEach(c => {
+      if (c) userAssignedClasses.add(String(c).trim().toLowerCase());
+    });
+  }
+  if (Array.isArray(currentUser.assignedSubjects)) {
+    currentUser.assignedSubjects.forEach(s => {
+      if (s) userAssignedSubjects.add(String(s).trim().toLowerCase());
+    });
+  }
+  (classesList || []).forEach(c => {
+    const ctName = (c.classTeacher || '').trim().toLowerCase();
+    const ctEmail = (c.classTeacherEmail || '').trim().toLowerCase();
+    if ((ctName && ctName !== 'not assigned' && ctName === myName) || (ctEmail && ctEmail === myEmail)) {
+      if (c.name) userAssignedClasses.add(c.name.trim().toLowerCase());
+    }
+  });
+
+  // Fetch timetable slots for this account
+  let userSlots = [];
+  try {
+    const res = await API.getTimetable('', '', myEmail);
+    const rawSlots = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+    userSlots = rawSlots.filter(s => {
+      const sEmail = (s.teacherEmail || '').trim().toLowerCase();
+      const sTeacher = (s.teacher || '').trim().toLowerCase();
+      return (myEmail && sEmail === myEmail) || (myName && sTeacher === myName);
+    });
+  } catch (err) {
+    userSlots = (cachedCurrentTimetableSlots || []).filter(s => {
+      const sEmail = (s.teacherEmail || '').trim().toLowerCase();
+      return !myEmail || !sEmail || sEmail === myEmail;
+    });
+  }
+
+  // 1. If user has timetable slots, check each slot for unassigned class or subject
+  if (userSlots.length > 0) {
+    const unassignedSlots = [];
+
+    for (const slot of userSlots) {
+      const sClass = (slot.class || '').trim();
+      const sSubject = (slot.subject || '').trim();
+      const sTime = slot.timeSlot || slot.time || 'Period';
+      const sDay = slot.day || (Array.isArray(slot.days) ? slot.days.join(', ') : '');
+
+      let reasons = [];
+
+      // Check class assignment
+      if (!sClass || sClass.toLowerCase() === 'unassigned' || sClass.toLowerCase() === 'not assigned') {
+        reasons.push('Class is not assigned');
+      } else if (!userAssignedClasses.has(sClass.toLowerCase())) {
+        reasons.push(`Class "${sClass}" is not assigned to you`);
+      }
+
+      // Check subject assignment
+      if (!sSubject || sSubject.toLowerCase() === 'unassigned' || sSubject.toLowerCase() === 'not assigned') {
+        reasons.push('Subject is not assigned');
+      } else {
+        // If user is Class Teacher of sClass, class teacher is authorized for classes they lead
+        const isCT = (currentUser.classTeacherOf && isClassEqual(currentUser.classTeacherOf, sClass)) ||
+                     (classesList || []).some(c => isClassEqual(c.name, sClass) && (isClassEqual(c.classTeacher, currentUser.name) || (c.classTeacherEmail && isClassEqual(c.classTeacherEmail, currentUser.email))));
+
+        if (!isCT) {
+          const teachesSubjectForThisClass = (subjectsList || []).some(s => {
+            if (!isClassEqual(s.name, sSubject)) return false;
+            const st = (s.teacher || '').trim().toLowerCase();
+            const se = (s.teacherEmail || s.ownerEmail || '').trim().toLowerCase();
+            const isTeacherOfSub = (se && se === myEmail) || (!se && st && st === myName);
+            if (!isTeacherOfSub) return false;
+            return Array.isArray(s.assignedClasses) && s.assignedClasses.some(ac => isClassEqual(ac, sClass));
+          });
+
+          if (!teachesSubjectForThisClass) {
+            const teachesSubSomewhere = (subjectsList || []).some(s => {
+              if (!isClassEqual(s.name, sSubject)) return false;
+              const st = (s.teacher || '').trim().toLowerCase();
+              const se = (s.teacherEmail || s.ownerEmail || '').trim().toLowerCase();
+              return (se && se === myEmail) || (!se && st && st === myName);
+            }) || userAssignedSubjects.has(sSubject.toLowerCase());
+
+            if (teachesSubSomewhere) {
+              reasons.push(`Subject "${sSubject}" is not assigned to Class "${sClass}"`);
+            } else {
+              reasons.push(`Subject "${sSubject}" is not assigned to you`);
+            }
+          }
+        }
+      }
+
+      if (reasons.length > 0) {
+        unassignedSlots.push({
+          slot,
+          class: sClass || 'Unassigned Class',
+          subject: sSubject || 'Unassigned Subject',
+          time: sTime,
+          day: sDay,
+          reasons
+        });
+      }
+    }
+
+    if (unassignedSlots.length > 0) {
+      return {
+        type: 'unassigned_timetable',
+        title: "You Didn't Assign a Class or Subject",
+        badge: '⚠️ Timetable Warning',
+        message: `Your timetable contains ${unassignedSlots.length} slot(s) with an unassigned class or subject. You cannot enter the Attendance page until all timetable slots are assigned properly.`,
+        unassignedSlots
+      };
+    }
+  }
+
+  // 2. If user has NO timetable slots, but is a teacher without any assigned classes/subjects
+  if (userSlots.length === 0 && isTeacher && userAssignedClasses.size === 0 && userAssignedSubjects.size === 0) {
+    return {
+      type: 'no_assignments',
+      title: "You Didn't Assign a Class or Subject",
+      badge: '⚠️ Assignment Required',
+      message: "You have not been assigned any class or subject yet. Please assign a class or subject to your account before taking attendance.",
+      unassignedSlots: []
+    };
+  }
+
+  return null;
+}
+
+function showUnassignedTimetableModal(warningData) {
+  const modal = document.getElementById('modal-unassigned-timetable-warning');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('unassigned-tt-title');
+  const badgeEl = document.getElementById('unassigned-tt-badge');
+  const descEl = document.getElementById('unassigned-tt-description');
+  const listEl = document.getElementById('unassigned-tt-slots-list');
+  const sectionEl = document.getElementById('unassigned-tt-slots-section');
+
+  if (titleEl && warningData.title) titleEl.textContent = warningData.title;
+  if (badgeEl && warningData.badge) badgeEl.innerHTML = `<span>${escapeHtml(warningData.badge)}</span>`;
+  if (descEl && warningData.message) descEl.textContent = warningData.message;
+
+  if (listEl) {
+    if (warningData.unassignedSlots && warningData.unassignedSlots.length > 0) {
+      if (sectionEl) sectionEl.classList.remove('hidden');
+      listEl.innerHTML = warningData.unassignedSlots.map(item => {
+        const timeStr = item.time || 'Slot';
+        const dayStr = item.day ? `${item.day} • ` : '';
+        return `
+          <div class="p-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-start justify-between gap-3 transition">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
+                <span class="text-amber-300 font-extrabold">${escapeHtml(dayStr + timeStr)}</span>
+                <span>:</span>
+                <span class="text-cyan-100">${escapeHtml(item.subject)}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/20 text-white font-bold">[${escapeHtml(item.class)}]</span>
+              </div>
+              <div class="text-[11px] text-rose-300 mt-1.5 space-y-0.5">
+                ${(item.reasons || []).map(r => `<div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span><span>${escapeHtml(r)}</span></div>`).join('')}
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-lg bg-rose-500/25 text-rose-300 border border-rose-400/40 font-black whitespace-nowrap">
+              Not Assigned
+            </span>
+          </div>
+        `;
+      }).join('');
+    } else {
+      if (sectionEl) sectionEl.classList.add('hidden');
+      listEl.innerHTML = '';
+    }
+  }
+
+  modal.classList.remove('hidden');
+  const allowVibrate = localStorage.getItem('admin_notif_vibrate') !== 'false';
+  if (allowVibrate) {
+    try { if (navigator.vibrate) navigator.vibrate([150, 80, 150]); } catch(_) {}
+  }
+}
+
+function closeUnassignedTimetableModal() {
+  const modal = document.getElementById('modal-unassigned-timetable-warning');
+  if (modal) modal.classList.add('hidden');
+}
+
+function handleFixTimetableFromWarning() {
+  closeUnassignedTimetableModal();
+  openMyTimetable();
+}
+
+// Close unassigned timetable modal on Escape
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeUnassignedTimetableModal();
+  }
+});
+
 // ================= TAB NAVIGATION =================
-function selectTab(tab) {
+async function selectTab(tab) {
   triggerNavHaptic('medium');
+
+  if (tab === 'attendance') {
+    if (checkingAttendanceAccess) return false;
+    checkingAttendanceAccess = true;
+    try {
+      const unassignedData = await checkUnassignedTimetableForAttendance();
+      if (unassignedData) {
+        showUnassignedTimetableModal(unassignedData);
+        return false;
+      }
+    } finally {
+      checkingAttendanceAccess = false;
+    }
+  }
 
   if (currentActiveTab !== tab) {
     previousAppTab = currentActiveTab;
@@ -5115,7 +5341,8 @@ async function handleStartQuickAttendance() {
     currentSubject = selectedSubject;
   }
 
-  selectTab('attendance');
+  const ok = await selectTab('attendance');
+  if (!ok) return;
   await loadAttendanceRoster();
   showToast(`Attendance ready for ${selectedClass} • ${selectedSubject || currentSubject}`);
 }
@@ -5313,11 +5540,15 @@ async function loadDashboardTimetable() {
   }
 }
 
-function startAttendanceFromTimetable(className, subjectName) {
+async function startAttendanceFromTimetable(className, subjectName) {
   if (!className) {
     showToast('Class is not specified in this timetable slot', true);
     return;
   }
+
+  const ok = await selectTab('attendance');
+  if (!ok) return;
+
   const selClass = document.getElementById('sel-class');
   const selSubject = document.getElementById('sel-subject');
   if (selClass) selClass.value = className;
@@ -5330,7 +5561,6 @@ function startAttendanceFromTimetable(className, subjectName) {
     currentSubject = subjectName;
   }
 
-  selectTab('attendance');
   loadAttendanceRoster();
   showToast(`Attendance ready for ${className} • ${subjectName || currentSubject}`);
 }
@@ -9599,9 +9829,10 @@ function closeTodayScheduleModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-function jumpToTakeAttendance(className, subjectName) {
+async function jumpToTakeAttendance(className, subjectName) {
+  const ok = await selectTab('attendance');
+  if (!ok) return;
   closeTodayScheduleModal();
-  selectTab('attendance');
   if (className) {
     currentClass = className;
     const selClass = document.getElementById('sel-class');
@@ -9704,9 +9935,10 @@ function closeTodayMarkedModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-function jumpToAttendanceSession(className, subjectName, dateStr) {
+async function jumpToAttendanceSession(className, subjectName, dateStr) {
+  const ok = await selectTab('attendance');
+  if (!ok) return;
   closeTodayMarkedModal();
-  selectTab('attendance');
   if (dateStr) {
     currentDateStr = dateStr;
     const picker = document.getElementById('attendance-date-picker');
