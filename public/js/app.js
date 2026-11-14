@@ -5090,6 +5090,12 @@ function closeUnassignedTimetableModal() {
 
 function handleFixTimetableFromWarning() {
   closeUnassignedTimetableModal();
+  if (typeof closeTodayScheduleModal === 'function') {
+    closeTodayScheduleModal();
+  }
+  if (typeof closeTodayMarkedModal === 'function') {
+    closeTodayMarkedModal();
+  }
   openMyTimetable();
 }
 
