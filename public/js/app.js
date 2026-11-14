@@ -209,18 +209,38 @@ function getTeacherAssignments(teacherName, teacherEmail) {
     return 0;
   });
 
-  // Always follow assigned subjects order as the exact order on Add Subject page
-  const pageOrder = getSubjectOrderFromAddSubjectPage();
-  assignedSubjects.sort((a, b) => {
-    const normA = (a || '').trim().toLowerCase();
-    const normB = (b || '').trim().toLowerCase();
-    const idxA = pageOrder.findIndex(name => name.toLowerCase() === normA);
-    const idxB = pageOrder.findIndex(name => name.toLowerCase() === normB);
-    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-    if (idxA !== -1) return -1;
-    if (idxB !== -1) return 1;
-    return a.localeCompare(b);
+  // Follow assigned subjects order strictly by the teacher's assigned class categories in Add Subject page order
+  const orderedAssignedSubjects = [];
+  const seenAssignedSub = new Set();
+
+  assignedClasses.forEach(clsName => {
+    // Under this class category on Add Subject page, subjects appear in allSubs order where assignedClasses includes clsName
+    const classSubs = allSubs.filter(s =>
+      Array.isArray(s.assignedClasses) && s.assignedClasses.some(ac => isClassEqual(ac, clsName))
+    );
+    classSubs.forEach(s => {
+      const sName = (s.name || '').trim();
+      const sKey = sName.toLowerCase();
+      const isTeacherSub = matchedSubjects.some(ms => ms._id ? String(ms._id) === String(s._id) : (ms.name && s.name && ms.name.trim().toLowerCase() === sKey))
+        || (currentUser && currentUser.email && String(currentUser.email).toLowerCase().trim() === normEmail && (currentUser.assignedSubjects || []).some(cs => (cs || '').trim().toLowerCase() === sKey));
+
+      if (isTeacherSub && sName && !seenAssignedSub.has(sKey)) {
+        seenAssignedSub.add(sKey);
+        orderedAssignedSubjects.push(sName);
+      }
+    });
   });
+
+  // Append any remaining assigned subjects (e.g. unassigned class subjects or explicit user assignments)
+  assignedSubjects.forEach(sName => {
+    const sKey = (sName || '').trim().toLowerCase();
+    if (sKey && !seenAssignedSub.has(sKey)) {
+      seenAssignedSub.add(sKey);
+      orderedAssignedSubjects.push(sName);
+    }
+  });
+
+  assignedSubjects = orderedAssignedSubjects;
 
   return { assignedSubjects, assignedClasses };
 }
@@ -4624,8 +4644,6 @@ function handleAdminToggleNotifVibrate(enabled) {
 function openAdminPanel() {
   selectTab('admin');
   loadAdminTeachersList();
-  loadAdminAnnouncementsList();
-  loadAdminEventsList();
 
   // Scroll to top of main viewport
   const mainViewport = document.querySelector('main');
@@ -4635,20 +4653,6 @@ function openAdminPanel() {
   const appLogo = appSettings ? appSettings.appLogo : '';
   const firstLetter = (appSettings && appSettings.appName ? appSettings.appName.trim()[0] : 'R').toUpperCase();
   updateAdminLogoPreview(appLogo, firstLetter);
-
-  // Sync notification toggles in Admin Panel
-  const tMorning = document.getElementById('admin-toggle-notif-morning');
-  const tPreclass = document.getElementById('admin-toggle-notif-preclass');
-  const tVibrate = document.getElementById('admin-toggle-notif-vibrate');
-  if (tMorning) tMorning.checked = localStorage.getItem('admin_notif_morning') !== 'false';
-  if (tPreclass) tPreclass.checked = localStorage.getItem('admin_notif_preclass') !== 'false';
-  if (tVibrate) tVibrate.checked = localStorage.getItem('admin_notif_vibrate') !== 'false';
-
-  // Sync dashboard display toggles in Admin Panel
-  const tAnn = document.getElementById('admin-toggle-dash-announcements');
-  const tEv = document.getElementById('admin-toggle-dash-events');
-  if (tAnn) tAnn.checked = appSettings ? appSettings.showAnnouncementsOnDashboard !== false : true;
-  if (tEv) tEv.checked = appSettings ? appSettings.showEventsOnDashboard !== false : true;
 }
 
 function closeAdminPanel() {
@@ -4957,8 +4961,6 @@ function selectTab(tab) {
     renderTeachersList();
   } else if (tab === 'admin') {
     loadAdminTeachersList();
-    if (typeof loadAdminAnnouncementsList === 'function') loadAdminAnnouncementsList();
-    if (typeof loadAdminEventsList === 'function') loadAdminEventsList();
     const mainViewport = document.querySelector('main');
     if (mainViewport) mainViewport.scrollTop = 0;
   } else if (tab === 'timetable') {
@@ -4985,55 +4987,12 @@ function selectBottomTab(tab) {
 }
 
 // ================= HOME / SCHOOL DASHBOARD MODULE =================
-function applyDashboardSectionVisibility() {
-  const annSection = document.getElementById('dash-section-announcements');
-  const evSection = document.getElementById('dash-section-events');
-
-  const showAnn = appSettings ? appSettings.showAnnouncementsOnDashboard !== false : true;
-  const showEv = appSettings ? appSettings.showEventsOnDashboard !== false : true;
-
-  if (annSection) annSection.style.display = showAnn ? '' : 'none';
-  if (evSection) evSection.style.display = showEv ? '' : 'none';
-
-  const tAnn = document.getElementById('admin-toggle-dash-announcements');
-  const tEv = document.getElementById('admin-toggle-dash-events');
-  if (tAnn) tAnn.checked = showAnn;
-  if (tEv) tEv.checked = showEv;
-}
-
-async function handleAdminToggleDashAnnouncements(enabled) {
-  try {
-    if (!appSettings) appSettings = {};
-    appSettings.showAnnouncementsOnDashboard = Boolean(enabled);
-    applyDashboardSectionVisibility();
-    await API.updateAdminSettings({ showAnnouncementsOnDashboard: Boolean(enabled) });
-    showToast(enabled ? 'Announcements enabled on Dashboard' : 'Announcements hidden from Dashboard');
-  } catch (err) {
-    showToast(err.message || 'Failed to update setting', true);
-  }
-}
-
-async function handleAdminToggleDashEvents(enabled) {
-  try {
-    if (!appSettings) appSettings = {};
-    appSettings.showEventsOnDashboard = Boolean(enabled);
-    applyDashboardSectionVisibility();
-    await API.updateAdminSettings({ showEventsOnDashboard: Boolean(enabled) });
-    showToast(enabled ? 'Events enabled on Dashboard' : 'Events hidden from Dashboard');
-  } catch (err) {
-    showToast(err.message || 'Failed to update setting', true);
-  }
-}
-
 async function loadHomeDashboard() {
-  applyDashboardSectionVisibility();
   updateWelcomeGreeting();
   populateQuickAttendanceDropdowns();
   updateProfileDashboardKPIs();
   await Promise.allSettled([
-    loadDashboardStats(),
-    loadDashboardAnnouncements(),
-    loadDashboardEvents()
+    loadDashboardStats()
   ]);
 }
 
@@ -5369,461 +5328,6 @@ function startAttendanceFromTimetable(className, subjectName) {
   selectTab('attendance');
   loadAttendanceRoster();
   showToast(`Attendance ready for ${className} • ${subjectName || currentSubject}`);
-}
-
-let cachedAnnouncements = [];
-
-async function loadDashboardAnnouncements() {
-  const container = document.getElementById('dash-announcements-container');
-  if (!container) return;
-
-  try {
-    const res = await API.getAnnouncements();
-    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-    cachedAnnouncements = list;
-
-    const published = list.filter(a => a.isPublished !== false);
-
-    if (published.length === 0) {
-      container.innerHTML = `
-        <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-page)]">
-          <svg class="w-8 h-8 mx-auto text-[var(--text-sub)] opacity-50 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          <div class="text-xs font-bold text-[var(--text-main)]">No announcements yet</div>
-          <p class="text-[10px] text-[var(--text-sub)] mt-0.5">Stay tuned for upcoming news and notices</p>
-        </div>`;
-      return;
-    }
-
-    const topItems = published.slice(0, 3);
-    container.innerHTML = topItems.map(a => {
-      const isImportant = a.priority === 'important';
-      const badge = isImportant
-        ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">Important</span>`
-        : `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold text-[var(--text-sub)] bg-slate-500/10 border border-slate-500/20">Notice</span>`;
-      
-      const dateStr = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-
-      return `
-        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1 hover:border-[#245b70]/30 transition">
-          <div class="flex items-center justify-between gap-2">
-            <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(a.title)}</h5>
-            ${badge}
-          </div>
-          <p class="text-[11px] text-[var(--text-sub)] line-clamp-2 leading-relaxed">${escapeHtml(a.description || '')}</p>
-          ${dateStr ? `<div class="text-[10px] text-[var(--text-sub)] opacity-70 pt-1">${dateStr}</div>` : ''}
-        </div>
-      `;
-    }).join('');
-  } catch (e) {
-    console.log('[Dashboard Announcements Error]', e);
-    container.innerHTML = `
-      <div class="text-center py-4 px-2 text-xs text-rose-500 font-semibold">
-        Could not load announcements.
-      </div>`;
-  }
-}
-
-let cachedEvents = [];
-
-async function loadDashboardEvents() {
-  const container = document.getElementById('dash-events-container');
-  if (!container) return;
-
-  try {
-    const res = await API.getEvents(true);
-    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-    cachedEvents = list;
-
-    if (list.length === 0) {
-      container.innerHTML = `
-        <div class="text-center py-6 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-page)]">
-          <svg class="w-8 h-8 mx-auto text-[var(--text-sub)] opacity-50 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          <div class="text-xs font-bold text-[var(--text-main)]">No upcoming events</div>
-          <p class="text-[10px] text-[var(--text-sub)] mt-0.5">Upcoming school events will appear here</p>
-        </div>`;
-      return;
-    }
-
-    const topItems = list.slice(0, 3);
-    container.innerHTML = topItems.map(ev => {
-      const dateStr = ev.date ? new Date(ev.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
-      const metaParts = [dateStr, ev.time, ev.location].filter(Boolean);
-
-      return `
-        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-start gap-3 hover:border-[#245b70]/30 transition">
-          <div class="w-10 h-10 rounded-xl bg-teal-500/10 text-[#245b70] dark:text-cyan-400 flex flex-col items-center justify-center flex-shrink-0 font-black">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center justify-between gap-2">
-              <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(ev.name)}</h5>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-[#245b70] dark:text-cyan-400 border border-teal-500/20 capitalize">${escapeHtml(ev.status || 'Upcoming')}</span>
-            </div>
-            ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)] line-clamp-1 mt-0.5 leading-snug">${escapeHtml(ev.description)}</p>` : ''}
-            <div class="text-[10px] font-semibold text-[var(--text-sub)] flex items-center gap-1.5 mt-1 truncate">
-              <span>📅 ${escapeHtml(metaParts.join(' • '))}</span>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  } catch (e) {
-    console.log('[Dashboard Events Error]', e);
-    container.innerHTML = `
-      <div class="text-center py-4 px-2 text-xs text-rose-500 font-semibold">
-        Could not load upcoming events.
-      </div>`;
-  }
-}
-
-function openAllAnnouncementsModal() {
-  const modal = document.getElementById('modal-all-announcements');
-  const container = document.getElementById('all-announcements-list-container');
-  if (!modal || !container) return;
-  modal.classList.remove('hidden');
-
-  const published = (cachedAnnouncements || []).filter(a => a.isPublished !== false);
-  if (published.length === 0) {
-    container.innerHTML = `<div class="text-center py-8 text-xs text-[var(--text-sub)] font-semibold">No announcements found.</div>`;
-    return;
-  }
-
-  container.innerHTML = published.map(a => {
-    const isImportant = a.priority === 'important';
-    const badge = isImportant
-      ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">Important</span>`
-      : `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold text-[var(--text-sub)] bg-slate-500/10 border border-slate-500/20">Notice</span>`;
-    const dateStr = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
-
-    return `
-      <div class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5 shadow-sm">
-        <div class="flex items-center justify-between gap-2">
-          <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${escapeHtml(a.title)}</h4>
-          ${badge}
-        </div>
-        <p class="text-xs text-[var(--text-sub)] leading-relaxed whitespace-pre-line">${escapeHtml(a.description || '')}</p>
-        ${dateStr ? `<div class="text-[10px] text-[var(--text-sub)] opacity-70 pt-1 border-t border-[var(--border-color)]/50">Posted on ${dateStr}</div>` : ''}
-      </div>
-    `;
-  }).join('');
-}
-
-function closeAllAnnouncementsModal() {
-  const modal = document.getElementById('modal-all-announcements');
-  if (modal) modal.classList.add('hidden');
-}
-
-function openAllEventsModal() {
-  const modal = document.getElementById('modal-all-events');
-  const container = document.getElementById('all-events-list-container');
-  if (!modal || !container) return;
-  modal.classList.remove('hidden');
-
-  if (!cachedEvents || cachedEvents.length === 0) {
-    container.innerHTML = `<div class="text-center py-8 text-xs text-[var(--text-sub)] font-semibold">No events found.</div>`;
-    return;
-  }
-
-  container.innerHTML = cachedEvents.map(ev => {
-    const dateStr = ev.date ? new Date(ev.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
-    const metaParts = [dateStr, ev.time, ev.location].filter(Boolean);
-
-    return `
-      <div class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5 shadow-sm">
-        <div class="flex items-center justify-between gap-2">
-          <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${escapeHtml(ev.name)}</h4>
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-[#245b70] dark:text-cyan-400 border border-teal-500/20 capitalize">${escapeHtml(ev.status || 'Upcoming')}</span>
-        </div>
-        ${ev.description ? `<p class="text-xs text-[var(--text-sub)] leading-relaxed whitespace-pre-line">${escapeHtml(ev.description)}</p>` : ''}
-        <div class="text-[11px] font-semibold text-[var(--text-sub)] pt-1 border-t border-[var(--border-color)]/50">
-          📍 ${escapeHtml(metaParts.join(' • '))}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function closeAllEventsModal() {
-  const modal = document.getElementById('modal-all-events');
-  if (modal) modal.classList.add('hidden');
-}
-
-// Admin Announcements Management
-async function loadAdminAnnouncementsList() {
-  const container = document.getElementById('admin-announcements-list');
-  if (!container) return;
-
-  try {
-    const res = await API.getAnnouncements();
-    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-    cachedAnnouncements = list;
-
-    if (list.length === 0) {
-      container.innerHTML = `<div class="text-center py-4 text-xs text-[var(--text-sub)] font-medium">No announcements created yet.</div>`;
-      return;
-    }
-
-    container.innerHTML = list.map(a => {
-      const isImportant = a.priority === 'important';
-      const isPublished = a.isPublished !== false;
-      return `
-        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(a.title)}</h5>
-              <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase ${isImportant ? 'bg-rose-500/20 text-rose-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}">${a.priority}</span>
-              ${!isPublished ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-500/20 text-amber-600">Draft</span>` : ''}
-            </div>
-            <p class="text-[10px] text-[var(--text-sub)] truncate mt-0.5">${escapeHtml(a.description || '')}</p>
-          </div>
-          <div class="flex items-center gap-1 flex-shrink-0">
-            <button type="button" onclick="openAnnouncementModal('${a._id}')" class="p-1.5 rounded-lg bg-[var(--card-bg)] text-[#245b70] dark:text-cyan-400 border border-[var(--border-color)] hover:scale-105 active:scale-95 transition" title="Edit">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-            </button>
-            <button type="button" onclick="deleteAnnouncement('${a._id}')" class="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:scale-105 active:scale-95 transition" title="Delete">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-  } catch (e) {
-    console.log('[Admin Announcements Load Error]', e);
-  }
-}
-
-function openAnnouncementModal(id = null) {
-  const modal = document.getElementById('modal-announcement-edit');
-  const titleEl = document.getElementById('modal-announcement-title');
-  const idEl = document.getElementById('announcement-edit-id');
-  const inputTitle = document.getElementById('announcement-input-title');
-  const inputDesc = document.getElementById('announcement-input-desc');
-  const inputPriority = document.getElementById('announcement-input-priority');
-  const inputPublished = document.getElementById('announcement-input-published');
-
-  if (!modal) return;
-
-  if (id) {
-    const item = (cachedAnnouncements || []).find(a => a._id === id);
-    if (!item) return;
-    if (titleEl) titleEl.textContent = 'Edit Announcement';
-    if (idEl) idEl.value = id;
-    if (inputTitle) inputTitle.value = item.title || '';
-    if (inputDesc) inputDesc.value = item.description || '';
-    if (inputPriority) inputPriority.value = item.priority || 'normal';
-    if (inputPublished) inputPublished.value = item.isPublished === false ? 'false' : 'true';
-  } else {
-    if (titleEl) titleEl.textContent = 'Add Announcement';
-    if (idEl) idEl.value = '';
-    if (inputTitle) inputTitle.value = '';
-    if (inputDesc) inputDesc.value = '';
-    if (inputPriority) inputPriority.value = 'normal';
-    if (inputPublished) inputPublished.value = 'true';
-  }
-
-  modal.classList.remove('hidden');
-}
-
-function closeAnnouncementModal() {
-  const modal = document.getElementById('modal-announcement-edit');
-  if (modal) modal.classList.add('hidden');
-}
-
-async function handleSaveAnnouncement(e) {
-  e.preventDefault();
-  const idEl = document.getElementById('announcement-edit-id');
-  const inputTitle = document.getElementById('announcement-input-title');
-  const inputDesc = document.getElementById('announcement-input-desc');
-  const inputPriority = document.getElementById('announcement-input-priority');
-  const inputPublished = document.getElementById('announcement-input-published');
-  const btn = document.getElementById('btn-save-announcement');
-
-  const id = idEl ? idEl.value : '';
-  const title = inputTitle ? inputTitle.value.trim() : '';
-  const description = inputDesc ? inputDesc.value.trim() : '';
-  const priority = inputPriority ? inputPriority.value : 'normal';
-  const isPublished = inputPublished ? inputPublished.value === 'true' : true;
-
-  if (!title) {
-    showToast('Please enter an announcement title', true);
-    return;
-  }
-
-  const payload = { title, description, priority, isPublished };
-
-  try {
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    if (id) {
-      await API.updateAnnouncement(id, payload);
-      showToast('Announcement updated successfully!');
-    } else {
-      await API.createAnnouncement(payload);
-      showToast('Announcement created successfully!');
-    }
-    closeAnnouncementModal();
-    await loadAdminAnnouncementsList();
-    await loadDashboardAnnouncements();
-  } catch (err) {
-    showToast(err.message || 'Failed to save announcement', true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-  }
-}
-
-async function deleteAnnouncement(id) {
-  if (!confirm('Are you sure you want to delete this announcement?')) return;
-  try {
-    await API.deleteAnnouncement(id);
-    showToast('Announcement deleted');
-    await loadAdminAnnouncementsList();
-    await loadDashboardAnnouncements();
-  } catch (err) {
-    showToast(err.message || 'Failed to delete announcement', true);
-  }
-}
-
-// Admin Events Management
-async function loadAdminEventsList() {
-  const container = document.getElementById('admin-events-list');
-  if (!container) return;
-
-  try {
-    const res = await API.getEvents(false);
-    const list = (res && res.success && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-    cachedEvents = list;
-
-    if (list.length === 0) {
-      container.innerHTML = `<div class="text-center py-4 text-xs text-[var(--text-sub)] font-medium">No events scheduled yet.</div>`;
-      return;
-    }
-
-    container.innerHTML = list.map(ev => {
-      const dateStr = ev.date ? new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-      return `
-        <div class="p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h5 class="text-xs font-black text-[var(--text-main)] truncate">${escapeHtml(ev.name)}</h5>
-              <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-teal-500/20 text-[#245b70] dark:text-cyan-400 capitalize">${ev.status || 'upcoming'}</span>
-            </div>
-            <p class="text-[10px] text-[var(--text-sub)] truncate mt-0.5">${escapeHtml([dateStr, ev.time, ev.location].filter(Boolean).join(' • '))}</p>
-          </div>
-          <div class="flex items-center gap-1 flex-shrink-0">
-            <button type="button" onclick="openEventModal('${ev._id}')" class="p-1.5 rounded-lg bg-[var(--card-bg)] text-[#245b70] dark:text-cyan-400 border border-[var(--border-color)] hover:scale-105 active:scale-95 transition" title="Edit">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-            </button>
-            <button type="button" onclick="deleteEvent('${ev._id}')" class="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:scale-105 active:scale-95 transition" title="Delete">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-  } catch (e) {
-    console.log('[Admin Events Load Error]', e);
-  }
-}
-
-function openEventModal(id = null) {
-  const modal = document.getElementById('modal-event-edit');
-  const titleEl = document.getElementById('modal-event-title');
-  const idEl = document.getElementById('event-edit-id');
-  const inputName = document.getElementById('event-input-name');
-  const inputDesc = document.getElementById('event-input-desc');
-  const inputDate = document.getElementById('event-input-date');
-  const inputTime = document.getElementById('event-input-time');
-  const inputLocation = document.getElementById('event-input-location');
-  const inputStatus = document.getElementById('event-input-status');
-
-  if (!modal) return;
-
-  if (id) {
-    const item = (cachedEvents || []).find(ev => ev._id === id);
-    if (!item) return;
-    if (titleEl) titleEl.textContent = 'Edit Event';
-    if (idEl) idEl.value = id;
-    if (inputName) inputName.value = item.name || '';
-    if (inputDesc) inputDesc.value = item.description || '';
-    if (inputDate) {
-      inputDate.value = item.date ? item.date.split('T')[0] : '';
-    }
-    if (inputTime) inputTime.value = item.time || '';
-    if (inputLocation) inputLocation.value = item.location || '';
-    if (inputStatus) inputStatus.value = item.status || 'upcoming';
-  } else {
-    if (titleEl) titleEl.textContent = 'Add Event';
-    if (idEl) idEl.value = '';
-    if (inputName) inputName.value = '';
-    if (inputDesc) inputDesc.value = '';
-    if (inputDate) inputDate.value = new Date().toISOString().split('T')[0];
-    if (inputTime) inputTime.value = '';
-    if (inputLocation) inputLocation.value = '';
-    if (inputStatus) inputStatus.value = 'upcoming';
-  }
-
-  modal.classList.remove('hidden');
-}
-
-function closeEventModal() {
-  const modal = document.getElementById('modal-event-edit');
-  if (modal) modal.classList.add('hidden');
-}
-
-async function handleSaveEvent(e) {
-  e.preventDefault();
-  const idEl = document.getElementById('event-edit-id');
-  const inputName = document.getElementById('event-input-name');
-  const inputDesc = document.getElementById('event-input-desc');
-  const inputDate = document.getElementById('event-input-date');
-  const inputTime = document.getElementById('event-input-time');
-  const inputLocation = document.getElementById('event-input-location');
-  const inputStatus = document.getElementById('event-input-status');
-  const btn = document.getElementById('btn-save-event');
-
-  const id = idEl ? idEl.value : '';
-  const name = inputName ? inputName.value.trim() : '';
-  const description = inputDesc ? inputDesc.value.trim() : '';
-  const date = inputDate ? inputDate.value : '';
-  const time = inputTime ? inputTime.value.trim() : '';
-  const location = inputLocation ? inputLocation.value.trim() : '';
-  const status = inputStatus ? inputStatus.value : 'upcoming';
-
-  if (!name || !date) {
-    showToast('Event name and date are required', true);
-    return;
-  }
-
-  const payload = { name, description, date, time, location, status };
-
-  try {
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    if (id) {
-      await API.updateEvent(id, payload);
-      showToast('Event updated successfully!');
-    } else {
-      await API.createEvent(payload);
-      showToast('Event created successfully!');
-    }
-    closeEventModal();
-    await loadAdminEventsList();
-    await loadDashboardEvents();
-  } catch (err) {
-    showToast(err.message || 'Failed to save event', true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-  }
-}
-
-async function deleteEvent(id) {
-  if (!confirm('Are you sure you want to delete this event?')) return;
-  try {
-    await API.deleteEvent(id);
-    showToast('Event deleted');
-    await loadAdminEventsList();
-    await loadDashboardEvents();
-  } catch (err) {
-    showToast(err.message || 'Failed to delete event', true);
-  }
 }
 
 // Account Settings Handlers
@@ -7648,7 +7152,8 @@ async function handleSaveTimetableSlot(e) {
       const allRes = await API.getTimetable('', '', '');
       allSlotsForCheck = (allRes && allRes.data) ? allRes.data : (Array.isArray(allRes) ? allRes : allSlotsForCheck);
     } catch(_) {}
-    const myEmail = ((currentUser && currentUser.email) || timetableViewTeacherEmail || '').trim().toLowerCase();
+    // Target teacher email strictly (only look with editing teacher's email, not admin id)
+    const targetTeacherEmail = (slotData.teacherEmail || teacherEmailVal || timetableViewTeacherEmail || '').trim().toLowerCase();
     let selfConflictSlot = null;
     let classConflictSlot = null;
     for (const s of allSlotsForCheck) {
@@ -7664,7 +7169,7 @@ async function handleSaveTimetableSlot(e) {
       );
       if (!dayOverlap) continue;
       const ownerEmail = (s.teacherEmail || '').trim().toLowerCase();
-      if (ownerEmail === myEmail) { selfConflictSlot = s; break; }
+      if (targetTeacherEmail && ownerEmail === targetTeacherEmail) { selfConflictSlot = s; break; }
       if (!classConflictSlot && isClassEqual(s.class, slotData.class)) { classConflictSlot = s; }
     }
     const conflictSlot = selfConflictSlot || classConflictSlot;
@@ -7763,16 +7268,6 @@ function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
   const saveBtn = document.getElementById('conflict-modal-save-btn');
   const cancelBtn = document.getElementById('conflict-modal-cancel-btn');
 
-  if (conflictType === 'self') {
-    if (badge) badge.textContent = '⚠️ Your Own Conflict';
-    if (title) title.textContent = 'You Already Have a Class!';
-    if (desc) desc.textContent = 'You already have a slot scheduled at this time:';
-  } else {
-    if (badge) badge.textContent = '⚠️ Class Conflict';
-    if (title) title.textContent = 'Slot Overlap Detected!';
-    if (desc) desc.textContent = 'This slot overlaps with an existing class in this room/class:';
-  }
-
   // Find teacher name from cachedTeachersList
   const ownerEmail = (conflictSlot.teacherEmail || '').trim();
   let teacherName = ownerEmail;
@@ -7784,6 +7279,18 @@ function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
   // Also check currentUser if the slot belongs to self
   if (teacherName === ownerEmail && currentUser && (currentUser.email || '').toLowerCase() === ownerEmail.toLowerCase()) {
     teacherName = currentUser.name || ownerEmail;
+  }
+
+  const isEditingOther = Boolean(currentUser && currentUser.role === 'admin' && currentUser.email && currentUser.email.toLowerCase() !== ownerEmail.toLowerCase());
+
+  if (conflictType === 'self') {
+    if (badge) badge.textContent = isEditingOther ? '⚠️ Teacher Schedule Conflict' : '⚠️ Your Own Conflict';
+    if (title) title.textContent = isEditingOther ? `${teacherName} Already Has a Class!` : 'You Already Have a Class!';
+    if (desc) desc.textContent = isEditingOther ? `${teacherName} already has a slot scheduled at this time:` : 'You already have a slot scheduled at this time:';
+  } else {
+    if (badge) badge.textContent = '⚠️ Class Conflict';
+    if (title) title.textContent = 'Slot Overlap Detected!';
+    if (desc) desc.textContent = 'This slot overlaps with an existing class in this room/class:';
   }
 
   const slotDays = Array.isArray(conflictSlot.days) && conflictSlot.days.length > 0
@@ -7876,7 +7383,22 @@ function printTimetableSchedule() {
     ? appSettings.appName.trim()
     : (localStorage.getItem('registerly_app_name') || 'REGISTERLY');
 
-  const teacherDisplay = timetableViewTeacherEmail || (currentUser ? currentUser.email : 'Weekly Schedule');
+  const targetEmail = (timetableViewTeacherEmail || (currentUser ? currentUser.email : '')).trim().toLowerCase();
+  let teacherProfileName = '';
+  if (timetableViewTeacherName && timetableViewTeacherName.trim().toLowerCase() !== targetEmail) {
+    teacherProfileName = timetableViewTeacherName.trim();
+  }
+  if (!teacherProfileName && targetEmail) {
+    if (currentUser && (currentUser.email || '').trim().toLowerCase() === targetEmail && currentUser.name) {
+      teacherProfileName = currentUser.name.trim();
+    } else if (typeof cachedTeachersList !== 'undefined' && Array.isArray(cachedTeachersList)) {
+      const found = cachedTeachersList.find(t => (t.email || '').trim().toLowerCase() === targetEmail);
+      if (found && (found.name || found.username)) {
+        teacherProfileName = (found.name || found.username).trim();
+      }
+    }
+  }
+  const teacherDisplay = teacherProfileName || targetEmail || 'Weekly Schedule';
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   // Group slots by day

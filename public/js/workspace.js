@@ -239,12 +239,8 @@ function renderPWClassesView() {
   container.innerHTML = `
     <div class="pw-animate-enter space-y-3.5">
       <!-- Header -->
-      <div class="flex items-center justify-between gap-2 flex-wrap">
-        <div class="flex items-center gap-2 flex-wrap">
-          <button type="button" onclick="renderWorkspaceHub()" class="touch-btn px-2.5 py-1 rounded-xl bg-pink-100 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-800 text-xs font-bold text-pink-700 dark:text-pink-300 hover:bg-pink-200 flex items-center gap-1 transition shadow-xs">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            <span>Workspace</span>
-          </button>
+      <div class="flex items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2 flex-wrap min-w-0">
           <div class="flex items-center gap-1.5">
             ${lockSVG('16')}
             <h2 class="text-base font-extrabold text-pink-800 dark:text-pink-200">My Classes</h2>
@@ -344,12 +340,8 @@ function renderPWSubjectsView() {
   container.innerHTML = `
     <div class="pw-animate-enter space-y-3.5">
       <!-- Header -->
-      <div class="flex items-center justify-between gap-2 flex-wrap">
-        <div class="flex items-center gap-2 flex-wrap">
-          <button type="button" onclick="renderWorkspaceHub()" class="touch-btn px-2.5 py-1 rounded-xl bg-pink-100 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-800 text-xs font-bold text-pink-700 dark:text-pink-300 hover:bg-pink-200 flex items-center gap-1 transition shadow-xs">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            <span>Workspace</span>
-          </button>
+      <div class="flex items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2 flex-wrap min-w-0">
           <div class="flex items-center gap-1.5">
             ${lockSVG('16')}
             <h2 class="text-base font-extrabold text-pink-800 dark:text-pink-200">My Subjects</h2>
@@ -427,12 +419,8 @@ function renderPWStudentsView(filterClass = 'all', searchText = '') {
   container.innerHTML = `
     <div class="pw-animate-enter space-y-3">
       <!-- Header -->
-      <div class="flex items-center justify-between gap-2 flex-wrap">
-        <div class="flex items-center gap-2 flex-wrap">
-          <button type="button" onclick="renderWorkspaceHub()" class="touch-btn px-2.5 py-1 rounded-xl bg-pink-100 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-800 text-xs font-bold text-pink-700 dark:text-pink-300 hover:bg-pink-200 flex items-center gap-1 transition shadow-xs">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            <span>Workspace</span>
-          </button>
+      <div class="flex items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2 flex-wrap min-w-0">
           <div class="flex items-center gap-1.5">
             ${lockSVG('16')}
             <h2 class="text-base font-extrabold text-pink-800 dark:text-pink-200">My Students</h2>
