@@ -2193,12 +2193,16 @@ function renderSubjectsList() {
     if (classSubs.length > 0) {
       classSubs.forEach(s => renderedSubjectIds.add(String(s._id)));
       html += `
-        <div class="space-y-2 pt-1 pb-1">
-          <div class="flex items-center justify-between px-1">
-            <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
-              ${escapeHtml(clsName)} : <span class="font-bold opacity-90">${classSubs.length}</span>
-            </span>
-            <span class="h-px bg-[#245b70]/20 dark:bg-cyan-400/20 flex-1 ml-3"></span>
+        <div class="space-y-2.5 pt-1 pb-1">
+          <div class="flex items-center justify-between pt-2 pb-1 select-none">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-[#245b70] via-[#2a6880] to-[#1e4e60] text-white shadow-sm border border-[#245b70]/40">
+              <svg class="w-3.5 h-3.5 text-white/90 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              <span class="text-xs font-black tracking-wider uppercase">${escapeHtml(clsName)}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-xl bg-white/20 text-white font-black text-[11px] shadow-2xs">
+                TOTAL: ${classSubs.length}
+              </span>
+            </div>
+            <div class="h-[2px] flex-1 bg-gradient-to-r from-[#245b70]/30 via-[#245b70]/15 to-transparent rounded-full ml-3"></div>
           </div>
           <div class="space-y-2.5">
             ${classSubs.map(s => {
@@ -2215,12 +2219,16 @@ function renderSubjectsList() {
   const unassignedSubs = subjectsList.filter(s => !renderedSubjectIds.has(String(s._id)));
   if (unassignedSubs.length > 0) {
     html += `
-      <div class="space-y-2 pt-1 pb-1">
-        <div class="flex items-center justify-between px-1">
-          <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
-            GENERAL / UNASSIGNED : <span class="font-bold opacity-90">${unassignedSubs.length}</span>
-          </span>
-          <span class="h-px bg-[#245b70]/20 dark:bg-cyan-400/20 flex-1 ml-3"></span>
+      <div class="space-y-2.5 pt-1 pb-1">
+        <div class="flex items-center justify-between pt-2 pb-1 select-none">
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 text-white shadow-sm border border-slate-500/40">
+            <svg class="w-3.5 h-3.5 text-white/90 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span class="text-xs font-black tracking-wider uppercase">GENERAL / UNASSIGNED</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-xl bg-white/20 text-white font-black text-[11px] shadow-2xs">
+              TOTAL: ${unassignedSubs.length}
+            </span>
+          </div>
+          <div class="h-[2px] flex-1 bg-gradient-to-r from-slate-400/30 via-slate-400/15 to-transparent rounded-full ml-3"></div>
         </div>
         <div class="space-y-2.5">
           ${unassignedSubs.map(s => {
@@ -2995,11 +3003,16 @@ async function renderStudentsDirectory() {
         if (clsStudents.length > 0) {
           clsStudents.forEach(s => accountedFor.add(String(s._id || s.studentId)));
           groupsHtml.push(`
-            <div class="class-student-group space-y-2">
-              <div class="flex items-center justify-between px-1 border-b border-[var(--border-color)] pb-1.5 pt-2">
-                <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
-                  ${clsName} : ${clsStudents.length}
-                </span>
+            <div class="class-student-group space-y-2.5">
+              <div class="flex items-center justify-between pt-3 pb-1 select-none">
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-[#245b70] via-[#2a6880] to-[#1e4e60] text-white shadow-sm border border-[#245b70]/40">
+                  <svg class="w-3.5 h-3.5 text-white/90 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                  <span class="text-xs font-black tracking-wider uppercase">${escapeHtml(clsName)}</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-xl bg-white/20 text-white font-black text-[11px] shadow-2xs">
+                    TOTAL: ${clsStudents.length}
+                  </span>
+                </div>
+                <div class="h-[2px] flex-1 bg-gradient-to-r from-[#245b70]/30 via-[#245b70]/15 to-transparent rounded-full ml-3"></div>
               </div>
               <div class="space-y-2">
                 ${clsStudents.map(st => renderStudentCardItem(st)).join('')}
@@ -3014,11 +3027,16 @@ async function renderStudentsDirectory() {
       remainingStudents = sortStudentsList(remainingStudents);
       if (remainingStudents.length > 0) {
         groupsHtml.push(`
-          <div class="class-student-group space-y-2">
-            <div class="flex items-center justify-between px-1 border-b border-[var(--border-color)] pb-1.5 pt-2">
-              <span class="text-xs font-black tracking-wide uppercase text-[#245b70] dark:text-cyan-400">
-                OTHER / UNASSIGNED : ${remainingStudents.length}
-              </span>
+          <div class="class-student-group space-y-2.5">
+            <div class="flex items-center justify-between pt-3 pb-1 select-none">
+              <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 text-white shadow-sm border border-slate-500/40">
+                <svg class="w-3.5 h-3.5 text-white/90 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span class="text-xs font-black tracking-wider uppercase">OTHER / UNASSIGNED</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-xl bg-white/20 text-white font-black text-[11px] shadow-2xs">
+                  TOTAL: ${remainingStudents.length}
+                </span>
+              </div>
+              <div class="h-[2px] flex-1 bg-gradient-to-r from-slate-400/30 via-slate-400/15 to-transparent rounded-full ml-3"></div>
             </div>
             <div class="space-y-2">
               ${remainingStudents.map(st => renderStudentCardItem(st)).join('')}
