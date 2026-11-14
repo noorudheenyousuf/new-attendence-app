@@ -670,12 +670,12 @@ function updateUserUI() {
   const myAssign = getTeacherAssignments(currentUser.name, currentUser.email);
   if (clsPills) {
     clsPills.innerHTML = myAssign.assignedClasses.length > 0
-      ? myAssign.assignedClasses.map(c => `<span class="px-2 py-0.5 rounded-lg bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20 font-bold text-xs shadow-2xs">${escapeHtml(c)}</span>`).join(' ')
+      ? myAssign.assignedClasses.map(c => `<span class="px-2.5 py-1 rounded-xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-xs text-[#245b70] dark:text-cyan-300 border border-[#245b70]/30 font-bold text-xs shadow-2xs">${escapeHtml(c)}</span>`).join(' ')
       : '<span class="text-[11px] text-[var(--text-sub)] italic">None assigned</span>';
   }
   if (subPills) {
     subPills.innerHTML = myAssign.assignedSubjects.length > 0
-      ? myAssign.assignedSubjects.map(s => `<span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 font-bold text-xs shadow-2xs">${escapeHtml(s)}</span>`).join(' ')
+      ? myAssign.assignedSubjects.map(s => `<span class="px-2.5 py-1 rounded-xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-xs text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 font-bold text-xs shadow-2xs">${escapeHtml(s)}</span>`).join(' ')
       : '<span class="text-[11px] text-[var(--text-sub)] italic">None assigned</span>';
   }
 
@@ -1482,10 +1482,10 @@ async function renderClassesList() {
 
     const actionBtns = canUserEditDelete() ? `
       <div class="flex items-center gap-1.5 flex-shrink-0 ml-auto pl-2">
-        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-[#245b70] hover:text-white border border-slate-200 dark:border-slate-600 flex items-center justify-center transition shadow-xs active:scale-95">
+        <button onclick="openEditClassModal('${c._id}')" title="Edit Class" class="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-200 dark:border-rose-800 flex items-center justify-center transition shadow-xs active:scale-95">
+        <button onclick="deleteClass('${c._id}', '${escapeQuotes(c.name)}')" title="Delete Class" class="w-8 h-8 rounded-xl bg-rose-500/20 hover:bg-rose-500/35 text-rose-100 border border-rose-300/30 flex items-center justify-center transition shadow-xs active:scale-95">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>` : '';
@@ -1509,19 +1509,19 @@ async function renderClassesList() {
          ondragend="handleClassDragEnd(event)"
          ondrop="handleClassDrop(event, ${index})">
 
-      <!-- Heading Div with clean white/light-gray header -->
-      <div class="bg-teal-800 text-white p-4 rounded-t-xl flex justify-between items-center">
+      <!-- Heading Div with Brand Gradient Header -->
+      <div class="custom-gradient-header text-white p-3.5 sm:p-4 rounded-t-2xl flex justify-between items-center shadow-xs">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="drag-handle text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 flex-shrink-0 cursor-grab active:cursor-grabbing transition" title="Hold card or drag handle to reorder">
+          <div class="drag-handle text-white/60 hover:text-white p-1 flex-shrink-0 cursor-grab active:cursor-grabbing transition" title="Hold card or drag handle to reorder">
             <svg class="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
             </svg>
           </div>
           <div class="min-w-0">
-            <h3 class="text-sm font-black text-white truncate">${c.isPrivate ? '<svg style=\"display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>' : ''}${escapeHtml(c.name)}</h3>
-            <div class="text-[10px] text-teal-100 dark:text-teal-300 flex items-center gap-1 mt-0.5 truncate select-none">
+            <h3 class="text-sm sm:text-base font-black text-white truncate">${c.isPrivate ? '<svg style=\"display:inline;width:11px;height:11px;color:#db2777;vertical-align:middle;margin-right:3px\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><rect x=\"3\" y=\"11\" width=\"18\" height=\"11\" rx=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>' : ''}${escapeHtml(c.name)}</h3>
+            <div class="text-[10px] sm:text-xs text-teal-100 dark:text-teal-200 flex items-center gap-1 mt-0.5 truncate select-none">
               <svg class="w-3.5 h-3.5 opacity-80 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-slate-400 dark:text-slate-500 font-normal italic">No Teacher Assigned</span>'}</span>
+              <span class="truncate">${c.classTeacher ? 'Teacher: ' + escapeHtml(c.classTeacher) : '<span class="text-teal-200/60 font-normal italic">No Teacher Assigned</span>'}</span>
             </div>
           </div>
         </div>
