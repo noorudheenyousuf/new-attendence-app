@@ -704,6 +704,26 @@
           </div>
         </div>
 
+        <!-- 1.5. LATEST ANNOUNCEMENT & MESSAGES SHOWCASE -->
+        <div id="profile-announcement-card" class="relative overflow-hidden rounded-3xl border-2 border-[#245b70]/30 dark:border-[#43888a]/40 shadow-lg transition-all duration-300 bg-gradient-to-br from-[#245b70]/15 via-[#43888a]/10 to-[var(--card-bg)] dark:from-[#245b70]/30 dark:via-[#1a4454]/25 dark:to-[var(--card-bg)] p-4 sm:p-5">
+          <!-- Ambient glowing background accents -->
+          <div class="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-gradient-to-br from-[#245b70]/30 to-teal-400/20 blur-2xl pointer-events-none"></div>
+          <div class="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-gradient-to-tr from-cyan-500/20 to-transparent blur-2xl pointer-events-none"></div>
+          <!-- Decorative top accent bar -->
+          <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#245b70] via-teal-400 to-[#43888a]"></div>
+
+          <!-- Dynamic content loaded by renderProfileAnnouncementCard() -->
+          <div id="profile-announcement-content">
+            <div class="flex items-center gap-3 py-3 animate-pulse">
+              <div class="w-11 h-11 rounded-2xl bg-slate-200 dark:bg-slate-700/60"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-3.5 bg-slate-200 dark:bg-slate-700/60 rounded-md w-1/3"></div>
+                <div class="h-2.5 bg-slate-200 dark:bg-slate-700/60 rounded-md w-1/2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 2. ADMINISTRATION SECTION (Admin Only) -->
         <div id="admin-settings-section" class="space-y-1.5">
           <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] px-1">Administration</div>

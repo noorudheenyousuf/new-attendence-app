@@ -953,3 +953,25 @@ input:checked + .switch-slider:before {
   animation: badgeJump 1.2s infinite ease-in-out;
 }
 
+/* ==========================================================================
+   PROFILE ANNOUNCEMENT & NOTICE SHOWCASE STYLES
+   ========================================================================== */
+#profile-announcement-card {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#profile-announcement-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -6px rgba(36, 91, 112, 0.22), 0 8px 12px -6px rgba(36, 91, 112, 0.15);
+}
+.dark #profile-announcement-card:hover {
+  box-shadow: 0 12px 28px -6px rgba(67, 136, 138, 0.28), 0 8px 12px -6px rgba(67, 136, 138, 0.2);
+}
+.announcement-box-glow {
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.2), 0 4px 14px -2px rgba(36, 91, 112, 0.12);
+}
+.dark .announcement-box-glow {
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.05), 0 4px 14px -2px rgba(0, 0, 0, 0.35);
+}
+
+
