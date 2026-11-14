@@ -4893,6 +4893,7 @@ let checkingAttendanceAccess = false;
 
 async function checkUnassignedTimetableForAttendance() {
   if (!currentUser) return null;
+  if (currentUser.role === 'admin') return null; // Admin has full access to all classes and subjects
   const myEmail = (currentUser.email || '').trim().toLowerCase();
   const myName = (currentUser.name || '').trim().toLowerCase();
   const isTeacher = currentUser.role !== 'admin';
@@ -5099,10 +5100,12 @@ function handleFixTimetableFromWarning() {
   openMyTimetable();
 }
 
-// Close unassigned timetable modal on Escape
+// Close unassigned timetable modal and schedule modals on Escape
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeUnassignedTimetableModal();
+    if (typeof closeTodayScheduleModal === 'function') closeTodayScheduleModal();
+    if (typeof closeTodayMarkedModal === 'function') closeTodayMarkedModal();
   }
 });
 
@@ -5119,6 +5122,8 @@ async function selectTab(tab) {
         showUnassignedTimetableModal(unassignedData);
         return false;
       }
+    } catch (err) {
+      console.warn('[Attendance Access Check Error]', err);
     } finally {
       checkingAttendanceAccess = false;
     }
@@ -5207,6 +5212,8 @@ async function selectTab(tab) {
     const mainViewport = document.querySelector('main');
     if (mainViewport) mainViewport.scrollTop = 0;
   }
+
+  return true;
 }
 
 // Backward compatibility aliases
@@ -5330,16 +5337,38 @@ async function handleStartQuickAttendance() {
     return;
   }
 
-  const selClass = document.getElementById('sel-class');
-  const selSubject = document.getElementById('sel-subject');
-  if (selClass) selClass.value = selectedClass;
-  currentClass = selectedClass;
   attendanceReadyToLoad = true;
+  currentClass = selectedClass;
+  const selClass = document.getElementById('sel-class');
+  if (selClass) {
+    const matchOpt = Array.from(selClass.options).find(opt => isClassEqual(opt.value, selectedClass));
+    if (matchOpt) {
+      selClass.value = matchOpt.value;
+      currentClass = matchOpt.value;
+    } else {
+      const newOpt = document.createElement('option');
+      newOpt.value = selectedClass;
+      newOpt.textContent = selectedClass;
+      selClass.appendChild(newOpt);
+      selClass.value = selectedClass;
+    }
+  }
 
-  updateAttendanceSubjectsDropdown(selectedClass);
+  updateAttendanceSubjectsDropdown(currentClass, selectedSubject);
+  const selSubject = document.getElementById('sel-subject');
   if (selSubject && selectedSubject) {
-    selSubject.value = selectedSubject;
-    currentSubject = selectedSubject;
+    const matchSub = Array.from(selSubject.options).find(opt => isClassEqual(opt.value, selectedSubject));
+    if (matchSub) {
+      selSubject.value = matchSub.value;
+      currentSubject = matchSub.value;
+    } else {
+      const newOpt = document.createElement('option');
+      newOpt.value = selectedSubject;
+      newOpt.textContent = selectedSubject;
+      selSubject.appendChild(newOpt);
+      selSubject.value = selectedSubject;
+      currentSubject = selectedSubject;
+    }
   }
 
   const ok = await selectTab('attendance');
@@ -5547,20 +5576,42 @@ async function startAttendanceFromTimetable(className, subjectName) {
     return;
   }
 
+  attendanceReadyToLoad = true;
+  currentClass = className;
+  const selClass = document.getElementById('sel-class');
+  if (selClass) {
+    const matchOpt = Array.from(selClass.options).find(opt => isClassEqual(opt.value, className));
+    if (matchOpt) {
+      selClass.value = matchOpt.value;
+      currentClass = matchOpt.value;
+    } else {
+      const newOpt = document.createElement('option');
+      newOpt.value = className;
+      newOpt.textContent = className;
+      selClass.appendChild(newOpt);
+      selClass.value = className;
+    }
+  }
+
+  updateAttendanceSubjectsDropdown(currentClass, subjectName);
+  const selSubject = document.getElementById('sel-subject');
+  if (selSubject && subjectName) {
+    const matchSub = Array.from(selSubject.options).find(opt => isClassEqual(opt.value, subjectName));
+    if (matchSub) {
+      selSubject.value = matchSub.value;
+      currentSubject = matchSub.value;
+    } else {
+      const newOpt = document.createElement('option');
+      newOpt.value = subjectName;
+      newOpt.textContent = subjectName;
+      selSubject.appendChild(newOpt);
+      selSubject.value = subjectName;
+      currentSubject = subjectName;
+    }
+  }
+
   const ok = await selectTab('attendance');
   if (!ok) return;
-
-  const selClass = document.getElementById('sel-class');
-  const selSubject = document.getElementById('sel-subject');
-  if (selClass) selClass.value = className;
-  currentClass = className;
-  attendanceReadyToLoad = true;
-
-  updateAttendanceSubjectsDropdown(className);
-  if (selSubject && subjectName) {
-    selSubject.value = subjectName;
-    currentSubject = subjectName;
-  }
 
   loadAttendanceRoster();
   showToast(`Attendance ready for ${className} • ${subjectName || currentSubject}`);
@@ -9273,17 +9324,17 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
       listEl.innerHTML = slots.map(slot => {
         const timeStr = slot.timeSlot || slot.time || 'Period';
         return `
-          <div class="p-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-between gap-3 transition">
+          <div onclick="dismissTimetableSummary(); jumpToTakeAttendance('${escapeQuotes(slot.class || '')}', '${escapeQuotes(slot.subject || '')}')" class="p-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-between gap-3 transition cursor-pointer active:scale-98 group">
             <div class="min-w-0 flex-1">
               <div class="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
                 <span class="text-amber-300 font-extrabold">${escapeHtml(timeStr)}</span>
                 <span>:</span>
-                <span class="text-cyan-100">${escapeHtml(slot.subject)}</span>
+                <span class="text-cyan-100 group-hover:text-cyan-200 transition">${escapeHtml(slot.subject)}</span>
                 <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-white/20 text-white font-bold">[${escapeHtml(slot.class)}]</span>
               </div>
               ${slot.room ? `<div class="text-[10px] text-cyan-200/80 mt-0.5">Room: ${escapeHtml(slot.room)}</div>` : ''}
             </div>
-            <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 text-cyan-200">
+            <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 text-cyan-200 group-hover:bg-cyan-500/30 transition">
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             </div>
           </div>
@@ -9720,18 +9771,50 @@ function closeTodayScheduleModal() {
 }
 
 async function jumpToTakeAttendance(className, subjectName) {
-  const ok = await selectTab('attendance');
-  if (!ok) return;
   closeTodayScheduleModal();
+
+  attendanceReadyToLoad = true;
   if (className) {
     currentClass = className;
     const selClass = document.getElementById('sel-class');
     if (selClass) {
-      selClass.value = className;
+      const matchOpt = Array.from(selClass.options).find(opt => isClassEqual(opt.value, className));
+      if (matchOpt) {
+        selClass.value = matchOpt.value;
+        currentClass = matchOpt.value;
+      } else {
+        const newOpt = document.createElement('option');
+        newOpt.value = className;
+        newOpt.textContent = className;
+        selClass.appendChild(newOpt);
+        selClass.value = className;
+        currentClass = className;
+      }
     }
   }
-  attendanceReadyToLoad = true;
+
   updateAttendanceSubjectsDropdown(currentClass, subjectName);
+  if (subjectName) {
+    const selSub = document.getElementById('sel-subject');
+    if (selSub) {
+      const matchSub = Array.from(selSub.options).find(opt => isClassEqual(opt.value, subjectName));
+      if (matchSub) {
+        selSub.value = matchSub.value;
+        currentSubject = matchSub.value;
+      } else {
+        const newOpt = document.createElement('option');
+        newOpt.value = subjectName;
+        newOpt.textContent = subjectName;
+        selSub.appendChild(newOpt);
+        selSub.value = subjectName;
+        currentSubject = subjectName;
+      }
+    }
+  }
+
+  const ok = await selectTab('attendance');
+  if (!ok) return;
+
   loadAttendanceRoster();
 }
 
@@ -9826,8 +9909,6 @@ function closeTodayMarkedModal() {
 }
 
 async function jumpToAttendanceSession(className, subjectName, dateStr) {
-  const ok = await selectTab('attendance');
-  if (!ok) return;
   closeTodayMarkedModal();
   if (dateStr) {
     currentDateStr = dateStr;
@@ -9835,30 +9916,47 @@ async function jumpToAttendanceSession(className, subjectName, dateStr) {
     if (picker) picker.value = dateStr;
     updateDateDisplay();
   }
+  attendanceReadyToLoad = true;
   if (className) {
     currentClass = className;
     const selClass = document.getElementById('sel-class');
     if (selClass) {
-      selClass.value = className;
+      const matchOpt = Array.from(selClass.options).find(opt => isClassEqual(opt.value, className));
+      if (matchOpt) {
+        selClass.value = matchOpt.value;
+        currentClass = matchOpt.value;
+      } else {
+        const newOpt = document.createElement('option');
+        newOpt.value = className;
+        newOpt.textContent = className;
+        selClass.appendChild(newOpt);
+        selClass.value = className;
+        currentClass = className;
+      }
     }
-    attendanceReadyToLoad = true;
-    updateAttendanceSubjectsDropdown(currentClass);
   }
+  updateAttendanceSubjectsDropdown(currentClass, subjectName);
   if (subjectName && subjectName !== 'all') {
-    currentSubject = subjectName;
     const selSub = document.getElementById('sel-subject');
     if (selSub) {
-      const exists = Array.from(selSub.options).some(opt => opt.value === subjectName);
-      if (!exists) {
+      const matchSub = Array.from(selSub.options).find(opt => isClassEqual(opt.value, subjectName));
+      if (matchSub) {
+        selSub.value = matchSub.value;
+        currentSubject = matchSub.value;
+      } else {
         const newOpt = document.createElement('option');
         newOpt.value = subjectName;
         newOpt.textContent = subjectName;
         selSub.appendChild(newOpt);
+        selSub.value = subjectName;
+        currentSubject = subjectName;
       }
-      selSub.value = subjectName;
     }
   } else {
     currentSubject = '';
   }
+
+  const ok = await selectTab('attendance');
+  if (!ok) return;
   loadAttendanceRoster();
 }

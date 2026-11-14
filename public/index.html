@@ -2950,7 +2950,7 @@
   </div>
 
   <!-- ================= TODAY'S SCHEDULE & ATTENDANCE STATUS MODAL ================= -->
-  <div id="modal-today-schedule" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print transition-all duration-300">
+  <div id="modal-today-schedule" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print transition-all duration-300" onclick="if (event.target === this) closeTodayScheduleModal();">
     <div class="relative w-full max-w-xl rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/20 bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white overflow-hidden my-auto space-y-4 max-h-[90vh] flex flex-col">
       <!-- Decorative Background Bubbles -->
       <div class="absolute -top-12 -right-12 w-36 h-36 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none"></div>
@@ -2998,7 +2998,7 @@
   </div>
 
   <!-- ================= TODAY'S MARKED ATTENDANCE MODAL ================= -->
-  <div id="modal-today-marked" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print transition-all duration-300">
+  <div id="modal-today-marked" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print transition-all duration-300" onclick="if (event.target === this) closeTodayMarkedModal();">
     <div class="relative w-full max-w-xl rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/20 bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white overflow-hidden my-auto space-y-4 max-h-[90vh] flex flex-col">
       <!-- Decorative Background Bubbles -->
       <div class="absolute -top-12 -right-12 w-36 h-36 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
