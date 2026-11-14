@@ -10,6 +10,11 @@ const messageSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  senderEmail: {
+    type: String,
+    default: '',
+    trim: true
+  },
   senderRole: {
     type: String,
     default: 'teacher'

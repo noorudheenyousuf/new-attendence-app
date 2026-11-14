@@ -776,15 +776,15 @@ input:checked + .switch-slider:before {
     page-break-inside: avoid;
     break-inside: avoid;
     width: 100% !important;
-    min-height: 280mm !important;
-    max-height: 287mm !important;
+    min-height: auto !important;
+    max-height: none !important;
     padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
-    grid-template-rows: repeat(6, 1fr) !important;
+    grid-auto-rows: min-content !important;
     gap: 2.5mm !important;
     box-sizing: border-box !important;
   }
@@ -816,8 +816,12 @@ input:checked + .switch-slider:before {
   transition: transform 0.08s ease-in-out;
 }
 
-/* Printable Timetable Grid Styles */
+/* Printable Sheets & Pagination Optimization */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
   body.printing-timetable > *:not(#timetable-print-sheet),
   body.printing-attendance-sheet > *:not(#attendance-print-sheet),
   body.printing-student-roster > *:not(#student-roster-print-sheet),
@@ -829,12 +833,35 @@ input:checked + .switch-slider:before {
   #student-roster-print-sheet,
   #teacher-activity-print-sheet {
     display: block !important;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #ffffff !important;
     color: #0f172a !important;
+    box-sizing: border-box !important;
+  }
+  #timetable-print-sheet table,
+  #attendance-print-sheet table,
+  #student-roster-print-sheet table,
+  #teacher-activity-print-sheet table {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  #timetable-print-sheet thead,
+  #attendance-print-sheet thead,
+  #student-roster-print-sheet thead,
+  #teacher-activity-print-sheet thead {
+    display: table-header-group !important;
+  }
+  #timetable-print-sheet tr,
+  #attendance-print-sheet tr,
+  #student-roster-print-sheet tr,
+  #teacher-activity-print-sheet tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 

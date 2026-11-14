@@ -1377,21 +1377,32 @@
       <!-- 10. TEACHER / PROFILE LOGS FULL PAGE VIEW -->
       <section id="view-teacher-log" class="hidden space-y-4 max-w-3xl mx-auto pb-12">
         <!-- Top Navigation Bar inside Teacher Log Page -->
-        <div class="flex items-center justify-between bg-[var(--card-bg)] p-3.5 sm:p-4 rounded-3xl border border-[var(--border-color)] shadow-sm">
-          <div class="flex items-center gap-3">
-            <button type="button" onclick="closeTeacherLogModal()" class="touch-btn w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs" title="Back">
+        <div class="flex items-center justify-between bg-[var(--card-bg)] p-3.5 sm:p-4 rounded-3xl border border-[var(--border-color)] shadow-sm gap-2 flex-wrap">
+          <div class="flex items-center gap-3 min-w-0">
+            <button type="button" onclick="closeTeacherLogModal()" class="touch-btn w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs flex-shrink-0" title="Back">
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <div class="flex items-center gap-3">
-              <img id="tlog-avatar" src="/icons/logo.png" class="w-11 h-11 rounded-2xl object-cover border border-[#245b70] shadow-sm">
-              <div>
+            <div class="flex items-center gap-3 min-w-0">
+              <img id="tlog-avatar" src="/icons/logo.png" class="w-11 h-11 rounded-2xl object-cover border border-[#245b70] shadow-sm flex-shrink-0">
+              <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <h2 id="tlog-name" class="font-extrabold text-base text-[var(--text-main)]">Teacher Name</h2>
+                  <h2 id="tlog-name" class="font-extrabold text-base text-[var(--text-main)] truncate">Teacher Name</h2>
                   <span id="tlog-google-status" class="px-2 py-0.5 rounded-lg text-[10px] font-bold"></span>
                 </div>
-                <p id="tlog-email" class="text-xs text-[var(--text-sub)]">email@domain.com</p>
+                <p id="tlog-email" class="text-xs text-[var(--text-sub)] truncate">email@domain.com</p>
               </div>
             </div>
+          </div>
+          <!-- Action Buttons in Teacher Log Header: Print Report & CSV -->
+          <div class="flex items-center gap-2 flex-shrink-0 ml-auto">
+            <button type="button" onclick="printTeacherLogDirect()" class="touch-btn px-3 py-2 rounded-xl bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition" title="Print this teacher's activity report">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+              <span>Print Report</span>
+            </button>
+            <button type="button" onclick="exportTeacherLogCSVDirect()" class="touch-btn px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition" title="Export CSV">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>CSV</span>
+            </button>
           </div>
         </div>
 
@@ -2407,13 +2418,13 @@
 
       <div class="space-y-2.5">
         <!-- Option 1: Student Details -->
-        <button type="button" onclick="selectPrintOption('students')" class="touch-btn w-full bg-[var(--bg-page)] hover:bg-[#245b70]/10 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-xs flex items-center gap-3 transition active:scale-98 group text-left">
+        <button id="print-choice-student-details" type="button" onclick="selectPrintOption('students')" class="touch-btn w-full bg-[var(--bg-page)] hover:bg-[#245b70]/10 p-3.5 rounded-2xl border border-[var(--border-color)] shadow-xs flex items-center gap-3 transition active:scale-98 group text-left">
           <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           </div>
           <div class="min-w-0 flex-1">
             <div class="text-xs font-black text-[var(--text-main)]">Student Details</div>
-            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">Choose fields for A4 printable cards (18/page) or CSV</div>
+            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">A4 Student Table Roster, ID Cards, or CSV</div>
           </div>
           <svg class="w-4 h-4 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
@@ -2705,6 +2716,14 @@
 
       <!-- Filters Form -->
       <div class="space-y-3">
+        <!-- Filter 0: Select Teacher -->
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Select Teacher</label>
+          <select id="export-tlog-teacher" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            <option value="">Loading teachers...</option>
+          </select>
+        </div>
+
         <!-- Filter 1: Class Filter -->
         <div>
           <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Filter by Class</label>

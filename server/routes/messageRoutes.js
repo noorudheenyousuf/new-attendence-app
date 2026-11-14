@@ -9,7 +9,11 @@ const authMiddleware = require('../middleware/auth');
 // @desc    Get all messages (last 100) sorted by newest first
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const messages = await Message.find().sort({ createdAt: -1 }).limit(100).lean();
+    const messages = await Message.find()
+      .populate('senderId', 'name email avatarUrl role')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
     const currentUserId = req.user ? req.user._id.toString() : null;
 
     // Count how many are unread for current user
@@ -21,9 +25,23 @@ router.get('/', authMiddleware, async (req, res) => {
       }).length;
     }
 
+    const populatedMessages = messages.map(m => {
+      const senderEmail = m.senderEmail || (m.senderId && m.senderId.email) || '';
+      const senderName = m.senderName || (m.senderId && m.senderId.name) || 'Anonymous Teacher';
+      const senderAvatar = m.senderAvatar || (m.senderId && m.senderId.avatarUrl) || '';
+      const senderRole = m.senderRole || (m.senderId && m.senderId.role) || 'teacher';
+      return {
+        ...m,
+        senderEmail,
+        senderName,
+        senderAvatar,
+        senderRole
+      };
+    });
+
     res.json({
       success: true,
-      data: messages.reverse(), // chronological order
+      data: populatedMessages.reverse(), // chronological order
       unreadCount
     });
   } catch (error) {
@@ -44,6 +62,7 @@ router.post('/', authMiddleware, async (req, res) => {
     const newMsg = new Message({
       senderId: sender._id,
       senderName: sender.name || 'Anonymous Teacher',
+      senderEmail: sender.email || '',
       senderRole: sender.role || 'teacher',
       senderAvatar: sender.avatarUrl || '',
       text: text.trim(),
