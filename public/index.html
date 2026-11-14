@@ -704,26 +704,6 @@
           </div>
         </div>
 
-        <!-- 1.5. LATEST ANNOUNCEMENT & MESSAGES SHOWCASE -->
-        <div id="profile-announcement-card" class="relative overflow-hidden rounded-3xl border-2 border-[#245b70]/30 dark:border-[#43888a]/40 shadow-lg transition-all duration-300 bg-gradient-to-br from-[#245b70]/15 via-[#43888a]/10 to-[var(--card-bg)] dark:from-[#245b70]/30 dark:via-[#1a4454]/25 dark:to-[var(--card-bg)] p-4 sm:p-5">
-          <!-- Ambient glowing background accents -->
-          <div class="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-gradient-to-br from-[#245b70]/30 to-teal-400/20 blur-2xl pointer-events-none"></div>
-          <div class="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-gradient-to-tr from-cyan-500/20 to-transparent blur-2xl pointer-events-none"></div>
-          <!-- Decorative top accent bar -->
-          <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#245b70] via-teal-400 to-[#43888a]"></div>
-
-          <!-- Dynamic content loaded by renderProfileAnnouncementCard() -->
-          <div id="profile-announcement-content">
-            <div class="flex items-center gap-3 py-3 animate-pulse">
-              <div class="w-11 h-11 rounded-2xl bg-slate-200 dark:bg-slate-700/60"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-3.5 bg-slate-200 dark:bg-slate-700/60 rounded-md w-1/3"></div>
-                <div class="h-2.5 bg-slate-200 dark:bg-slate-700/60 rounded-md w-1/2"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- 2. ADMINISTRATION SECTION (Admin Only) -->
         <div id="admin-settings-section" class="space-y-1.5">
           <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] px-1">Administration</div>
@@ -1472,39 +1452,56 @@
       <!-- 11. MESSAGES & NOTICES FULL PAGE VIEW -->
       <section id="view-messages" class="hidden flex flex-col max-w-2xl mx-auto pb-1" style="height: calc(100vh - 165px);">
         <!-- Top Navigation Bar inside Messages Page -->
-        <div class="flex items-center justify-between bg-[var(--card-bg)] p-3 sm:p-3.5 rounded-2xl border border-[var(--border-color)] shadow-sm mb-2.5 flex-shrink-0">
-          <div class="flex items-center gap-3">
-            <button type="button" onclick="closeMessagesModal()" class="touch-btn w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs" title="Back">
+        <div class="flex items-center justify-between bg-gradient-to-r from-[var(--card-bg)] via-[var(--card-bg)] to-[#245b70]/10 p-3 sm:p-3.5 rounded-3xl border border-[var(--border-color)] shadow-sm mb-2.5 flex-shrink-0 gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <button type="button" onclick="closeMessagesModal()" class="touch-btn w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[var(--text-main)] hover:bg-[#245b70] hover:text-white flex items-center justify-center transition shadow-xs flex-shrink-0" title="Back">
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 flex items-center justify-center">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#245b70] to-[#43888a] text-white flex items-center justify-center shadow-sm flex-shrink-0">
+                <svg class="w-5 h-5 text-amber-300 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2a1 1 0 0 1 1 1v1.07A8.002 8.002 0 0 1 20 12v3l2 2v1H2v-1l2-2v-3a8.002 8.002 0 0 1 7-7.93V3a1 1 0 0 1 1-1zm0 20a3 3 0 0 0 2.83-2H9.17A3 3 0 0 0 12 22z"/>
+                </svg>
               </div>
-              <div>
-                <h2 class="font-extrabold text-sm sm:text-base text-[var(--text-main)] leading-tight">Teacher Notice Board</h2>
-                <p class="text-[10px] text-[var(--text-sub)]">Read and broadcast messages to all teachers</p>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h2 class="font-extrabold text-sm sm:text-base text-[var(--text-main)] leading-tight truncate">Teacher Notice Board</h2>
+                  <span id="messages-count-pill" class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/20">Announcements</span>
+                </div>
+                <p class="text-[11px] text-[var(--text-sub)] truncate">Official broadcast messages & notices for all teachers</p>
               </div>
             </div>
           </div>
-          <button id="btn-clear-chat" type="button" onclick="handleClearAllChat()" title="Delete all chat history" class="w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-400 flex items-center justify-center transition" aria-label="Clear Chat History">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-          </button>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button id="btn-clear-chat" type="button" onclick="handleClearAllChat()" title="Delete all notice history" class="touch-btn h-9 px-2.5 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-900/50 flex items-center gap-1.5 transition text-xs font-bold" aria-label="Clear Notice History">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              <span class="hidden sm:inline">Clear All</span>
+            </button>
+          </div>
         </div>
 
         <!-- Messages Container Card -->
-        <div class="bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] p-3 sm:p-4 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div class="bg-[var(--card-bg)] rounded-3xl border border-[var(--border-color)] p-3 sm:p-4 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden relative">
+          <!-- Subtle decorative ambient background glow -->
+          <div class="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-gradient-to-br from-[#245b70]/10 to-teal-400/10 blur-3xl pointer-events-none"></div>
+          <div class="absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-gradient-to-tr from-cyan-500/10 to-transparent blur-3xl pointer-events-none"></div>
+
           <!-- Messages Stream List -->
-          <div id="messages-list-container" class="space-y-3 flex-1 overflow-y-auto pr-1">
+          <div id="messages-list-container" class="space-y-3 flex-1 overflow-y-auto pr-1.5 pb-2 relative z-10 message-custom-scrollbar">
             <!-- Dynamic message bubbles -->
           </div>
 
-          <!-- Send Message Form: Pinned flush at the bottom with NO free space under -->
-          <form onsubmit="handleSendMessage(event)" class="pt-2.5 mt-2 border-t border-[var(--border-color)] flex items-center gap-2 flex-shrink-0">
-            <input type="text" id="message-input-text" placeholder="Write a message or announcement..." required autocomplete="off" class="touch-input flex-1 bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70]">
-            <button type="submit" id="btn-send-message" class="touch-btn px-4 py-2.5 custom-gradient-btn text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 active:scale-95 transition flex-shrink-0">
-              <span>Send</span>
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          <!-- Send Message Form: Pinned flush at the bottom -->
+          <form onsubmit="handleSendMessage(event)" class="pt-2.5 mt-1.5 border-t border-[var(--border-color)] flex items-center gap-2 flex-shrink-0 relative z-10">
+            <div class="relative flex-1">
+              <input type="text" id="message-input-text" placeholder="Write an announcement or message to all teachers..." required autocomplete="off" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-2xl pl-3.5 pr-9 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-2xs">
+              <div class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sub)] pointer-events-none opacity-60">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              </div>
+            </div>
+            <button type="submit" id="btn-send-message" class="touch-btn px-4 sm:px-5 py-2.5 sm:py-3 custom-gradient-btn text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md flex items-center gap-1.5 active:scale-95 transition flex-shrink-0 hover:opacity-95">
+              <span>Post</span>
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </button>
           </form>
         </div>
