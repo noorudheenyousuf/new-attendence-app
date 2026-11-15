@@ -505,6 +505,20 @@ const APP_PHRASES_ML = {
   "November": "നവംബർ",
   "December": "ഡിസംബർ",
 
+  // Dashboard Status Strings (Zero flicker translations)
+  "None": "ഒന്നുമില്ല",
+  "Done": "പൂർത്തിയായി",
+  "No classes today": "ഇന്ന് ക്ലാസുകളില്ല",
+  "No active session": "ഇപ്പോൾ ക്ലാസുകളൊന്നുമില്ല",
+  "All classes completed": "ഇന്നത്തെ ക്ലാസുകൾ പൂർത്തിയായി",
+  "No upcoming classes": "അടുത്ത ക്ലാസുകളൊന്നുമില്ല",
+  "Upcoming": "അടുത്ത ക്ലാസ്",
+  "In session": "നടന്നുകൊണ്ടിരിക്കുന്നു",
+  "Today's Status": "ഇന്നത്തെ സ്ഥിതി",
+  "Your live class & schedule status": "തത്സമയ ക്ലാസും ഷെഡ്യൂൾ വിവരങ്ങളും",
+  "Live Schedule": "തത്സമയ ഷെഡ്യൂൾ",
+  "Live In": "ഇപ്പോൾ നടക്കുന്നത്",
+
   // Common Button Actions & Placeholders
   "Save": "സംരക്ഷിക്കുക",
   "Cancel": "റദ്ദാക്കുക",
@@ -707,8 +721,19 @@ function applyTranslations(lang) {
     badge.textContent = lang === 'ml' ? 'മലയാളം' : 'English';
   }
 
-  // 6. Update modal active indicators
+  // 6. Update header action language button
+  const headerLangText = document.getElementById('header-language-text');
+  if (headerLangText) {
+    headerLangText.textContent = lang === 'ml' ? 'മല' : 'EN';
+  }
+
+  // 7. Update modal active indicators
   updateLanguageModalUI(lang);
+
+  // 8. Immediately refresh dashboard status in new language without flicker
+  if (typeof loadHomeDashboardStatus === 'function') {
+    try { loadHomeDashboardStatus(); } catch(_) {}
+  }
 }
 
 function updateLanguageModalUI(lang) {

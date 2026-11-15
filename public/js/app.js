@@ -411,6 +411,19 @@ const DEFAULT_STUDENT_FORM_FIELDS = [
 
 let appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
 
+function showSplashLoader(msg = 'Loading application...') {
+  const loader = document.getElementById('app-splash-loader');
+  if (loader) {
+    loader.classList.remove('splash-fade-out');
+    loader.style.display = 'flex';
+    loader.style.opacity = '1';
+    loader.style.visibility = 'visible';
+    loader.style.pointerEvents = 'auto';
+    const sub = document.getElementById('splash-status-text') || loader.querySelector('p span:last-child');
+    if (sub && msg) sub.textContent = msg;
+  }
+}
+
 function hideSplashLoader() {
   const loader = document.getElementById('app-splash-loader');
   if (loader) {
@@ -457,37 +470,55 @@ document.addEventListener('DOMContentLoaded', async () => {
       _applyTeachersTabVisibility();
       initTimetableNotificationScheduler();
       await loadHomeDashboard();
-      checkInitialOnboarding();
+      // Flow sequence: Language -> Guide -> Morning Modal -> Dashboard
+      proceedAppWorkflowSequence();
     } else {
       await loadHomeDashboard();
+      hideSplashLoader();
     }
   } catch (err) {
     console.error('[App Init Error]', err);
-  } finally {
     hideSplashLoader();
+  } finally {
     applyHeaderButtonPreference();
     // Poll for new messages every 60 seconds
     setInterval(checkUnreadMessages, 60000);
   }
 });
 
-// ================= APP ONBOARDING & GUIDE SYSTEM =================
-function checkInitialOnboarding() {
-  if (!currentUser) return; // Strictly only show onboarding after authentication
+// ================= APP ONBOARDING & SEQUENCED WORKFLOW =================
+function proceedAppWorkflowSequence() {
+  if (!currentUser) {
+    hideSplashLoader();
+    return;
+  }
+
   const langChosen = localStorage.getItem('app_language_chosen');
   const guideSeen = localStorage.getItem('registerly_guide_seen');
 
   if (!langChosen) {
-    // Show Step 1: Language selection modal first for new user!
+    // Step 1: Language selection modal first for user
+    hideSplashLoader();
     setTimeout(() => {
       openInitialLanguageModal();
-    }, 450);
+    }, 350);
   } else if (!guideSeen) {
-    // Language already picked, but guide not yet viewed
+    // Step 2: Language already picked, guide not yet viewed
+    hideSplashLoader();
     setTimeout(() => {
       openAppGuideModal();
-    }, 450);
+    }, 350);
+  } else {
+    // Step 3: All onboarding completed -> Check Morning Modal -> Dashboard
+    hideSplashLoader();
+    setTimeout(() => {
+      checkAndTriggerTimetableNotifications();
+    }, 400);
   }
+}
+
+function checkInitialOnboarding() {
+  proceedAppWorkflowSequence();
 }
 
 function openInitialLanguageModal() {
@@ -509,10 +540,17 @@ function selectInitialLanguage(lang) {
   localStorage.setItem('app_language_chosen', 'true');
   closeInitialLanguageModal();
 
-  // Immediately transition to Step 2: Open Morning Guide Modal in chosen language
-  setTimeout(() => {
-    openAppGuideModal();
-  }, 250);
+  // Step 2: Open Morning Guide Modal if first time, else Morning Timetable Modal
+  const guideSeen = localStorage.getItem('registerly_guide_seen');
+  if (!guideSeen) {
+    setTimeout(() => {
+      openAppGuideModal();
+    }, 300);
+  } else {
+    setTimeout(() => {
+      checkAndTriggerTimetableNotifications();
+    }, 350);
+  }
 }
 
 function openAppGuideModal() {
@@ -527,6 +565,11 @@ function closeAppGuideModal() {
   const modal = document.getElementById('modal-app-guide');
   if (modal) modal.classList.add('hidden');
   localStorage.setItem('registerly_guide_seen', 'true');
+
+  // Step 3: Transition to Morning Timetable Modal -> Dashboard
+  setTimeout(() => {
+    checkAndTriggerTimetableNotifications();
+  }, 350);
 }
 
 function switchGuideLanguage(lang) {
@@ -636,7 +679,6 @@ async function loadCurrentUser() {
         updateUserUI();
         const authModal = document.getElementById('auth-modal');
         if (authModal) authModal.classList.add('hidden');
-        checkAndTriggerTimetableNotifications();
         return;
       }
     } catch (error) {
@@ -1103,14 +1145,28 @@ async function loadAppSettings() {
 function applyHeaderButtonPreference() {
   const btnGuide = document.getElementById('header-guide-btn');
   const btnTheme = document.getElementById('dark-mode-btn');
+  const btnLang = document.getElementById('header-language-btn');
   const pref = (appSettings && appSettings.headerActionButton) ? appSettings.headerActionButton : 'guide';
+
+  if (btnGuide) btnGuide.classList.add('hidden');
+  if (btnTheme) btnTheme.classList.add('hidden');
+  if (btnLang) btnLang.classList.add('hidden');
+
   if (pref === 'theme') {
     if (btnTheme) btnTheme.classList.remove('hidden');
-    if (btnGuide) btnGuide.classList.add('hidden');
+  } else if (pref === 'language') {
+    if (btnLang) {
+      btnLang.classList.remove('hidden');
+      const headerLangText = document.getElementById('header-language-text');
+      if (headerLangText) {
+        const curLang = localStorage.getItem('app_language') || 'en';
+        headerLangText.textContent = curLang === 'ml' ? 'മല' : 'EN';
+      }
+    }
   } else {
     if (btnGuide) btnGuide.classList.remove('hidden');
-    if (btnTheme) btnTheme.classList.add('hidden');
   }
+
   const selectEl = document.getElementById('admin-select-header-button');
   if (selectEl) selectEl.value = pref;
 }
@@ -4853,17 +4909,19 @@ async function updateProfileDashboardKPIs() {
       return item.startMin > currentMin;
     });
 
+    const isMl = (typeof currentAppLanguage !== 'undefined' ? currentAppLanguage : localStorage.getItem('app_language')) === 'ml';
+
     if (liveSubEls.length > 0) {
       if (liveMatch) {
         const s = liveMatch.slot;
         const timeText = s.timeSlot || s.time || '';
-        const classText = s.class ? `Class ${s.class}` : '';
-        const liveMeta = [classText, timeText].filter(Boolean).join(' • ') || 'In session';
-        liveSubEls.forEach(el => el.textContent = s.subject || 'Class');
+        const classText = s.class ? (isMl ? `ക്ലാസ് ${s.class}` : `Class ${s.class}`) : '';
+        const liveMeta = [classText, timeText].filter(Boolean).join(' • ') || (isMl ? 'നടന്നുകൊണ്ടിരിക്കുന്നു' : 'In session');
+        liveSubEls.forEach(el => el.textContent = s.subject || (isMl ? 'ക്ലാസ്' : 'Class'));
         liveMetaEls.forEach(el => el.textContent = liveMeta);
       } else {
-        const liveMeta = todaySlots.length === 0 ? 'No classes today' : 'No active session';
-        liveSubEls.forEach(el => el.textContent = 'None');
+        const liveMeta = todaySlots.length === 0 ? (isMl ? 'ഇന്ന് ക്ലാസുകളില്ല' : 'No classes today') : (isMl ? 'ഇപ്പോൾ ക്ലാസുകളൊന്നുമില്ല' : 'No active session');
+        liveSubEls.forEach(el => el.textContent = isMl ? 'ഒന്നുമില്ല' : 'None');
         liveMetaEls.forEach(el => el.textContent = liveMeta);
       }
     }
@@ -4872,20 +4930,20 @@ async function updateProfileDashboardKPIs() {
       if (nextMatch) {
         const s = nextMatch.slot;
         const diff = nextMatch.startMin - currentMin;
-        const classText = s.class ? `Class ${s.class}` : '';
-        const diffText = diff > 0 ? (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`) : '';
+        const classText = s.class ? (isMl ? `ക്ലാസ് ${s.class}` : `Class ${s.class}`) : '';
+        const diffText = diff > 0 ? (isMl ? (diff < 60 ? `${diff} മിനിറ്റിൽ` : `${Math.floor(diff / 60)} മണി ${diff % 60} മിനിറ്റിൽ`) : (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`)) : '';
         const timeText = s.timeSlot || s.time || '';
         const metaParts = [classText, diffText || timeText].filter(Boolean);
-        const nextMeta = metaParts.join(' • ') || 'Upcoming';
-        nextSubEls.forEach(el => el.textContent = s.subject || 'Class');
+        const nextMeta = metaParts.join(' • ') || (isMl ? 'അടുത്ത ക്ലാസ്' : 'Upcoming');
+        nextSubEls.forEach(el => el.textContent = s.subject || (isMl ? 'ക്ലാസ്' : 'Class'));
         nextMetaEls.forEach(el => el.textContent = nextMeta);
       } else {
         if (todaySlots.length > 0) {
-          nextSubEls.forEach(el => el.textContent = 'Done');
-          nextMetaEls.forEach(el => el.textContent = 'All classes completed');
+          nextSubEls.forEach(el => el.textContent = isMl ? 'പൂർത്തിയായി' : 'Done');
+          nextMetaEls.forEach(el => el.textContent = isMl ? 'ഇന്നത്തെ ക്ലാസുകൾ പൂർത്തിയായി' : 'All classes completed');
         } else {
-          nextSubEls.forEach(el => el.textContent = 'None');
-          nextMetaEls.forEach(el => el.textContent = 'No upcoming classes');
+          nextSubEls.forEach(el => el.textContent = isMl ? 'ഒന്നുമില്ല' : 'None');
+          nextMetaEls.forEach(el => el.textContent = isMl ? 'അടുത്ത ക്ലാസുകളൊന്നുമില്ല' : 'No upcoming classes');
         }
       }
     }
@@ -6272,6 +6330,9 @@ async function handleGoogleTokenResponse(tokenResponse) {
       showToast(res.message || `Welcome, ${res.user.name}!`);
       selectTab('home');
 
+      // Show animation during loading (no dashboard preview)
+      showSplashLoader('Signing in & setting up portal...');
+
       try {
         await loadCurrentUser();
         await loadAppSettings();
@@ -6283,7 +6344,7 @@ async function handleGoogleTokenResponse(tokenResponse) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
-        checkInitialOnboarding();
+        proceedAppWorkflowSequence();
       } catch (postSyncErr) {
         console.warn('[Google Post-Login Sync Warning]', postSyncErr);
       }
@@ -6313,6 +6374,9 @@ async function handleGoogleCredentialResponse(response) {
       showToast(res.message || `Welcome, ${res.user.name}!`);
       selectTab('home');
 
+      // Show animation during loading (no dashboard preview)
+      showSplashLoader('Signing in & setting up portal...');
+
       try {
         await loadCurrentUser();
         await loadAppSettings();
@@ -6324,7 +6388,7 @@ async function handleGoogleCredentialResponse(response) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
-        checkInitialOnboarding();
+        proceedAppWorkflowSequence();
       } catch (postSyncErr) {
         console.warn('[Google Post-Login Sync Warning]', postSyncErr);
       }
@@ -6366,6 +6430,9 @@ async function handleEmailLogin(e) {
       showToast(res.message || `Welcome back, ${res.user.name}!`);
       selectTab('home');
 
+      // Show animation during loading (no dashboard preview)
+      showSplashLoader('Signing in & setting up portal...');
+
       try {
         await loadCurrentUser();
         await loadAppSettings();
@@ -6377,7 +6444,7 @@ async function handleEmailLogin(e) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
-        checkInitialOnboarding();
+        proceedAppWorkflowSequence();
       } catch (postSyncErr) {
         console.warn('[Email Post-Login Sync Warning]', postSyncErr);
       }
@@ -6439,6 +6506,9 @@ async function handleEmailRegister(e) {
       showToast(res.message || 'Account created successfully!');
       selectTab('home');
 
+      // Show animation during loading (no dashboard preview)
+      showSplashLoader('Creating account & setting up portal...');
+
       try {
         await loadCurrentUser();
         await loadAppSettings();
@@ -6450,7 +6520,7 @@ async function handleEmailRegister(e) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
-        checkInitialOnboarding();
+        proceedAppWorkflowSequence();
       } catch (postSyncErr) {
         console.warn('[Register Post-Login Sync Warning]', postSyncErr);
       }
@@ -8028,25 +8098,57 @@ function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
   const saveBtn = document.getElementById('conflict-modal-save-btn');
   const cancelBtn = document.getElementById('conflict-modal-cancel-btn');
 
-  // Find teacher name with priority on currentUser (e.g. Admin or current teacher)
+  // Accurately resolve first/conflicting slot's assigned teacher (from slot, subjectsList, or currentUser)
   const ownerEmail = (conflictSlot.teacherEmail || '').trim().toLowerCase();
+  const slotSubject = (conflictSlot.subject || '').trim().toLowerCase();
+  const slotClass = (conflictSlot.class || '').trim().toLowerCase();
+
+  let subjTeacherName = '';
+  let subjTeacherEmail = '';
+  const _sList = (typeof subjectsList !== 'undefined' && Array.isArray(subjectsList)) ? subjectsList : [];
+  const foundSubj = _sList.find(s => {
+    const sName = (s.name || '').trim().toLowerCase();
+    if (sName !== slotSubject) return false;
+    if (s.assignedClasses && Array.isArray(s.assignedClasses) && s.assignedClasses.length > 0) {
+      return s.assignedClasses.some(c => c.trim().toLowerCase() === slotClass);
+    }
+    return true;
+  }) || _sList.find(s => (s.name || '').trim().toLowerCase() === slotSubject);
+
+  if (foundSubj) {
+    subjTeacherName = (foundSubj.teacher || '').trim();
+    subjTeacherEmail = (foundSubj.teacherEmail || '').trim().toLowerCase();
+  }
+
+  const effectiveEmail = ownerEmail || subjTeacherEmail;
+
+  const _tList = (typeof cachedTeachersList !== 'undefined' && Array.isArray(cachedTeachersList)) ? cachedTeachersList : [];
+  const foundByEmail = effectiveEmail ? _tList.find(t => (t.email || '').trim().toLowerCase() === effectiveEmail) : null;
+  const foundByName = subjTeacherName ? _tList.find(t => (t.name || '').trim().toLowerCase() === subjTeacherName.toLowerCase()) : null;
+  const matchedTeacher = foundByEmail || foundByName;
+
+  const isOwnerCurrent = Boolean(
+    currentUser && (
+      (effectiveEmail && (currentUser.email || '').trim().toLowerCase() === effectiveEmail) ||
+      (subjTeacherName && (currentUser.name || '').trim().toLowerCase() === subjTeacherName.toLowerCase()) ||
+      (matchedTeacher && (currentUser.email || '').trim().toLowerCase() === (matchedTeacher.email || '').trim().toLowerCase())
+    )
+  );
+
   let teacherName = '';
-
-  const isOwnerCurrent = Boolean(currentUser && (currentUser.email || '').trim().toLowerCase() === ownerEmail);
-
   if (isOwnerCurrent) {
     const roleTag = currentUser.role === 'admin' ? ' (Admin / You)' : ' (You)';
     teacherName = `${currentUser.name || 'Admin'}${roleTag}`;
+  } else if (subjTeacherName) {
+    teacherName = subjTeacherName;
+  } else if (matchedTeacher && (matchedTeacher.name || matchedTeacher.username)) {
+    teacherName = (matchedTeacher.name || matchedTeacher.username).trim();
+  } else if (conflictSlot.teacherName) {
+    teacherName = conflictSlot.teacherName.trim();
+  } else if (effectiveEmail) {
+    teacherName = effectiveEmail;
   } else {
-    const _tList = (typeof cachedTeachersList !== 'undefined' && cachedTeachersList) || [];
-    const found = _tList.find(t => (t.email || '').trim().toLowerCase() === ownerEmail);
-    if (found && (found.name || found.username)) {
-      teacherName = (found.name || found.username).trim();
-    } else if (conflictSlot.teacherName) {
-      teacherName = conflictSlot.teacherName.trim();
-    } else {
-      teacherName = ownerEmail || 'Another Teacher';
-    }
+    teacherName = 'Assigned Teacher';
   }
 
   const isEditingOther = Boolean(currentUser && currentUser.role === 'admin' && currentUser.email && currentUser.email.toLowerCase() !== ownerEmail);
