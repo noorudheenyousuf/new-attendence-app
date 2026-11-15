@@ -6078,21 +6078,22 @@ function closeLanguageSettingsModal() {
 }
 
 function selectAppLanguage(lang) {
-  if (typeof applyTranslations === 'function') {
+  if (typeof setAppLanguage === 'function') {
+    setAppLanguage(lang);
+  } else if (typeof applyTranslations === 'function') {
     applyTranslations(lang);
+    const toastMsg = lang === 'ml' ? 'ഭാഷ മലയാളത്തിലേക്ക് മാറ്റി' : 'Language changed to English';
+    if (typeof showToast === 'function') {
+      showToast(toastMsg);
+    }
   } else {
     try { localStorage.setItem('app_language', lang); } catch(_) {}
     document.documentElement.lang = lang;
   }
 
-  const toastMsg = lang === 'ml' ? 'ഭാഷ മലയാളത്തിലേക്ക് മാറ്റി' : 'Language changed to English';
-  if (typeof showToast === 'function') {
-    showToast(toastMsg);
-  }
-
   setTimeout(() => {
     closeLanguageSettingsModal();
-  }, 220);
+  }, 180);
 }
 
 // Modal triggers

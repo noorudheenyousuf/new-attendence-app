@@ -560,6 +560,14 @@ const APP_PHRASES_ML = {
   "Failed to save attendance": "ഹാജർ സംരക്ഷിക്കാൻ സാധിച്ചില്ല"
 };
 
+// Dynamic Reverse Lookup for 100% Reliable ML -> EN Switching
+const APP_PHRASES_EN = {};
+for (const [enKey, mlVal] of Object.entries(APP_PHRASES_ML)) {
+  if (mlVal && typeof mlVal === 'string') {
+    APP_PHRASES_EN[mlVal.trim()] = enKey.trim();
+  }
+}
+
 let currentAppLanguage = 'en';
 let i18nObserver = null;
 
@@ -586,12 +594,13 @@ function t(key, fallback = '') {
 }
 
 function tPhrase(phrase) {
-  if (currentAppLanguage !== 'ml' || !phrase) return phrase;
+  if (!phrase) return phrase;
   const trimmed = String(phrase).trim();
-  if (APP_PHRASES_ML[trimmed]) {
-    return APP_PHRASES_ML[trimmed];
+  if (currentAppLanguage === 'ml') {
+    return APP_PHRASES_ML[trimmed] || phrase;
+  } else {
+    return APP_PHRASES_EN[trimmed] || phrase;
   }
-  return phrase;
 }
 
 // TreeWalker: Walks text nodes in DOM to translate static text elements cleanly
@@ -604,8 +613,13 @@ function walkAndTranslateDOM(rootNode, lang) {
     {
       acceptNode(node) {
         if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-        const parentTag = node.parentElement ? node.parentElement.tagName.toLowerCase() : '';
-        if (parentTag === 'script' || parentTag === 'style' || parentTag === 'svg' || parentTag === 'path') {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        const parentTag = parent.tagName.toLowerCase();
+        if (parentTag === 'script' || parentTag === 'style' || parentTag === 'svg' || parentTag === 'path' || parentTag === 'noscript') {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (parent.closest && parent.closest('[data-i18n]')) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -632,9 +646,14 @@ function walkAndTranslateDOM(rootNode, lang) {
         node.nodeValue = leading + APP_PHRASES_ML[trimmed] + trailing;
       }
     } else {
+      // Switching back to English
       if (node._origText) {
         node.nodeValue = node._origText;
         delete node._origText;
+      } else if (APP_PHRASES_EN[trimmed]) {
+        const leading = raw.match(/^\s*/)[0];
+        const trailing = raw.match(/\s*$/)[0];
+        node.nodeValue = leading + APP_PHRASES_EN[trimmed] + trailing;
       }
     }
   }
@@ -643,14 +662,17 @@ function walkAndTranslateDOM(rootNode, lang) {
   rootNode.querySelectorAll?.('input[placeholder], textarea[placeholder]').forEach(el => {
     const ph = el.getAttribute('placeholder');
     if (!ph) return;
+    const trimmed = ph.trim();
     if (lang === 'ml') {
       if (!el.dataset.i18nOrigPlaceholder) el.dataset.i18nOrigPlaceholder = ph;
-      const translated = APP_PHRASES_ML[ph.trim()];
+      const translated = APP_PHRASES_ML[trimmed];
       if (translated) el.setAttribute('placeholder', translated);
     } else {
       if (el.dataset.i18nOrigPlaceholder) {
         el.setAttribute('placeholder', el.dataset.i18nOrigPlaceholder);
         delete el.dataset.i18nOrigPlaceholder;
+      } else if (APP_PHRASES_EN[trimmed]) {
+        el.setAttribute('placeholder', APP_PHRASES_EN[trimmed]);
       }
     }
   });
@@ -659,14 +681,17 @@ function walkAndTranslateDOM(rootNode, lang) {
   rootNode.querySelectorAll?.('[title]').forEach(el => {
     const title = el.getAttribute('title');
     if (!title) return;
+    const trimmed = title.trim();
     if (lang === 'ml') {
       if (!el.dataset.i18nOrigTitle) el.dataset.i18nOrigTitle = title;
-      const translated = APP_PHRASES_ML[title.trim()];
+      const translated = APP_PHRASES_ML[trimmed];
       if (translated) el.setAttribute('title', translated);
     } else {
       if (el.dataset.i18nOrigTitle) {
         el.setAttribute('title', el.dataset.i18nOrigTitle);
         delete el.dataset.i18nOrigTitle;
+      } else if (APP_PHRASES_EN[trimmed]) {
+        el.setAttribute('title', APP_PHRASES_EN[trimmed]);
       }
     }
   });
@@ -731,6 +756,9 @@ function applyTranslations(lang) {
   updateLanguageModalUI(lang);
 
   // 8. Immediately refresh dashboard status in new language without flicker
+  if (typeof updateProfileDashboardKPIs === 'function') {
+    try { updateProfileDashboardKPIs(); } catch(_) {}
+  }
   if (typeof loadHomeDashboardStatus === 'function') {
     try { loadHomeDashboardStatus(); } catch(_) {}
   }
@@ -763,6 +791,22 @@ function updateLanguageModalUI(lang) {
   }
 }
 
+function setAppLanguage(lang) {
+  if (lang !== 'en' && lang !== 'ml') lang = 'en';
+  applyTranslations(lang);
+  const toastMsg = lang === 'ml' ? 'ഭാഷ മലയാളത്തിലേക്ക് മാറ്റി' : 'Language changed to English';
+  if (typeof showToast === 'function') {
+    showToast(toastMsg);
+  }
+}
+
+function toggleAppLanguage() {
+  const current = getAppLanguage();
+  const next = current === 'ml' ? 'en' : 'ml';
+  setAppLanguage(next);
+  return next;
+}
+
 // Observer to re-apply translations when dynamic content is inserted
 function setupI18nObserver() {
   if (i18nObserver || typeof MutationObserver === 'undefined') return;
@@ -773,13 +817,12 @@ function setupI18nObserver() {
       if (timeout) clearTimeout(timeout);
       timeout = setTimeout(() => {
         walkAndTranslateDOM(document.body, 'ml');
-      }, 100);
+      }, 80);
     }
   });
 
-  const main = (typeof document.querySelector === 'function') ? (document.querySelector('main') || document.body) : document.body;
-  if (main && typeof i18nObserver.observe === 'function') {
-    i18nObserver.observe(main, { childList: true, subtree: true });
+  if (document.body && typeof i18nObserver.observe === 'function') {
+    i18nObserver.observe(document.body, { childList: true, subtree: true });
   }
 }
 
@@ -787,6 +830,16 @@ function initI18n() {
   const lang = getAppLanguage();
   applyTranslations(lang);
   setupI18nObserver();
+}
+
+// Global window exposure
+if (typeof window !== 'undefined') {
+  window.setAppLanguage = setAppLanguage;
+  window.toggleAppLanguage = toggleAppLanguage;
+  window.getAppLanguage = getAppLanguage;
+  window.applyTranslations = applyTranslations;
+  window.t = t;
+  window.tPhrase = tPhrase;
 }
 
 // Auto-run on DOM ready
