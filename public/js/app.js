@@ -457,6 +457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       _applyTeachersTabVisibility();
       initTimetableNotificationScheduler();
       await loadHomeDashboard();
+      checkInitialOnboarding();
     } else {
       await loadHomeDashboard();
     }
@@ -465,7 +466,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   } finally {
     hideSplashLoader();
     applyHeaderButtonPreference();
-    checkInitialOnboarding();
     // Poll for new messages every 60 seconds
     setInterval(checkUnreadMessages, 60000);
   }
@@ -473,6 +473,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ================= APP ONBOARDING & GUIDE SYSTEM =================
 function checkInitialOnboarding() {
+  if (!currentUser) return; // Strictly only show onboarding after authentication
   const langChosen = localStorage.getItem('app_language_chosen');
   const guideSeen = localStorage.getItem('registerly_guide_seen');
 
@@ -549,15 +550,15 @@ function renderGuideLanguage(lang) {
   if (isMl) {
     if (mlContent) mlContent.classList.remove('hidden');
     if (enContent) enContent.classList.add('hidden');
-    if (btnMl) btnMl.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 font-bold shadow-sm transition";
-    if (btnEn) btnEn.className = "px-2.5 py-1 rounded-lg text-white/70 hover:text-white font-semibold transition";
+    if (btnMl) btnMl.className = "px-2 py-0.5 rounded-md bg-white text-slate-900 font-bold shadow-sm transition";
+    if (btnEn) btnEn.className = "px-2 py-0.5 rounded-md text-white/70 hover:text-white font-semibold transition";
     if (titleEl) titleEl.innerText = "ആപ്പ് നിർദ്ദേശങ്ങൾ (Guide)";
     if (btnLabel) btnLabel.innerText = "ശരി, ആരംഭിക്കാം!";
   } else {
     if (enContent) enContent.classList.remove('hidden');
     if (mlContent) mlContent.classList.add('hidden');
-    if (btnEn) btnEn.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 font-bold shadow-sm transition";
-    if (btnMl) btnMl.className = "px-2.5 py-1 rounded-lg text-white/70 hover:text-white font-semibold transition";
+    if (btnEn) btnEn.className = "px-2 py-0.5 rounded-md bg-white text-slate-900 font-bold shadow-sm transition";
+    if (btnMl) btnMl.className = "px-2 py-0.5 rounded-md text-white/70 hover:text-white font-semibold transition";
     if (titleEl) titleEl.innerText = "App Guide & Instructions";
     if (btnLabel) btnLabel.innerText = "Got it / Let's Start!";
   }
@@ -6282,6 +6283,7 @@ async function handleGoogleTokenResponse(tokenResponse) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
+        checkInitialOnboarding();
       } catch (postSyncErr) {
         console.warn('[Google Post-Login Sync Warning]', postSyncErr);
       }
@@ -6322,6 +6324,7 @@ async function handleGoogleCredentialResponse(response) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
+        checkInitialOnboarding();
       } catch (postSyncErr) {
         console.warn('[Google Post-Login Sync Warning]', postSyncErr);
       }
@@ -6374,6 +6377,7 @@ async function handleEmailLogin(e) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
+        checkInitialOnboarding();
       } catch (postSyncErr) {
         console.warn('[Email Post-Login Sync Warning]', postSyncErr);
       }
@@ -6446,6 +6450,7 @@ async function handleEmailRegister(e) {
         await loadActivityLogs();
         _applyTeachersTabVisibility();
         await loadHomeDashboard();
+        checkInitialOnboarding();
       } catch (postSyncErr) {
         console.warn('[Register Post-Login Sync Warning]', postSyncErr);
       }
@@ -6473,6 +6478,10 @@ function handleSignout() {
   if (bubbleModal) bubbleModal.classList.add('hidden');
   const preclassCard = document.getElementById('notif-preclass-card');
   if (preclassCard) preclassCard.classList.add('hidden');
+  const langModal = document.getElementById('modal-first-language-select');
+  if (langModal) langModal.classList.add('hidden');
+  const guideModal = document.getElementById('modal-app-guide');
+  if (guideModal) guideModal.classList.add('hidden');
   showToast('Signed out successfully');
   openAuthModal();
 }
@@ -8019,29 +8028,39 @@ function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
   const saveBtn = document.getElementById('conflict-modal-save-btn');
   const cancelBtn = document.getElementById('conflict-modal-cancel-btn');
 
-  // Find teacher name from cachedTeachersList
-  const ownerEmail = (conflictSlot.teacherEmail || '').trim();
-  let teacherName = ownerEmail;
-  const _tList = (typeof cachedTeachersList !== 'undefined' && cachedTeachersList) || [];
-  if (_tList.length > 0) {
-    const found = _tList.find(t => (t.email || '').toLowerCase() === ownerEmail.toLowerCase());
-    if (found) teacherName = found.name || found.email || ownerEmail;
-  }
-  // Also check currentUser if the slot belongs to self
-  if (teacherName === ownerEmail && currentUser && (currentUser.email || '').toLowerCase() === ownerEmail.toLowerCase()) {
-    teacherName = currentUser.name || ownerEmail;
+  // Find teacher name with priority on currentUser (e.g. Admin or current teacher)
+  const ownerEmail = (conflictSlot.teacherEmail || '').trim().toLowerCase();
+  let teacherName = '';
+
+  const isOwnerCurrent = Boolean(currentUser && (currentUser.email || '').trim().toLowerCase() === ownerEmail);
+
+  if (isOwnerCurrent) {
+    const roleTag = currentUser.role === 'admin' ? ' (Admin / You)' : ' (You)';
+    teacherName = `${currentUser.name || 'Admin'}${roleTag}`;
+  } else {
+    const _tList = (typeof cachedTeachersList !== 'undefined' && cachedTeachersList) || [];
+    const found = _tList.find(t => (t.email || '').trim().toLowerCase() === ownerEmail);
+    if (found && (found.name || found.username)) {
+      teacherName = (found.name || found.username).trim();
+    } else if (conflictSlot.teacherName) {
+      teacherName = conflictSlot.teacherName.trim();
+    } else {
+      teacherName = ownerEmail || 'Another Teacher';
+    }
   }
 
-  const isEditingOther = Boolean(currentUser && currentUser.role === 'admin' && currentUser.email && currentUser.email.toLowerCase() !== ownerEmail.toLowerCase());
+  const isEditingOther = Boolean(currentUser && currentUser.role === 'admin' && currentUser.email && currentUser.email.toLowerCase() !== ownerEmail);
 
   if (conflictType === 'self') {
     if (badge) badge.textContent = isEditingOther ? '⚠️ Teacher Schedule Conflict' : '⚠️ Your Own Conflict';
     if (title) title.textContent = isEditingOther ? `${teacherName} Already Has a Class!` : 'You Already Have a Class!';
     if (desc) desc.textContent = isEditingOther ? `${teacherName} already has a slot scheduled at this time:` : 'You already have a slot scheduled at this time:';
   } else {
-    if (badge) badge.textContent = '⚠️ Class Conflict';
-    if (title) title.textContent = 'Slot Overlap Detected!';
-    if (desc) desc.textContent = 'This slot overlaps with an existing class in this room/class:';
+    if (badge) badge.textContent = isOwnerCurrent ? '⚠️ Your Class Overlap' : '⚠️ Class Schedule Conflict';
+    if (title) title.textContent = `${teacherName} Already Has a Class Here!`;
+    if (desc) desc.textContent = isOwnerCurrent
+      ? `You already have "${conflictSlot.subject || 'a subject'}" scheduled for ${conflictSlot.class || 'this class'} at this time:`
+      : `${teacherName} already has "${conflictSlot.subject || 'a subject'}" scheduled for ${conflictSlot.class || 'this class'} at this time:`;
   }
 
   const slotDays = Array.isArray(conflictSlot.days) && conflictSlot.days.length > 0
