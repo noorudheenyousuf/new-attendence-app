@@ -464,10 +464,104 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('[App Init Error]', err);
   } finally {
     hideSplashLoader();
+    applyHeaderButtonPreference();
+    checkInitialOnboarding();
     // Poll for new messages every 60 seconds
     setInterval(checkUnreadMessages, 60000);
   }
 });
+
+// ================= APP ONBOARDING & GUIDE SYSTEM =================
+function checkInitialOnboarding() {
+  const langChosen = localStorage.getItem('app_language_chosen');
+  const guideSeen = localStorage.getItem('registerly_guide_seen');
+
+  if (!langChosen) {
+    // Show Step 1: Language selection modal first for new user!
+    setTimeout(() => {
+      openInitialLanguageModal();
+    }, 450);
+  } else if (!guideSeen) {
+    // Language already picked, but guide not yet viewed
+    setTimeout(() => {
+      openAppGuideModal();
+    }, 450);
+  }
+}
+
+function openInitialLanguageModal() {
+  const modal = document.getElementById('modal-first-language-select');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeInitialLanguageModal() {
+  const modal = document.getElementById('modal-first-language-select');
+  if (modal) modal.classList.add('hidden');
+}
+
+function selectInitialLanguage(lang) {
+  if (typeof setAppLanguage === 'function') {
+    setAppLanguage(lang);
+  } else {
+    localStorage.setItem('app_language', lang);
+  }
+  localStorage.setItem('app_language_chosen', 'true');
+  closeInitialLanguageModal();
+
+  // Immediately transition to Step 2: Open Morning Guide Modal in chosen language
+  setTimeout(() => {
+    openAppGuideModal();
+  }, 250);
+}
+
+function openAppGuideModal() {
+  const modal = document.getElementById('modal-app-guide');
+  if (!modal) return;
+  const currentLang = localStorage.getItem('app_language') || 'en';
+  renderGuideLanguage(currentLang);
+  modal.classList.remove('hidden');
+}
+
+function closeAppGuideModal() {
+  const modal = document.getElementById('modal-app-guide');
+  if (modal) modal.classList.add('hidden');
+  localStorage.setItem('registerly_guide_seen', 'true');
+}
+
+function switchGuideLanguage(lang) {
+  if (typeof setAppLanguage === 'function') {
+    setAppLanguage(lang);
+  } else {
+    localStorage.setItem('app_language', lang);
+  }
+  renderGuideLanguage(lang);
+}
+
+function renderGuideLanguage(lang) {
+  const isMl = lang === 'ml';
+  const mlContent = document.getElementById('guide-content-ml');
+  const enContent = document.getElementById('guide-content-en');
+  const btnEn = document.getElementById('guide-btn-en');
+  const btnMl = document.getElementById('guide-btn-ml');
+  const titleEl = document.getElementById('guide-modal-title');
+  const btnLabel = document.getElementById('guide-modal-btn-label');
+
+  if (isMl) {
+    if (mlContent) mlContent.classList.remove('hidden');
+    if (enContent) enContent.classList.add('hidden');
+    if (btnMl) btnMl.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 font-bold shadow-sm transition";
+    if (btnEn) btnEn.className = "px-2.5 py-1 rounded-lg text-white/70 hover:text-white font-semibold transition";
+    if (titleEl) titleEl.innerText = "ആപ്പ് നിർദ്ദേശങ്ങൾ (Guide)";
+    if (btnLabel) btnLabel.innerText = "ശരി, ആരംഭിക്കാം!";
+  } else {
+    if (enContent) enContent.classList.remove('hidden');
+    if (mlContent) mlContent.classList.add('hidden');
+    if (btnEn) btnEn.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 font-bold shadow-sm transition";
+    if (btnMl) btnMl.className = "px-2.5 py-1 rounded-lg text-white/70 hover:text-white font-semibold transition";
+    if (titleEl) titleEl.innerText = "App Guide & Instructions";
+    if (btnLabel) btnLabel.innerText = "Got it / Let's Start!";
+  }
+}
 
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -966,14 +1060,14 @@ async function loadAppSettings() {
     const res = await API.getAdminSettings();
     if (res.success && res.data) {
       appSettings = res.data;
-      const appName = res.data.appName !== undefined ? res.data.appName : '';
+      const appName = 'REGISTERLY';
       const schoolName = res.data.schoolName !== undefined ? res.data.schoolName : '';
-      const appLogo = res.data.appLogo !== undefined ? res.data.appLogo : '';
+      const appLogo = '/icons/logo.png';
       updateHeaderBranding(appName, schoolName, appLogo);
 
       const adminAppInput = document.getElementById('admin-input-app-name');
       const adminSchoolInput = document.getElementById('admin-input-school-name');
-      if (adminAppInput) adminAppInput.value = appName;
+      if (adminAppInput) adminAppInput.value = 'REGISTERLY';
       if (adminSchoolInput) adminSchoolInput.value = schoolName;
 
       const toggleEl = document.getElementById('admin-toggle-edit-delete');
@@ -992,6 +1086,7 @@ async function loadAppSettings() {
       }
       _applyStudentPrintButtonVisibility();
       applyDashboardSectionVisibility();
+      applyHeaderButtonPreference();
 
       if (Array.isArray(res.data.studentFormFields) && res.data.studentFormFields.length > 0) {
         appStudentFormFields = res.data.studentFormFields;
@@ -1001,6 +1096,33 @@ async function loadAppSettings() {
     }
   } catch (error) {
     console.log('[Settings Load]', error);
+  }
+}
+
+function applyHeaderButtonPreference() {
+  const btnGuide = document.getElementById('header-guide-btn');
+  const btnTheme = document.getElementById('dark-mode-btn');
+  const pref = (appSettings && appSettings.headerActionButton) ? appSettings.headerActionButton : 'guide';
+  if (pref === 'theme') {
+    if (btnTheme) btnTheme.classList.remove('hidden');
+    if (btnGuide) btnGuide.classList.add('hidden');
+  } else {
+    if (btnGuide) btnGuide.classList.remove('hidden');
+    if (btnTheme) btnTheme.classList.add('hidden');
+  }
+  const selectEl = document.getElementById('admin-select-header-button');
+  if (selectEl) selectEl.value = pref;
+}
+
+async function handleAdminHeaderButtonChange(val) {
+  if (!appSettings) appSettings = {};
+  appSettings.headerActionButton = val;
+  applyHeaderButtonPreference();
+  try {
+    await API.updateAdminSettings('REGISTERLY', appSettings.schoolName || '', { headerActionButton: val });
+    showToast('Header button preference updated!');
+  } catch (e) {
+    showToast(e.message || 'Error updating setting', true);
   }
 }
 
@@ -1027,11 +1149,9 @@ function _applyTeachersTabVisibility() {
 
 async function handleAdminToggleTeachersTab(enabled) {
   try {
-    // Use a generic settings update - we need a backend field
-    // For now store in appSettings locally and via API
     const res = await API.updateAdminSettings(
-      appSettings.appName,
-      appSettings.schoolName,
+      'REGISTERLY',
+      appSettings ? appSettings.schoolName : '',
       { showTeachersTabToAll: enabled }
     );
     if (res.success) {
@@ -1054,7 +1174,6 @@ async function handleAdminToggleEditDelete(enabled) {
         appSettings.allowNonAdminEditDelete = Boolean(res.allowNonAdminEditDelete);
       }
       showToast(res.allowNonAdminEditDelete ? 'Edit & Delete buttons visible to all users' : 'Edit & Delete buttons hidden for non-admin accounts');
-      // Refresh views so buttons appear/disappear immediately
       renderClassesList();
       renderSubjectsList();
       renderStudentsDirectory();
@@ -1069,11 +1188,11 @@ async function handleAdminToggleEditDelete(enabled) {
 
 async function saveAdminSchoolSettings() {
   try {
-    const appName = document.getElementById('admin-input-app-name').value;
-    const schoolName = document.getElementById('admin-input-school-name').value;
-    const res = await API.updateAdminSettings(appName, schoolName);
+    const schoolInput = document.getElementById('admin-input-school-name');
+    const schoolName = (schoolInput ? schoolInput.value : '').trim();
+    const res = await API.updateAdminSettings('REGISTERLY', schoolName);
     if (res.success) {
-      showToast('App Name and School Name updated!');
+      showToast('Campus Name updated!');
       await loadAppSettings();
       closeAdminPanel();
     }
@@ -9227,18 +9346,24 @@ function _renderAndPrintTeacherActivitySheet(res, yearVal, classVal) {
       </tr>
     `;
   } else {
-    sessionsHtml = sessions.map((s, idx) => `
+    sessionsHtml = sessions.map((s, idx) => {
+      const tot = s.totalStudents !== undefined ? s.totalStudents : (s.summary && s.summary.total !== undefined ? s.summary.total : '-');
+      const pres = s.presentCount !== undefined ? s.presentCount : (s.summary && s.summary.present !== undefined ? s.summary.present : 0);
+      const abs = s.absentCount !== undefined ? s.absentCount : (s.summary && s.summary.absent !== undefined ? s.summary.absent : 0);
+      const lve = s.leaveCount !== undefined ? s.leaveCount : (s.summary && (s.summary.leave !== undefined ? s.summary.leave : (s.summary.late || 0)));
+      return `
       <tr style="border-bottom: 1px solid #e2e8f0; ${idx % 2 === 1 ? 'background-color: #fafafa;' : ''}">
         <td style="padding: 3.5px 6px; text-align: center; color: #64748b; font-size: 8.5pt;">${idx + 1}</td>
         <td style="padding: 3.5px 6px; font-weight: 700; font-size: 8.5pt;">${escapeHtml(s.date || '-')}</td>
         <td style="padding: 3.5px 6px; font-weight: 700; font-size: 8.5pt;">${escapeHtml(s.class || '-')}</td>
         <td style="padding: 3.5px 6px; font-size: 8.5pt;">${escapeHtml(s.subject || '-')}</td>
-        <td style="padding: 3.5px 6px; text-align: center; font-size: 8.5pt;">${s.totalStudents !== undefined ? s.totalStudents : '-'}</td>
-        <td style="padding: 3.5px 6px; text-align: center; font-weight: 700; color: #16a34a; font-size: 8.5pt;">${s.presentCount !== undefined ? s.presentCount : 0}</td>
-        <td style="padding: 3.5px 6px; text-align: center; font-weight: 700; color: #dc2626; font-size: 8.5pt;">${s.absentCount !== undefined ? s.absentCount : 0}</td>
-        <td style="padding: 3.5px 6px; text-align: center; color: #d97706; font-size: 8.5pt;">${s.leaveCount !== undefined ? s.leaveCount : 0}</td>
+        <td style="padding: 3.5px 6px; text-align: center; font-size: 8.5pt;">${tot}</td>
+        <td style="padding: 3.5px 6px; text-align: center; font-weight: 700; color: #16a34a; font-size: 8.5pt;">${pres}</td>
+        <td style="padding: 3.5px 6px; text-align: center; font-weight: 700; color: #dc2626; font-size: 8.5pt;">${abs}</td>
+        <td style="padding: 3.5px 6px; text-align: center; color: #d97706; font-size: 8.5pt;">${lve}</td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
   }
 
   let html = `
@@ -9327,15 +9452,19 @@ function _downloadTeacherActivityCSV(teacherName, yearVal, classVal, sessions) {
   ];
 
   sessions.forEach(s => {
+    const tot = s.totalStudents !== undefined ? s.totalStudents : (s.summary && s.summary.total !== undefined ? s.summary.total : 0);
+    const pres = s.presentCount !== undefined ? s.presentCount : (s.summary && s.summary.present !== undefined ? s.summary.present : 0);
+    const abs = s.absentCount !== undefined ? s.absentCount : (s.summary && s.summary.absent !== undefined ? s.summary.absent : 0);
+    const lve = s.leaveCount !== undefined ? s.leaveCount : (s.summary && (s.summary.leave !== undefined ? s.summary.leave : (s.summary.late || 0)));
     csvRows.push([
       `"${s.date || ''}"`,
       `"${(s.class || '').replace(/"/g, '""')}"`,
       `"${(s.subject || '').replace(/"/g, '""')}"`,
       `"${(s.period || '').replace(/"/g, '""')}"`,
-      `"${s.totalStudents !== undefined ? s.totalStudents : 0}"`,
-      `"${s.presentCount !== undefined ? s.presentCount : 0}"`,
-      `"${s.absentCount !== undefined ? s.absentCount : 0}"`,
-      `"${s.leaveCount !== undefined ? s.leaveCount : 0}"`
+      `"${tot}"`,
+      `"${pres}"`,
+      `"${abs}"`,
+      `"${lve}"`
     ].join(','));
   });
 

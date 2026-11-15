@@ -265,19 +265,32 @@ router.get('/:id/logs', authMiddleware, async (req, res) => {
         totalLate
       },
       availableYears,
-      sessions: filteredSessions.map(s => ({
-        id: s._id,
-        date: s.date,
-        class: s.class,
-        subject: s.subject,
-        summary: s.summary ? {
-          ...s.summary,
-          leave: s.summary.leave !== undefined ? s.summary.leave : (s.summary.late || 0)
-        } : { total: 0, present: 0, absent: 0, leave: 0, late: 0, percentage: 0 },
-        markedBy: s.markedBy || 'Teacher',
-        markedByEmail: s.markedByEmail || '',
-        createdAt: s.createdAt
-      }))
+      sessions: filteredSessions.map(s => {
+        const sumTotal = s.summary ? (s.summary.total || 0) : 0;
+        const sumPresent = s.summary ? (s.summary.present || 0) : 0;
+        const sumAbsent = s.summary ? (s.summary.absent || 0) : 0;
+        const sumLeave = s.summary ? (s.summary.leave !== undefined ? s.summary.leave : (s.summary.late || 0)) : 0;
+        return {
+          id: s._id,
+          date: s.date,
+          class: s.class,
+          subject: s.subject,
+          totalStudents: sumTotal,
+          presentCount: sumPresent,
+          absentCount: sumAbsent,
+          leaveCount: sumLeave,
+          summary: {
+            total: sumTotal,
+            present: sumPresent,
+            absent: sumAbsent,
+            leave: sumLeave,
+            percentage: sumTotal > 0 ? Math.round((sumPresent / sumTotal) * 100) : 0
+          },
+          markedBy: s.markedBy || 'Teacher',
+          markedByEmail: s.markedByEmail || '',
+          createdAt: s.createdAt
+        };
+      })
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

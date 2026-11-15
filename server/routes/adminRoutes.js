@@ -39,13 +39,14 @@ router.use(adminMiddleware);
 // @desc    Update App Name & School Name & Permissions & App Logo
 router.put('/settings', async (req, res) => {
   try {
-    const { appName, schoolName, appLogo, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint, studentFormFields } = req.body;
+    const { appName, schoolName, appLogo, headerActionButton, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint, studentFormFields } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings();
     }
-    if (appName !== undefined) settings.appName = (appName || '').trim();
+    if (appName !== undefined) settings.appName = 'REGISTERLY';
     if (schoolName !== undefined) settings.schoolName = (schoolName || '').trim();
+    if (headerActionButton !== undefined) settings.headerActionButton = headerActionButton === 'theme' ? 'theme' : 'guide';
     if (appLogo !== undefined) settings.appLogo = (appLogo || '').trim();
     if (allowNonAdminEditDelete !== undefined) settings.allowNonAdminEditDelete = Boolean(allowNonAdminEditDelete);
     if (showTeachersTabToAll !== undefined) settings.showTeachersTabToAll = Boolean(showTeachersTabToAll);

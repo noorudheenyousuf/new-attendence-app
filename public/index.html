@@ -51,26 +51,12 @@
   <script>
     (function() {
       try {
-        var cached = localStorage.getItem('registerly_app_name') || localStorage.getItem('registerly_appName');
-        if (cached && cached.trim()) {
-          var name = cached.trim();
-          var elName = document.getElementById('splash-app-name');
-          var elIcon = document.getElementById('splash-icon-letter');
-          if (elName) elName.textContent = name;
-          if (elIcon) elIcon.textContent = (name[0] || 'R').toUpperCase();
-        }
-        var cachedLogo = localStorage.getItem('registerly_app_logo');
-        if (cachedLogo && cachedLogo.trim()) {
-          var elIcon = document.getElementById('splash-icon-letter');
-          if (elIcon) {
-            elIcon.innerHTML = '<img src="' + cachedLogo + '" class="w-full h-full object-cover rounded-2xl" alt="Logo">';
-            elIcon.classList.remove('custom-gradient-header', 'text-white');
-          }
-          var fav = document.getElementById('dynamic-favicon');
-          var apple = document.getElementById('dynamic-apple-icon');
-          if (fav) fav.href = cachedLogo;
-          if (apple) apple.href = cachedLogo;
-        }
+        var elName = document.getElementById('splash-app-name');
+        if (elName) elName.textContent = 'REGISTERLY';
+        var fav = document.getElementById('dynamic-favicon');
+        var apple = document.getElementById('dynamic-apple-icon');
+        if (fav) fav.href = '/icons/logo.png';
+        if (apple) apple.href = '/icons/logo.png';
       } catch (e) {}
     })();
   </script>
@@ -109,8 +95,17 @@
             <span id="header-unread-msg-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center border border-white shadow-sm badge-jump"></span>
           </button>
 
-          <!-- Theme Toggle Button -->
-          <button onclick="toggleDarkMode()" id="dark-mode-btn" title="Toggle Light/Dark Theme" class="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition active:scale-95 border border-white/20 backdrop-blur-sm">
+          <!-- App Instructions / Guide (i) Button (Default in place of Light mode button) -->
+          <button onclick="openAppGuideModal()" id="header-guide-btn" title="App Guide & Instructions / ആപ്പ് നിർദ്ദേശങ്ങൾ" class="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition active:scale-95 border border-white/20 backdrop-blur-sm" aria-label="Instructions">
+            <svg class="w-4 h-4 text-cyan-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </button>
+
+          <!-- Theme Toggle Button (Toggleable via Admin Panel) -->
+          <button onclick="toggleDarkMode()" id="dark-mode-btn" title="Toggle Light/Dark Theme" class="hidden w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition active:scale-95 border border-white/20 backdrop-blur-sm">
             <svg id="sun-icon" class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="5"></circle>
               <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -857,6 +852,20 @@
 
               <!-- <span id="theme-status-label" class="text-xs font-bold text-[#245b70] dark:text-cyan-400">Light / Dark</span> -->
             </button>
+
+            <!-- App Guide & Instructions -->
+            <button type="button" onclick="openAppGuideModal()" class="touch-btn w-full p-3.5 flex items-center justify-between text-left hover:bg-[var(--bg-page)]/50 transition active:scale-98">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-[var(--text-main)]" data-i18n="app_guide_title">App Guide & Instructions</div>
+                  <div class="text-[10px] text-[var(--text-sub)]" data-i18n="app_guide_sub">Step-by-step tutorial on how to use Registerly</div>
+                </div>
+              </div>
+              <svg class="w-4 h-4 text-[var(--text-sub)] opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
           </div>
         </div>
 
@@ -1085,61 +1094,36 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <!-- LEFT COLUMN: Identity, Branding & Access Permissions -->
           <div class="space-y-4">
-            <!-- App Icon & Photo Upload -->
-            <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3">
+            <!-- Campus Identity (Permanent App Name & Logo) -->
+            <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3.5">
               <div class="flex items-center justify-between">
                 <div class="text-xs font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wide flex items-center gap-2">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  <span>App Icon & Photo</span>
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                  <span>Campus Identity</span>
                 </div>
-                <span class="text-[10px] font-semibold text-[var(--text-sub)]">Device Icon • Header • Splash</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Permanent Brand</span>
               </div>
 
-              <div class="flex items-center gap-4 bg-[var(--bg-page)] p-3.5 rounded-2xl border border-[var(--border-color)]">
-                <!-- Live Preview Squircle -->
-                <div class="relative flex-shrink-0">
-                  <div id="admin-logo-preview-box" class="w-16 h-16 rounded-2xl border-2 border-[#245b70]/30 overflow-hidden shadow-md bg-[var(--card-bg)] flex items-center justify-center transition">
-                    <span id="admin-logo-preview-letter" class="text-[#245b70] dark:text-teal-400 font-black text-2xl">R</span>
-                  </div>
-                  <!-- Uploading Spinner Overlay -->
-                  <div id="admin-logo-upload-spinner" class="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center hidden">
-                    <svg class="animate-spin w-5 h-5 text-white" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                  </div>
+              <!-- Permanent Logo & App Name Badge -->
+              <div class="flex items-center gap-3.5 bg-[var(--bg-page)] p-3 rounded-2xl border border-[var(--border-color)]">
+                <div class="w-12 h-12 rounded-2xl border border-[#245b70]/30 overflow-hidden shadow-sm flex-shrink-0 bg-white/10">
+                  <img src="/icons/logo.png" class="w-full h-full object-cover" alt="App Logo">
                 </div>
-
-                <div class="min-w-0 flex-1 space-y-2">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <input type="file" id="admin-app-logo-input" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="handleAdminAppLogoSelect(event)">
-                    <button type="button" onclick="document.getElementById('admin-app-logo-input').click()" class="touch-btn px-3 py-1.5 custom-gradient-btn text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm">
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      <span>Upload Photo</span>
-                    </button>
-                    <button type="button" id="btn-admin-reset-logo" onclick="handleAdminResetAppLogo()" class="touch-btn px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--text-sub)] hover:text-rose-500 hover:border-rose-300 transition hidden">
-                      Reset
-                    </button>
-                  </div>
-                  <p class="text-[10px] text-[var(--text-sub)] leading-tight">
-                    Upload a custom logo or badge. Automatically syncs to header, splash screen and mobile homescreen.
-                  </p>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-black text-[var(--text-main)] tracking-wider">REGISTERLY</div>
+                  <p class="text-[10px] text-[var(--text-sub)]">School Attendance & Management System</p>
                 </div>
               </div>
-            </div>
 
-            <!-- App & School Identity -->
-            <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3">
-              <div class="text-xs font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wide">App & School Identity</div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-[10px] font-bold text-[var(--text-main)] mb-1">App Name</label>
-                  <input type="text" id="admin-input-app-name" value="REGISTERLY" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs font-bold text-[var(--text-main)]">
-                </div>
-                <div>
-                  <label class="block text-[10px] font-bold text-[var(--text-main)] mb-1">School Name</label>
-                  <input type="text" id="admin-input-school-name" value="" placeholder="Enter school or college name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs font-bold text-[var(--text-main)]">
-                </div>
+              <!-- Campus Name Input -->
+              <div>
+                <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Campus Name</label>
+                <input type="text" id="admin-input-school-name" value="" placeholder="Enter campus name (e.g. Al Huda Campus)" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs font-bold text-[var(--text-main)]">
+                <p class="text-[10px] text-[var(--text-sub)] mt-1">Displays beneath REGISTERLY in the top header and on printed reports.</p>
               </div>
-              <button onclick="saveAdminSchoolSettings()" class="touch-btn w-full bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs py-2 rounded-xl transition shadow-sm">
-                Save Names & Branding
+
+              <button onclick="saveAdminSchoolSettings()" class="touch-btn w-full bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs py-2.5 rounded-xl transition shadow-sm active:scale-95">
+                Save Campus Name
               </button>
             </div>
 
@@ -1190,6 +1174,21 @@
                   <input type="checkbox" id="admin-toggle-student-print" onchange="handleAdminToggleStudentPrint(this.checked)" checked>
                   <span class="switch-slider"></span>
                 </label>
+              </div>
+
+              <!-- Header Action Button: App Guide (i) vs Light/Dark Mode -->
+              <div class="flex items-center justify-between gap-3 pt-2.5 border-t border-[var(--border-color)]">
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span>Header Action Button</span>
+                  </div>
+                  <div class="text-[10px] text-[var(--text-sub)] mt-0.5">Choose between App Guide (i) button and Light/Dark mode button in top header</div>
+                </div>
+                <select id="admin-select-header-button" onchange="handleAdminHeaderButtonChange(this.value)" class="touch-input bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 py-1.5 text-xs font-bold text-[var(--text-main)] flex-shrink-0">
+                  <option value="guide">App Guide (i)</option>
+                  <option value="theme">Light/Dark Mode</option>
+                </select>
               </div>
             </div>
 
@@ -3574,6 +3573,283 @@
           <button type="submit" class="flex-1 py-2.5 pw-gradient-btn rounded-xl font-bold text-sm shadow-md">Enroll</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= STEP 1: INITIAL APP LANGUAGE SELECTION MODAL ================= -->
+  <div id="modal-first-language-select" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden no-print transition-all duration-300">
+    <div class="relative w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-white/20 bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white overflow-hidden text-center space-y-4">
+      <div class="absolute -top-10 -right-10 w-28 h-28 bg-cyan-400/20 rounded-full blur-xl pointer-events-none"></div>
+      <div class="absolute -bottom-10 -left-10 w-28 h-28 bg-teal-300/15 rounded-full blur-xl pointer-events-none"></div>
+
+      <div class="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center mx-auto shadow-inner text-cyan-200">
+        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+      </div>
+
+      <div>
+        <h3 class="font-black text-lg text-white">Choose Language</h3>
+        <p class="text-xs text-cyan-200 font-bold mt-0.5">ഭാഷ തിരഞ്ഞെടുക്കുക</p>
+      </div>
+
+      <div class="space-y-2.5 pt-1">
+        <!-- English Option -->
+        <button type="button" onclick="selectInitialLanguage('en')" class="touch-btn w-full p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 active:scale-95 transition flex items-center justify-between text-left group">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🇬🇧</span>
+            <div>
+              <div class="font-black text-sm text-white group-hover:text-cyan-200 transition">English</div>
+              <div class="text-[11px] text-cyan-100/70">Continue in English</div>
+            </div>
+          </div>
+          <svg class="w-5 h-5 text-cyan-200 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+
+        <!-- Malayalam Option -->
+        <button type="button" onclick="selectInitialLanguage('ml')" class="touch-btn w-full p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 active:scale-95 transition flex items-center justify-between text-left group">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🇮🇳</span>
+            <div>
+              <div class="font-black text-sm text-white group-hover:text-cyan-200 transition">മലയാളം</div>
+              <div class="text-[11px] text-cyan-100/70">മലയാളത്തിൽ തുടരുക</div>
+            </div>
+          </div>
+          <svg class="w-5 h-5 text-cyan-200 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
+
+      <p class="text-[10px] text-cyan-100/60 pt-1">You can change language anytime from Profile settings.</p>
+    </div>
+  </div>
+
+  <!-- ================= STEP 2: APP GUIDE & INSTRUCTIONS MODAL (6:00 AM NOTIFICATION STYLE WITH SVGS) ================= -->
+  <div id="modal-app-guide" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print transition-all duration-300" onclick="if (event.target === this) closeAppGuideModal();">
+    <div class="relative w-full max-w-xl rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/20 bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white overflow-hidden my-auto space-y-4 max-h-[90vh] flex flex-col" onclick="event.stopPropagation()">
+      <!-- Decorative Background Bubbles -->
+      <div class="absolute -top-12 -right-12 w-36 h-36 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-300/15 rounded-full blur-xl pointer-events-none"></div>
+      <div class="absolute top-1/2 right-1/4 w-20 h-20 bg-white/10 rounded-full blur-lg pointer-events-none"></div>
+
+      <!-- Header -->
+      <div class="relative flex items-center justify-between pb-3 border-b border-white/15 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-inner text-cyan-200 flex-shrink-0">
+            <!-- App Guide SVG Compass/Rocket Icon -->
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 19 21 12 17 5 21 12 2"></polygon>
+            </svg>
+          </div>
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-400/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-black uppercase tracking-wider mb-0.5">
+              <span>📖 Quick Tutorial</span>
+            </div>
+            <h3 id="guide-modal-title" class="font-black text-base sm:text-lg text-white">App Guide & Instructions</h3>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Language Pill Switcher inside Guide -->
+          <div class="bg-black/30 p-1 rounded-xl border border-white/15 flex items-center gap-1 text-[11px] font-bold">
+            <button type="button" id="guide-btn-en" onclick="switchGuideLanguage('en')" class="px-2.5 py-1 rounded-lg transition">English</button>
+            <button type="button" id="guide-btn-ml" onclick="switchGuideLanguage('ml')" class="px-2.5 py-1 rounded-lg transition">മലയാളം</button>
+          </div>
+
+          <button type="button" onclick="closeAppGuideModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center font-bold text-xs transition ml-1" title="Close">✕</button>
+        </div>
+      </div>
+
+      <!-- Scrollable Guide Content Area -->
+      <div class="relative space-y-3.5 max-h-[60vh] overflow-y-auto pr-1 flex-1 text-xs sm:text-[13px] leading-relaxed">
+        
+        <!-- MALAYALAM GUIDE CONTENT -->
+        <div id="guide-content-ml" class="space-y-3 hidden">
+          <!-- 1. Add Class, Subject, Students -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-2">
+            <div class="flex items-center gap-2 font-black text-sm text-cyan-200">
+              <div class="w-7 h-7 rounded-xl bg-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </div>
+              <span>1. ക്ലാസ്, വിഷയം, കുട്ടികൾ എന്നിവ എങ്ങനെ ചേർക്കാം?</span>
+            </div>
+            <div class="space-y-1.5 text-cyan-100/90 pl-1">
+              <p><b>1️⃣ ക്ലാസുകൾ ചേർക്കാൻ:</b> ഹോം (Home) പേജിൽ താഴെയുള്ള <b>'Classes'</b> കാർഡിൽ ക്ലിക്ക് ചെയ്യുക ➔ മുകളിലുള്ള <b>'+ Add Class'</b> ബട്ടൺ അമർത്തി ക്ലാസിന്റെ പേര് (ഉദാ: Plus One, 10-A) നൽകി Save ചെയ്യുക.</p>
+              <p><b>2️⃣ വിഷയങ്ങൾ ചേർക്കാൻ:</b> ഹോം പേജിലെ <b>'Subjects'</b> കാർഡിൽ ക്ലിക്ക് ചെയ്യുക ➔ <b>'+ Add Subject'</b> അമർത്തി വിഷയത്തിന്റെ പേര് നൽകുക, അധ്യാപകനെയും ക്ലാസിനെയും ലിസ്റ്റിൽ നിന്ന് തിരഞ്ഞെടുത്ത് Save ചെയ്യുക.</p>
+              <p><b>3️⃣ കുട്ടികളെ ചേർക്കാൻ:</b> ഹോം പേജിലെ <b>'Students'</b> കാർഡിൽ ക്ലിക്ക് ചെയ്യുക ➔ <b>'+ Add Student'</b> അമർത്തി കുട്ടിയുടെ പേര്, റോൾ നമ്പർ, ക്ലാസ് നൽകുക (ഫോട്ടോയും അപ്‌ലോഡ് ചെയ്യാം), Save അമർത്തുക.</p>
+            </div>
+          </div>
+
+          <!-- 2. Main Tabs -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-1.5">
+            <div class="flex items-center gap-2 font-black text-sm text-teal-200">
+              <div class="w-7 h-7 rounded-xl bg-teal-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-teal-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              </div>
+              <span>2. ആപ്പിലെ പ്രധാന ടാബുകൾ</span>
+            </div>
+            <p class="text-cyan-100/90 pl-1">ഏറ്റവും താഴെ 4 പ്രധാന ടാബുകൾ ഉണ്ട്: <b>ഹോം (Home)</b>, <b>ഹാജർ (Attendance)</b>, <b>റിപ്പോർട്ട് (Report)</b>, <b>പ്രൊഫൈൽ (Profile)</b>.</p>
+          </div>
+
+          <!-- 3. Marking Attendance -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-2">
+            <div class="flex items-center gap-2 font-black text-sm text-emerald-200">
+              <div class="w-7 h-7 rounded-xl bg-emerald-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </div>
+              <span>3. ഹാജർ രേഖപ്പെടുത്താൻ</span>
+            </div>
+            <div class="space-y-1.5 text-cyan-100/90 pl-1">
+              <p>• താഴെയുള്ള <b>'ഹാജർ'</b> ടാബിൽ പോയി ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുമ്പോൾ കുട്ടികളുടെ ലിസ്റ്റ് തെളിയും.</p>
+              <div class="flex flex-col gap-1.5 py-1">
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-emerald-600 text-white font-black text-xs">P</span> <span><b>Present:</b> ഹാജർ</span></div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-rose-600 text-white font-black text-xs">A</span> <span><b>Absent:</b> ഹാജരില്ല</span></div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-amber-500 text-white font-black text-xs">L</span> <span><b>Leave:</b> അനുമതിയോടെ അവധിയെടുത്തവർ / വിട്ടുനിന്നവർ</span></div>
+              </div>
+              <p class="text-emerald-300 font-bold">⚡ ടിപ്പ്: എല്ലാവരും ഹാജരുണ്ടെങ്കിൽ 'Mark All Present' ഒരൊറ്റ ക്ലിക്കിൽ ഉപയോഗിക്കാം!</p>
+              <p>• അടയാളപ്പെടുത്തിയ ശേഷം <b>'Save'</b> അമർത്തുക. തിരുത്താൻ <b>'Update'</b>, ഒഴിവാക്കാൻ <b>'Delete'</b> ഉപയോഗിക്കാം.</p>
+            </div>
+          </div>
+
+          <!-- 4. Reports -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-1.5">
+            <div class="flex items-center gap-2 font-black text-sm text-indigo-200">
+              <div class="w-7 h-7 rounded-xl bg-indigo-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              </div>
+              <span>4. റിപ്പോർട്ട് കാണാൻ & പ്രിന്റ് ചെയ്യാൻ</span>
+            </div>
+            <div class="space-y-1 text-cyan-100/90 pl-1">
+              <p>• <b>'റിപ്പോർട്ട്'</b> ടാബിൽ ക്ലാസും വിഷയവും തിരഞ്ഞെടുക്കുക. ക്ലാസിന്റെ മൊത്തത്തിലുള്ള റിപ്പോർട്ടിന് <b>"All Subjects"</b> തിരഞ്ഞെടുക്കുക.</p>
+              <p>• <b>'Print Sheet'</b> അമർത്തി പ്രിന്റ് എടുക്കാം, അല്ലെങ്കിൽ ഡൗൺലോഡ് ചെയ്യാം.</p>
+            </div>
+          </div>
+
+          <!-- 5. Other Features -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-1.5">
+            <div class="flex items-center gap-2 font-black text-sm text-violet-200">
+              <div class="w-7 h-7 rounded-xl bg-violet-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+              <span>5. മറ്റ് പ്രധാന സവിശേഷതകൾ</span>
+            </div>
+            <div class="space-y-1 text-cyan-100/90 pl-1">
+              <p>• <b>കുട്ടികളുടെ ഫോട്ടോ:</b> ഫോട്ടോയിൽ തൊട്ടാൽ പൂർണ്ണ വിവരങ്ങൾ കാണാം, വലുതാക്കി ഹൈ-ക്വാളിറ്റിയിൽ ഡൗൺലോഡ് ചെയ്യാം.</p>
+              <p>• <b>ടൈംടേബിൾ:</b> ഉണ്ടാക്കിയാൽ അന്നത്തെ വിഷയങ്ങൾ ഡാഷ്ബോർഡിൽ തെളിയും, അതിൽ ക്ലിക്ക് ചെയ്താൽ നേരെ ഹാജർ പേജിലെത്താം.</p>
+              <p>• <b>സന്ദേശങ്ങൾ:</b> അധ്യാപകർക്ക് പരസ്പരം നോട്ടീസുകൾ അയക്കാം.</p>
+              <p>• <b>ഭാഷ & തീം:</b> പ്രൊഫൈൽ പേജിൽ നിന്ന് മലയാളം/ഇംഗ്ലീഷ്, ലൈറ്റ്/ഡാർക്ക് മോഡ് മാറ്റാം.</p>
+            </div>
+          </div>
+
+          <!-- 6. Pro Tip -->
+          <div class="p-3.5 rounded-2xl bg-amber-400/15 border border-amber-400/30 text-amber-200 flex items-start gap-2.5">
+            <svg class="w-5 h-5 text-amber-300 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2a6 6 0 0 0-6 6c0 2.22 1.21 4.16 3 5.2V17a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3.8c1.79-1.04 3-2.98 3-5.2a6 6 0 0 0-6-6z"/><line x1="10" y1="21" x2="14" y2="21"/></svg>
+            <div>
+              <div class="font-black text-xs text-amber-300 uppercase tracking-wide">പ്രധാന ടിപ്പ്</div>
+              <p class="text-[11px] text-amber-100 mt-0.5">കുട്ടികളുടെയും ഹാജറിന്റെയും വിവരങ്ങൾ ആവശ്യമുള്ള രൂപത്തിൽ Excel / Sheet ഫോർമാറ്റിൽ ഡൗൺലോഡ് ചെയ്യാം.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ENGLISH GUIDE CONTENT -->
+        <div id="guide-content-en" class="space-y-3">
+          <!-- 1. Add Class, Subject, Students -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-2">
+            <div class="flex items-center gap-2 font-black text-sm text-cyan-200">
+              <div class="w-7 h-7 rounded-xl bg-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </div>
+              <span>1. How to Add Classes, Subjects & Students</span>
+            </div>
+            <div class="space-y-1.5 text-cyan-100/90 pl-1">
+              <p><b>1️⃣ To Add Classes:</b> On the Home page, tap the <b>'Classes'</b> card ➔ Tap the <b>'+ Add Class'</b> button at the top, enter class name (e.g. Plus One, 10-A), and Save.</p>
+              <p><b>2️⃣ To Add Subjects:</b> Tap the <b>'Subjects'</b> card ➔ Tap <b>'+ Add Subject'</b>, enter the subject name, assign teacher and class, and Save.</p>
+              <p><b>3️⃣ To Add Students:</b> Tap the <b>'Students'</b> card ➔ Tap <b>'+ Add Student'</b>, enter name, roll number, class (upload photo if available), and Save.</p>
+            </div>
+          </div>
+
+          <!-- 2. Main Tabs -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-1.5">
+            <div class="flex items-center gap-2 font-black text-sm text-teal-200">
+              <div class="w-7 h-7 rounded-xl bg-teal-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-teal-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              </div>
+              <span>2. Main Navigation Tabs</span>
+            </div>
+            <p class="text-cyan-100/90 pl-1">Four primary tabs at the bottom: <b>Home</b>, <b>Attendance</b>, <b>Report</b>, and <b>Profile</b>.</p>
+          </div>
+
+          <!-- 3. Marking Attendance -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-2">
+            <div class="flex items-center gap-2 font-black text-sm text-emerald-200">
+              <div class="w-7 h-7 rounded-xl bg-emerald-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </div>
+              <span>3. Marking Attendance</span>
+            </div>
+            <div class="space-y-1.5 text-cyan-100/90 pl-1">
+              <p>• Switch to the <b>'Attendance'</b> tab, then select your Class and Subject to see the student list.</p>
+              <div class="flex flex-col gap-1.5 py-1">
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-emerald-600 text-white font-black text-xs">P</span> <span><b>Present</b></span></div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-rose-600 text-white font-black text-xs">A</span> <span><b>Absent</b></span></div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-amber-500 text-white font-black text-xs">L</span> <span><b>Leave:</b> Approved leave or absence with valid reason</span></div>
+              </div>
+              <p class="text-emerald-300 font-bold">⚡ Quick Tip: Use 'Mark All Present' to mark the whole class in one tap!</p>
+              <p>• Tap <b>'Save'</b> when finished. To edit: change status and tap <b>'Update'</b>. To remove: tap <b>'Delete'</b>.</p>
+            </div>
+          </div>
+
+          <!-- 4. Reports -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-1.5">
+            <div class="flex items-center gap-2 font-black text-sm text-indigo-200">
+              <div class="w-7 h-7 rounded-xl bg-indigo-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              </div>
+              <span>4. Viewing & Printing Reports</span>
+            </div>
+            <div class="space-y-1 text-cyan-100/90 pl-1">
+              <p>• On the <b>'Report'</b> tab, select class and subject. Choose <b>"All Subjects"</b> for class-wide consolidated attendance analytics.</p>
+              <p>• Tap <b>'Print Sheet'</b> to print clean sheets or download records.</p>
+            </div>
+          </div>
+
+          <!-- 5. Other Features -->
+          <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 space-y-1.5">
+            <div class="flex items-center gap-2 font-black text-sm text-violet-200">
+              <div class="w-7 h-7 rounded-xl bg-violet-400/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+              <span>5. Other Useful Features</span>
+            </div>
+            <div class="space-y-1 text-cyan-100/90 pl-1">
+              <p>• <b>Student Profiles & Photos:</b> Tap any student's photo to view full profile details, enlarge, and download in full clarity.</p>
+              <p>• <b>Timetable:</b> Today's classes appear on the Dashboard. Tap any class to jump straight to attendance.</p>
+              <p>• <b>Messages:</b> Teachers can send notices to each other.</p>
+              <p>• <b>Language & Theme:</b> Switch between English/Malayalam, and Light/Dark mode in Profile settings.</p>
+            </div>
+          </div>
+
+          <!-- 6. Pro Tip -->
+          <div class="p-3.5 rounded-2xl bg-amber-400/15 border border-amber-400/30 text-amber-200 flex items-start gap-2.5">
+            <svg class="w-5 h-5 text-amber-300 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2a6 6 0 0 0-6 6c0 2.22 1.21 4.16 3 5.2V17a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3.8c1.79-1.04 3-2.98 3-5.2a6 6 0 0 0-6-6z"/><line x1="10" y1="21" x2="14" y2="21"/></svg>
+            <div>
+              <div class="font-black text-xs text-amber-300 uppercase tracking-wide">Pro Tip</div>
+              <p class="text-[11px] text-amber-100 mt-0.5">You can export all student records, attendance logs, and reports in Excel / CSV format anytime.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Action Button -->
+      <div class="relative pt-2 border-t border-white/15 flex-shrink-0">
+        <button type="button" onclick="closeAppGuideModal()" class="touch-btn w-full py-3 px-4 rounded-2xl bg-cyan-400 hover:bg-cyan-300 active:scale-95 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg transition">
+          <svg class="w-4 h-4 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span id="guide-modal-btn-label">Got it / ആരംഭിക്കാം!</span>
+        </button>
+      </div>
+
     </div>
   </div>
 

@@ -16,6 +16,11 @@ const appSettingsSchema = new mongoose.Schema({
     default: '',
     trim: true
   },
+  headerActionButton: {
+    type: String,
+    enum: ['guide', 'theme'],
+    default: 'guide'
+  },
   allowNonAdminEditDelete: {
     type: Boolean,
     default: false
