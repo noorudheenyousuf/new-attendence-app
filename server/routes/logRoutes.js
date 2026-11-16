@@ -6,6 +6,7 @@ const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const Class = require('../models/Class');
+const Timetable = require('../models/Timetable');
 const AppSettings = require('../models/AppSettings');
 const authMiddleware = require('../middleware/auth');
 
@@ -160,6 +161,47 @@ router.post('/:id/undo', authMiddleware, async (req, res) => {
         }
       } else if (hasValidEntityId) {
         await Class.findByIdAndDelete(log.entityId);
+      }
+    } else if (log.entityType === 'timetable') {
+      if (log.previousState) {
+        const cleaned = cleanState(log.previousState);
+        if (hasValidEntityId) {
+          const existing = await Timetable.findById(log.entityId);
+          if (existing) {
+            await Timetable.findByIdAndUpdate(log.entityId, { $set: cleaned });
+          } else {
+            await Timetable.create({ ...cleaned, _id: log.entityId });
+          }
+        } else {
+          await Timetable.create(cleaned);
+        }
+      } else if (hasValidEntityId) {
+        await Timetable.findByIdAndDelete(log.entityId);
+      }
+    } else if (log.entityType === 'remark') {
+      const pState = log.previousState;
+      if (pState && pState.studentId) {
+        const student = await Student.findById(pState.studentId);
+        if (student) {
+          if (pState.type === 'add' && pState.remarkId) {
+            // Undo adding remark -> remove it
+            student.remarks.pull({ _id: pState.remarkId });
+            await student.save();
+          } else if (pState.type === 'edit' && pState.remarkId) {
+            // Undo edit -> revert text
+            const rem = (student.remarks || []).id(pState.remarkId);
+            if (rem) {
+              rem.text = pState.previousText || '';
+              rem.updatedAt = new Date();
+              await student.save();
+            }
+          } else if (pState.type === 'delete' && pState.remark) {
+            // Undo delete -> restore remark
+            if (!Array.isArray(student.remarks)) student.remarks = [];
+            student.remarks.push(pState.remark);
+            await student.save();
+          }
+        }
       }
     }
 

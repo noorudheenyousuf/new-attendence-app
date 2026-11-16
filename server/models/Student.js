@@ -54,7 +54,9 @@ const studentSchema = new mongoose.Schema({
     yearJoined: { type: String, default: '' },
     admissionStatus: { type: String, default: 'Confirmed' },
     rank: { type: String, default: '' },
-    previousCollege: { type: String, default: '' }
+    previousCollege: { type: String, default: '' },
+    stream: { type: String, default: '' },
+    degreeYear: { type: String, default: '' }
   },
   remarks: [{
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

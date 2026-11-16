@@ -54,6 +54,8 @@ async function attachAttendanceStatsToStudents(studentsList) {
     const stIdStr = String(st.studentId);
     let sessions = 0;
     let present = 0;
+    let absent = 0;
+    let leave = 0;
     for (const att of allAttendance) {
       if (Boolean(att.isPrivate) !== Boolean(st.isPrivate)) continue;
       if (st.isPrivate && (att.ownerEmail || '').toLowerCase() !== (st.ownerEmail || '').toLowerCase()) continue;
@@ -62,6 +64,8 @@ async function attachAttendanceStatsToStudents(studentsList) {
         if (rec) {
           sessions++;
           if (rec.status === 'P') present++;
+          else if (rec.status === 'A') absent++;
+          else if (rec.status === 'L') leave++;
         }
       }
     }
@@ -69,6 +73,8 @@ async function attachAttendanceStatsToStudents(studentsList) {
     st.attendancePercentage = percentage;
     st.attendanceSessions = sessions;
     st.attendancePresent = present;
+    st.attendanceAbsent = absent;
+    st.attendanceLeave = leave;
     return st;
   });
 }
@@ -236,7 +242,22 @@ router.post('/', authMiddleware, async (req, res) => {
         });
       }
     } else {
-      studentId = await Student.getNextStudentId();
+      if (req.user && req.user.role === 'admin' && customStudentId && String(customStudentId).trim()) {
+        const cleanCustom = String(customStudentId).trim();
+        const existing = await Student.findOne({
+          studentId: cleanCustom,
+          isPrivate: { $ne: true }
+        });
+        if (existing) {
+          return res.status(400).json({
+            success: false,
+            message: `Student ID "${cleanCustom}" already exists for student "${existing.name}". Please choose a unique ID.`
+          });
+        }
+        studentId = cleanCustom;
+      } else {
+        studentId = await Student.getNextStudentId();
+      }
     }
 
     const whitelistedPersonal = {
@@ -274,7 +295,9 @@ router.post('/', authMiddleware, async (req, res) => {
       yearJoined: academicStatus?.yearJoined ? String(academicStatus.yearJoined).trim() : '',
       admissionStatus: academicStatus?.admissionStatus || 'Confirmed',
       rank: academicStatus?.rank ? String(academicStatus.rank).trim() : '',
-      previousCollege: academicStatus?.previousCollege ? String(academicStatus.previousCollege).trim() : ''
+      previousCollege: academicStatus?.previousCollege ? String(academicStatus.previousCollege).trim() : '',
+      stream: academicStatus?.stream ? String(academicStatus.stream).trim() : '',
+      degreeYear: academicStatus?.degreeYear ? String(academicStatus.degreeYear).trim() : ''
     };
 
     const remarksArray = [];
@@ -416,7 +439,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
       yearJoined: academicStatus.yearJoined !== undefined ? String(academicStatus.yearJoined).trim() : (oldAcademic.yearJoined || ''),
       admissionStatus: academicStatus.admissionStatus !== undefined ? academicStatus.admissionStatus : (oldAcademic.admissionStatus || 'Confirmed'),
       rank: academicStatus.rank !== undefined ? String(academicStatus.rank).trim() : (oldAcademic.rank || ''),
-      previousCollege: academicStatus.previousCollege !== undefined ? String(academicStatus.previousCollege).trim() : (oldAcademic.previousCollege || '')
+      previousCollege: academicStatus.previousCollege !== undefined ? String(academicStatus.previousCollege).trim() : (oldAcademic.previousCollege || ''),
+      stream: academicStatus.stream !== undefined ? String(academicStatus.stream).trim() : (oldAcademic.stream || ''),
+      degreeYear: academicStatus.degreeYear !== undefined ? String(academicStatus.degreeYear).trim() : (oldAcademic.degreeYear || '')
     } : oldAcademic;
 
     const updatePayload = {
@@ -431,27 +456,46 @@ router.put('/:id', authMiddleware, async (req, res) => {
       customFields: customFields !== undefined ? customFields : oldStudent.customFields
     };
 
-    // Private student ID editing logic without requiring admin permission
-    if (oldStudent.isPrivate && newStudentId !== undefined) {
+    // Student ID editing logic:
+    // - Private student: owner or admin can edit
+    // - Public student: admin can edit
+    if (newStudentId !== undefined) {
       const cleanNewId = String(newStudentId).trim();
       if (!cleanNewId) {
-        return res.status(400).json({ success: false, message: 'Private Student ID cannot be empty' });
+        return res.status(400).json({ success: false, message: 'Student ID cannot be empty' });
       }
-      if (String(cleanNewId).toLowerCase() !== String(oldStudent.studentId).toLowerCase()) {
-        const duplicate = await Student.findOne({
-          _id: { $ne: req.params.id },
-          studentId: cleanNewId,
-          isPrivate: true,
-          ownerEmail: oldStudent.ownerEmail
-        });
-        if (duplicate) {
-          return res.status(400).json({
-            success: false,
-            message: `Student ID "${cleanNewId}" already exists in your private workspace. Please choose a unique ID.`
+      if (oldStudent.isPrivate) {
+        if (String(cleanNewId).toLowerCase() !== String(oldStudent.studentId).toLowerCase()) {
+          const duplicate = await Student.findOne({
+            _id: { $ne: req.params.id },
+            studentId: cleanNewId,
+            isPrivate: true,
+            ownerEmail: oldStudent.ownerEmail
           });
+          if (duplicate) {
+            return res.status(400).json({
+              success: false,
+              message: `Student ID "${cleanNewId}" already exists in your private workspace. Please choose a unique ID.`
+            });
+          }
         }
+        updatePayload.studentId = cleanNewId;
+      } else if (req.user && req.user.role === 'admin') {
+        if (String(cleanNewId).toLowerCase() !== String(oldStudent.studentId).toLowerCase()) {
+          const duplicate = await Student.findOne({
+            _id: { $ne: req.params.id },
+            studentId: cleanNewId,
+            isPrivate: { $ne: true }
+          });
+          if (duplicate) {
+            return res.status(400).json({
+              success: false,
+              message: `Student ID "${cleanNewId}" already exists for student "${duplicate.name}". Please choose a unique ID.`
+            });
+          }
+        }
+        updatePayload.studentId = cleanNewId;
       }
-      updatePayload.studentId = cleanNewId;
     }
 
     const updated = await Student.findByIdAndUpdate(
@@ -532,6 +576,26 @@ router.post('/:id/remarks', authMiddleware, async (req, res) => {
     student.remarks.push(remarkObj);
     await student.save();
 
+    const addedRemark = student.remarks[student.remarks.length - 1];
+
+    await ActivityLog.create({
+      action: `Student Remark Added: ${student.name}`,
+      details: `Teacher: ${userName} • Remark: "${String(text).trim().slice(0, 50)}${text.length > 50 ? '...' : ''}"`,
+      performedBy: userName,
+      performedByEmail: userEmail,
+      role: userRole,
+      entityType: 'remark',
+      entityId: student._id.toString(),
+      canUndo: true,
+      previousState: {
+        studentId: student._id.toString(),
+        remarkId: addedRemark ? addedRemark._id.toString() : null,
+        type: 'add'
+      },
+      isPrivate: Boolean(student.isPrivate),
+      ownerEmail: student.isPrivate ? student.ownerEmail : ''
+    });
+
     const [enriched] = await attachAttendanceStatsToStudents([student]);
     if (Array.isArray(enriched.remarks)) {
       enriched.remarks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
@@ -571,9 +635,29 @@ router.put('/:id/remarks/:remarkId', authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Permission denied: You can only edit your own remarks' });
     }
 
+    const previousRemarkText = remark.text;
     remark.text = String(text).trim();
     remark.updatedAt = new Date();
     await student.save();
+
+    await ActivityLog.create({
+      action: `Student Remark Updated: ${student.name}`,
+      details: `Teacher: ${req.user.name || 'Teacher'} • Previous: "${previousRemarkText.slice(0, 40)}"`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: userEmail,
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'remark',
+      entityId: student._id.toString(),
+      canUndo: true,
+      previousState: {
+        studentId: student._id.toString(),
+        remarkId: req.params.remarkId,
+        previousText: previousRemarkText,
+        type: 'edit'
+      },
+      isPrivate: Boolean(student.isPrivate),
+      ownerEmail: student.isPrivate ? student.ownerEmail : ''
+    });
 
     const [enriched] = await attachAttendanceStatsToStudents([student]);
     if (Array.isArray(enriched.remarks)) {
@@ -609,8 +693,27 @@ router.delete('/:id/remarks/:remarkId', authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Permission denied: You can only delete your own remarks' });
     }
 
+    const deletedRemarkSnapshot = remark.toObject ? remark.toObject() : { ...remark };
     student.remarks.pull({ _id: req.params.remarkId });
     await student.save();
+
+    await ActivityLog.create({
+      action: `Student Remark Deleted: ${student.name}`,
+      details: `Teacher: ${req.user.name || 'Teacher'} • Deleted: "${(deletedRemarkSnapshot.text || '').slice(0, 40)}"`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: userEmail,
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'remark',
+      entityId: student._id.toString(),
+      canUndo: true,
+      previousState: {
+        studentId: student._id.toString(),
+        remark: deletedRemarkSnapshot,
+        type: 'delete'
+      },
+      isPrivate: Boolean(student.isPrivate),
+      ownerEmail: student.isPrivate ? student.ownerEmail : ''
+    });
 
     const [enriched] = await attachAttendanceStatsToStudents([student]);
     if (Array.isArray(enriched.remarks)) {

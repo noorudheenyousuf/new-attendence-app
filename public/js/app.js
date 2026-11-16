@@ -574,11 +574,7 @@ function closeAppGuideModal() {
 }
 
 function switchGuideLanguage(lang) {
-  if (typeof setAppLanguage === 'function') {
-    setAppLanguage(lang);
-  } else {
-    localStorage.setItem('app_language', lang);
-  }
+  // Only toggle guide language; do not change whole app language
   renderGuideLanguage(lang);
 }
 
@@ -605,6 +601,227 @@ function renderGuideLanguage(lang) {
     if (btnMl) btnMl.className = "px-2 py-0.5 rounded-md text-white/70 hover:text-white font-semibold transition";
     if (titleEl) titleEl.innerText = "App Guide & Instructions";
     if (btnLabel) btnLabel.innerText = "Got it / Let's Start!";
+  }
+}
+
+// ================= CUSTOM DIALOG MODAL (CONFIRM / PROMPT / ALERT) =================
+// 6:00 AM Morning Modal Gradient & Style: #1e4d5f -> #245b70 -> #123644
+window.showCustomConfirm = function(opts) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-custom-dialog');
+    if (!modal) {
+      resolve(window.confirm(typeof opts === 'string' ? opts : (opts.message || 'Are you sure?')));
+      return;
+    }
+    const titleEl = document.getElementById('custom-dialog-title');
+    const badgeEl = document.getElementById('custom-dialog-badge');
+    const msgEl = document.getElementById('custom-dialog-message');
+    const inputWrap = document.getElementById('custom-dialog-input-wrapper');
+    const cancelBtn = document.getElementById('custom-dialog-cancel-btn');
+    const confirmBtn = document.getElementById('custom-dialog-confirm-btn');
+    const closeBtn = document.getElementById('custom-dialog-close-btn');
+
+    const config = typeof opts === 'string' ? { message: opts } : (opts || {});
+    if (titleEl) titleEl.innerText = config.title || 'Please Confirm';
+    if (badgeEl) badgeEl.innerHTML = `<span>${config.badge || 'Registerly'}</span>`;
+    if (msgEl) msgEl.innerText = config.message || 'Are you sure you want to proceed?';
+    if (inputWrap) inputWrap.classList.add('hidden');
+    if (cancelBtn) {
+      cancelBtn.classList.remove('hidden');
+      cancelBtn.innerText = config.cancelText || 'Cancel';
+    }
+    if (confirmBtn) {
+      confirmBtn.innerText = config.confirmText || 'Confirm';
+      confirmBtn.className = config.isDanger
+        ? 'touch-btn py-2.5 px-5 rounded-xl bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition'
+        : 'touch-btn py-2.5 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition';
+    }
+
+    const cleanup = (res) => {
+      modal.classList.add('hidden');
+      cancelBtn.onclick = null;
+      confirmBtn.onclick = null;
+      if (closeBtn) closeBtn.onclick = null;
+      resolve(res);
+    };
+
+    cancelBtn.onclick = () => cleanup(false);
+    if (closeBtn) closeBtn.onclick = () => cleanup(false);
+    confirmBtn.onclick = () => cleanup(true);
+
+    modal.classList.remove('hidden');
+  });
+};
+
+window.showCustomPrompt = function(opts) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-custom-dialog');
+    if (!modal) {
+      const defaultVal = typeof opts === 'object' ? opts.defaultValue : '';
+      const promptMsg = typeof opts === 'string' ? opts : (opts.message || 'Enter value:');
+      resolve(window.prompt(promptMsg, defaultVal));
+      return;
+    }
+    const titleEl = document.getElementById('custom-dialog-title');
+    const badgeEl = document.getElementById('custom-dialog-badge');
+    const msgEl = document.getElementById('custom-dialog-message');
+    const inputWrap = document.getElementById('custom-dialog-input-wrapper');
+    const inputEl = document.getElementById('custom-dialog-input');
+    const cancelBtn = document.getElementById('custom-dialog-cancel-btn');
+    const confirmBtn = document.getElementById('custom-dialog-confirm-btn');
+    const closeBtn = document.getElementById('custom-dialog-close-btn');
+
+    const config = typeof opts === 'string' ? { message: opts } : (opts || {});
+    if (titleEl) titleEl.innerText = config.title || 'Edit Value';
+    if (badgeEl) badgeEl.innerHTML = `<span>${config.badge || 'Input Required'}</span>`;
+    if (msgEl) msgEl.innerText = config.message || 'Please enter details below:';
+    if (inputWrap) inputWrap.classList.remove('hidden');
+    if (inputEl) {
+      inputEl.value = config.defaultValue || '';
+      inputEl.placeholder = config.placeholder || 'Type here...';
+    }
+    if (cancelBtn) {
+      cancelBtn.classList.remove('hidden');
+      cancelBtn.innerText = config.cancelText || 'Cancel';
+    }
+    if (confirmBtn) {
+      confirmBtn.innerText = config.confirmText || 'Save';
+      confirmBtn.className = 'touch-btn py-2.5 px-5 rounded-xl bg-cyan-500 hover:bg-cyan-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition';
+    }
+
+    const cleanup = (res) => {
+      modal.classList.add('hidden');
+      cancelBtn.onclick = null;
+      confirmBtn.onclick = null;
+      if (closeBtn) closeBtn.onclick = null;
+      if (inputEl) inputEl.onkeydown = null;
+      resolve(res);
+    };
+
+    cancelBtn.onclick = () => cleanup(null);
+    if (closeBtn) closeBtn.onclick = () => cleanup(null);
+    confirmBtn.onclick = () => cleanup(inputEl ? inputEl.value : '');
+    if (inputEl) {
+      inputEl.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          cleanup(inputEl.value);
+        } else if (e.key === 'Escape') {
+          cleanup(null);
+        }
+      };
+    }
+
+    modal.classList.remove('hidden');
+    if (inputEl) setTimeout(() => { inputEl.focus(); inputEl.select(); }, 50);
+  });
+};
+
+window.showCustomAlert = function(opts) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-custom-dialog');
+    if (!modal) {
+      window.alert(typeof opts === 'string' ? opts : (opts.message || ''));
+      resolve();
+      return;
+    }
+    const titleEl = document.getElementById('custom-dialog-title');
+    const badgeEl = document.getElementById('custom-dialog-badge');
+    const msgEl = document.getElementById('custom-dialog-message');
+    const inputWrap = document.getElementById('custom-dialog-input-wrapper');
+    const cancelBtn = document.getElementById('custom-dialog-cancel-btn');
+    const confirmBtn = document.getElementById('custom-dialog-confirm-btn');
+    const closeBtn = document.getElementById('custom-dialog-close-btn');
+
+    const config = typeof opts === 'string' ? { message: opts } : (opts || {});
+    if (titleEl) titleEl.innerText = config.title || 'Notice';
+    if (badgeEl) badgeEl.innerHTML = `<span>${config.badge || 'Registerly'}</span>`;
+    if (msgEl) msgEl.innerText = config.message || '';
+    if (inputWrap) inputWrap.classList.add('hidden');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    if (confirmBtn) {
+      confirmBtn.innerText = config.confirmText || 'Got it';
+      confirmBtn.className = 'touch-btn py-2.5 px-5 rounded-xl bg-cyan-500 hover:bg-cyan-600 active:scale-95 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-1.5 transition';
+    }
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      confirmBtn.onclick = null;
+      if (closeBtn) closeBtn.onclick = null;
+      resolve();
+    };
+
+    if (closeBtn) closeBtn.onclick = cleanup;
+    confirmBtn.onclick = cleanup;
+
+    modal.classList.remove('hidden');
+  });
+};
+
+// ================= DYNAMIC CLASS CATEGORY & STUDENT FORM FIELDS =================
+function getClassCategory(className) {
+  if (!className || typeof className !== 'string') return 'general';
+  const c = className.trim().toLowerCase();
+  // Plus One / Plus Two: +1, +2, plus one, plus two, 11, 12, xi, xii
+  if (/(plus\s*(one|two|1|2|\+1|\+2)|\+1|\+2|\b11th?\b|\b12th?\b|\bxi\b|\bxii\b)/i.test(c)) {
+    return 'plus_two';
+  }
+  // Degree: degree, ug, ba, bsc, bcom, bca, bba, btech, etc.
+  if (/(degree|\bug\b|\bba\b|\bb\.a\b|\bbsc\b|\bb\.sc\b|\bbcom\b|\bb\.com\b|\bbca\b|\bbba\b|\bbtech\b|\bb\.tech\b|\bunder\s*graduate\b)/i.test(c)) {
+    return 'degree';
+  }
+  // Class 5 to 10
+  if (/(\b(5|6|7|8|9|10)(th)?\b|\bv\b|\bvi\b|\bvii\b|\bviii\b|\bix\b|\bx\b)/i.test(c)) {
+    return 'school_5_10';
+  }
+  return 'general';
+}
+
+function updateDynamicClassFields(mode, className) {
+  const cat = getClassCategory(className);
+  const streamWrap = document.getElementById(`${mode}-wrap-stream`);
+  const degreeWrap = document.getElementById(`${mode}-wrap-degreeYear`);
+  
+  if (cat === 'plus_two') {
+    if (streamWrap) streamWrap.classList.remove('hidden');
+    if (degreeWrap) degreeWrap.classList.add('hidden');
+  } else if (cat === 'degree') {
+    if (streamWrap) streamWrap.classList.add('hidden');
+    if (degreeWrap) degreeWrap.classList.remove('hidden');
+  } else {
+    // 5 to 10 or other general
+    if (streamWrap) streamWrap.classList.add('hidden');
+    if (degreeWrap) degreeWrap.classList.add('hidden');
+  }
+}
+
+function checkDuplicateStudentId(mode) {
+  const inputEl = document.getElementById(mode === 'new' ? 'auto-student-id' : 'edit-student-id');
+  const warnEl = document.getElementById(`warning-${mode}-studentId`);
+  if (!inputEl) return false;
+  const val = String(inputEl.value).trim().toLowerCase();
+  if (!val) {
+    if (warnEl) warnEl.classList.add('hidden');
+    return false;
+  }
+
+  const allStu = (typeof studentsList !== 'undefined' && Array.isArray(studentsList)) ? studentsList : (cachedAllStudents || []);
+  const currentObjId = mode === 'edit' ? String(activeEditStudentObjId || '') : '';
+
+  const matched = allStu.find(s => {
+    if (mode === 'edit' && String(s._id) === currentObjId) return false;
+    return String(s.studentId).trim().toLowerCase() === val;
+  });
+
+  if (matched) {
+    if (warnEl) {
+      warnEl.innerText = `⚠️ Duplicate Warning: ID "${inputEl.value}" is already assigned to "${matched.name}" (Class: ${matched.class}). Please choose a unique ID.`;
+      warnEl.classList.remove('hidden');
+    }
+    return true;
+  } else {
+    if (warnEl) warnEl.classList.add('hidden');
+    return false;
   }
 }
 
@@ -1074,7 +1291,15 @@ async function handleAdminAppLogoSelect(e) {
 
 // Admin Reset App Logo to Default Handler
 async function handleAdminResetAppLogo() {
-  if (!confirm('Reset app icon and photo to the default icon?')) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Reset App Logo',
+        badge: 'Branding',
+        message: 'Reset app icon and photo to the default icon?',
+        isDanger: true
+      })
+    : confirm('Reset app icon and photo to the default icon?');
+  if (!confirmed) return;
 
   const spinner = document.getElementById('admin-logo-upload-spinner');
   if (spinner) spinner.classList.remove('hidden');
@@ -1824,7 +2049,15 @@ async function handleSaveClass(e) {
 }
 
 async function deleteClass(id, name) {
-  if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Class',
+        badge: 'Class Management',
+        message: `Are you sure you want to delete "${name}"?`,
+        isDanger: true
+      })
+    : confirm(`Are you sure you want to delete "${name}"?`);
+  if (!confirmed) return;
   triggerNavHaptic('delete');
   try {
     const res = await API.deleteClass(id);
@@ -2548,7 +2781,15 @@ async function handleUpdateSubject(e) {
 }
 
 async function deleteSubject(id, name) {
-  if (!confirm(`Delete subject "${name}"?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Subject',
+        badge: 'Subject Management',
+        message: `Delete subject "${name}"?`,
+        isDanger: true
+      })
+    : confirm(`Delete subject "${name}"?`);
+  if (!confirmed) return;
   triggerNavHaptic('delete');
   try {
     const res = await API.deleteSubject(id);
@@ -2821,7 +3062,16 @@ async function saveAttendance() {
 
 async function deleteCurrentAttendance() {
   const promptMsg = `Are you sure you want to delete the recorded attendance for ${currentClass} on ${currentDateStr}${currentSubject ? ' (' + currentSubject + ')' : ''}?`;
-  if (!confirm(promptMsg)) {
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Attendance Session',
+        badge: 'Attendance',
+        message: promptMsg,
+        confirmText: 'Delete Record',
+        isDanger: true
+      })
+    : confirm(promptMsg);
+  if (!confirmed) {
     return;
   }
   triggerNavHaptic('delete');
@@ -4124,10 +4374,18 @@ function saveFieldEditChanges() {
   showToast(`Updated "${newLabel || 'field'}"!`);
 }
 
-function deleteCurrentCustomField() {
+async function deleteCurrentCustomField() {
   if (activeEditingFieldIdx === null || !appStudentFormFields[activeEditingFieldIdx]) return;
   const name = appStudentFormFields[activeEditingFieldIdx].label;
-  if (confirm(`Delete custom field "${name}"?`)) {
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Custom Field',
+        badge: 'Form Builder',
+        message: `Delete custom field "${name}"?`,
+        isDanger: true
+      })
+    : confirm(`Delete custom field "${name}"?`);
+  if (confirmed) {
     appStudentFormFields.splice(activeEditingFieldIdx, 1);
     closeFieldEditModal();
     renderDynamicStudentInputs('new');
@@ -4143,8 +4401,15 @@ function toggleAdminStudentFieldSize(index) {
   triggerNavHaptic('medium');
 }
 
-function promptAddCustomStudentField() {
-  const label = prompt('Enter label for new custom field (e.g. Blood Group, Bus Stop, DOB):');
+async function promptAddCustomStudentField() {
+  const label = typeof showCustomPrompt === 'function'
+    ? await showCustomPrompt({
+        title: 'Add Custom Field',
+        badge: 'Form Builder',
+        message: 'Enter label for new custom field (e.g. Blood Group, Bus Stop, DOB):',
+        placeholder: 'e.g. Bus Stop, Blood Group'
+      })
+    : prompt('Enter label for new custom field (e.g. Blood Group, Bus Stop, DOB):');
   if (!label || !label.trim()) return;
 
   const key = 'custom_' + label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
@@ -4162,18 +4427,34 @@ function promptAddCustomStudentField() {
   showToast(`Custom field "${label.trim()}" added! Drag & hold to reposition.`);
 }
 
-function deleteAdminStudentCustomField(index) {
+async function deleteAdminStudentCustomField(index) {
   if (!appStudentFormFields[index]) return;
   const name = appStudentFormFields[index].label;
-  if (confirm(`Delete custom field "${name}"?`)) {
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Custom Field',
+        badge: 'Form Builder',
+        message: `Delete custom field "${name}"?`,
+        isDanger: true
+      })
+    : confirm(`Delete custom field "${name}"?`);
+  if (confirmed) {
     appStudentFormFields.splice(index, 1);
     renderDynamicStudentInputs('new');
     triggerNavHaptic('strong');
   }
 }
 
-function resetAdminStudentFieldsConfig() {
-  if (confirm('Reset student form inputs and layout to default?')) {
+async function resetAdminStudentFieldsConfig() {
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Reset Form Layout',
+        badge: 'Form Builder',
+        message: 'Reset student form inputs and layout to default?',
+        isDanger: true
+      })
+    : confirm('Reset student form inputs and layout to default?');
+  if (confirmed) {
     appStudentFormFields = JSON.parse(JSON.stringify(DEFAULT_STUDENT_FORM_FIELDS));
     renderDynamicStudentInputs('new');
     triggerNavHaptic('strong');
@@ -4209,9 +4490,10 @@ function handleStudentNameInput(type) {
 function handleNewStudentClassChanged() {
   const classSelect = document.getElementById('new-student-class');
   const rollInput = document.getElementById('new-student-roll');
-  if (!classSelect || !rollInput) return;
-  const selClass = classSelect.value;
-  if (!selClass) return;
+  if (!classSelect) return;
+  const selClass = classSelect.value || '';
+  updateDynamicClassFields('new', selClass);
+  if (!rollInput || !selClass) return;
 
   const inClass = (cachedAllStudents || []).filter(s => isClassEqual(s.class, selClass));
   const maxRoll = inClass.reduce((max, s) => {
@@ -4219,6 +4501,13 @@ function handleNewStudentClassChanged() {
     return (!isNaN(r) && r > max) ? r : max;
   }, 0);
   rollInput.value = maxRoll > 0 ? (maxRoll + 1) : 1;
+}
+
+function handleEditStudentClassChanged() {
+  const classSelect = document.getElementById('edit-student-class');
+  if (!classSelect) return;
+  const selClass = classSelect.value || '';
+  updateDynamicClassFields('edit', selClass);
 }
 
 // ================= STUDENT MODAL HELPERS (AGE, GUARDIAN, VALIDATION, DISCARD, REMARKS) =================
@@ -4394,6 +4683,7 @@ async function openStudentModal() {
   // Clear all inputs
   const clearIds = [
     'new-student-name', 'new-student-roll',
+    'new-student-stream', 'new-student-degreeYear',
     'new-student-dob', 'new-student-age', 'new-student-bloodGroup', 'new-student-studentEmail',
     'new-student-address', 'new-student-place', 'new-student-district', 'new-student-state', 'new-student-pinCode',
     'new-student-fatherName', 'new-student-motherName', 'new-student-fatherMobile', 'new-student-motherNumber',
@@ -4405,6 +4695,9 @@ async function openStudentModal() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+
+  const warnEl = document.getElementById('warning-new-studentId');
+  if (warnEl) warnEl.classList.add('hidden');
 
   // Pre-select Male in Add Student form only
   setSelectedStudentGender('new', 'Male');
@@ -4425,22 +4718,41 @@ async function openStudentModal() {
   await updateModalStudentCounts();
   handleNewStudentClassChanged();
 
+  const autoIdEl = document.getElementById('auto-student-id');
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  if (autoIdEl) {
+    if (isAdmin) {
+      autoIdEl.removeAttribute('readonly');
+      autoIdEl.classList.remove('cursor-not-allowed', 'opacity-70');
+      autoIdEl.classList.add('cursor-text');
+      autoIdEl.title = 'Admin: Custom Student ID (Editable)';
+    } else {
+      autoIdEl.setAttribute('readonly', 'true');
+      autoIdEl.classList.add('cursor-not-allowed');
+      autoIdEl.classList.remove('cursor-text');
+      autoIdEl.title = 'Auto-assigned by system';
+    }
+  }
+
   try {
     const res = await API.getNextStudentId();
-    if (res.success) {
-      document.getElementById('auto-student-id').value = res.nextId;
+    if (res.success && autoIdEl) {
+      autoIdEl.value = res.nextId;
     }
   } catch (e) {
-    document.getElementById('auto-student-id').value = 2000;
+    if (autoIdEl) autoIdEl.value = 2000;
   }
 
   captureStudentFormSnapshot('new');
   document.getElementById('modal-add-student').classList.remove('hidden');
 }
 
-function closeStudentModal(force = false) {
+async function closeStudentModal(force = false) {
   if (!force && isStudentFormDirty('new')) {
-    if (!confirm('Discard changes?')) return;
+    const confirmed = typeof showCustomConfirm === 'function'
+      ? await showCustomConfirm({ title: 'Discard Changes?', badge: 'Students', message: 'You have unsaved changes. Discard changes?', isDanger: true })
+      : confirm('Discard changes?');
+    if (!confirmed) return;
   }
   document.getElementById('modal-add-student').classList.add('hidden');
   clearAllStudentModalErrors('new');
@@ -4454,9 +4766,17 @@ async function handleSaveNewStudent(e) {
     return;
   }
 
+  if (checkDuplicateStudentId('new')) {
+    showToast('Student ID is already assigned. Please choose a unique ID.', true);
+    return;
+  }
+
+  const customStudentId = document.getElementById('auto-student-id')?.value.trim();
   const name = getStudentInputValue('new', 'name');
   const studentClass = getStudentInputValue('new', 'class') || (classesList[0]?.name || '');
   const roll = getStudentInputValue('new', 'roll');
+  const stream = getStudentInputValue('new', 'stream');
+  const degreeYear = getStudentInputValue('new', 'degreeYear');
 
   const dob = getStudentInputValue('new', 'dob');
   const gender = getSelectedStudentGender('new');
@@ -4492,6 +4812,9 @@ async function handleSaveNewStudent(e) {
     name,
     class: studentClass,
     roll,
+    studentId: customStudentId || undefined,
+    stream,
+    degreeYear,
     photoUrl,
     personalDetails: { dob, gender, bloodGroup, studentEmail },
     address: { fullAddress, place, district, state, pinCode },
@@ -4506,7 +4829,7 @@ async function handleSaveNewStudent(e) {
       guardianRelation,
       guardianOccupation
     },
-    academicStatus: { admissionNo, admissionDate, rank, previousCollege },
+    academicStatus: { admissionNo, admissionDate, rank, previousCollege, stream, degreeYear },
     initialRemark,
     customFields
   };
@@ -4572,14 +4895,31 @@ async function openEditStudentModal(id) {
       if (matchedOpt) classSelect.value = matchedOpt.value;
     }
 
-    const setVal = (inputKey, val) => {
-      const el = document.getElementById(inputKey);
-      if (el) el.value = val !== undefined && val !== null ? val : '';
-    };
+    const editIdInput = document.getElementById('edit-student-id');
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    if (editIdInput) {
+      if (isAdmin) {
+        editIdInput.removeAttribute('readonly');
+        editIdInput.classList.remove('cursor-not-allowed', 'opacity-70');
+        editIdInput.classList.add('cursor-text');
+        editIdInput.title = 'Admin: Custom Student ID (Editable)';
+      } else {
+        editIdInput.setAttribute('readonly', 'true');
+        editIdInput.classList.add('cursor-not-allowed');
+        editIdInput.classList.remove('cursor-text');
+        editIdInput.title = 'Assigned ID';
+      }
+    }
 
     setVal('edit-student-name', student.name);
     setVal('edit-student-class', student.class);
     setVal('edit-student-roll', student.roll);
+    setVal('edit-student-stream', student.academicStatus?.stream || student.stream || '');
+    setVal('edit-student-degreeYear', student.academicStatus?.degreeYear || student.degreeYear || '');
+    updateDynamicClassFields('edit', student.class);
+
+    const warnEl = document.getElementById('warning-edit-studentId');
+    if (warnEl) warnEl.classList.add('hidden');
 
     // Personal Details (never force Male on old records if missing)
     const dob = student.personalDetails?.dob || '';
@@ -4630,9 +4970,12 @@ async function openEditStudentModal(id) {
   }
 }
 
-function closeEditStudentModal(force = false) {
+async function closeEditStudentModal(force = false) {
   if (!force && isStudentFormDirty('edit')) {
-    if (!confirm('Discard changes?')) return;
+    const confirmed = typeof showCustomConfirm === 'function'
+      ? await showCustomConfirm({ title: 'Discard Changes?', badge: 'Students', message: 'You have unsaved changes. Discard changes?', isDanger: true })
+      : confirm('Discard changes?');
+    if (!confirmed) return;
   }
   document.getElementById('modal-edit-student').classList.add('hidden');
   clearAllStudentModalErrors('edit');
@@ -4649,9 +4992,17 @@ async function handleSaveEditedStudent(e) {
     return;
   }
 
+  if (checkDuplicateStudentId('edit')) {
+    showToast('Student ID is already assigned. Please choose a unique ID.', true);
+    return;
+  }
+
+  const customStudentId = document.getElementById('edit-student-id')?.value.trim();
   const name = getStudentInputValue('edit', 'name');
   const studentClass = getStudentInputValue('edit', 'class');
   const roll = getStudentInputValue('edit', 'roll');
+  const stream = getStudentInputValue('edit', 'stream');
+  const degreeYear = getStudentInputValue('edit', 'degreeYear');
 
   const dob = getStudentInputValue('edit', 'dob');
   const gender = getSelectedStudentGender('edit');
@@ -4684,6 +5035,9 @@ async function handleSaveEditedStudent(e) {
     name,
     class: studentClass,
     roll,
+    studentId: customStudentId || undefined,
+    stream,
+    degreeYear,
     photoUrl: editStudentPhotoUrl || editStudentBase64Photo,
     personalDetails: { dob, gender, bloodGroup, studentEmail },
     address: { fullAddress, place, district, state, pinCode },
@@ -4702,7 +5056,9 @@ async function handleSaveEditedStudent(e) {
       admissionNo,
       admissionDate,
       rank,
-      previousCollege
+      previousCollege,
+      stream,
+      degreeYear
     },
     customFields
   };
@@ -4800,7 +5156,7 @@ function renderStudentRemarksList(student, containerId) {
             <h5 class="text-xs font-extrabold text-[var(--text-main)] truncate">${escapeHtml(tName)}</h5>
             ${actionsHtml}
           </div>
-          <p class="text-[10px] text-[var(--text-sub)] font-semibold">${escapeHtml(tSub)}${dateStr ? ` &middot; ${escapeHtml(dateStr)}` : ''}</p>
+          <p class="text-[10px] text-[var(--text-sub)] font-semibold">${dateStr ? escapeHtml(dateStr) : ''}</p>
           <p class="text-xs text-[var(--text-main)] mt-1 leading-relaxed break-words">${escapeHtml(rem.text || '')}</p>
         </div>
       </div>
@@ -4859,7 +5215,14 @@ async function handleEditStudentRemark(studentId, remarkId) {
     ? currentDetailsStudent
     : activeEditStudentRecord;
   const rem = (targetStudent?.remarks || []).find(r => String(r._id) === String(remarkId));
-  const nextText = prompt('Edit your remark:', rem ? rem.text : '');
+  const nextText = typeof showCustomPrompt === 'function'
+    ? await showCustomPrompt({
+        title: 'Edit Remark',
+        badge: 'Teacher Remark',
+        message: 'Edit your remark below:',
+        defaultValue: rem ? rem.text : ''
+      })
+    : prompt('Edit your remark:', rem ? rem.text : '');
   if (nextText === null) return;
   if (!nextText.trim()) {
     showToast('Remark text cannot be empty', true);
@@ -4885,7 +5248,15 @@ async function handleEditStudentRemark(studentId, remarkId) {
 }
 
 async function handleDeleteStudentRemark(studentId, remarkId) {
-  if (!confirm('Delete this remark?')) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Remark',
+        badge: 'Teacher Remark',
+        message: 'Delete this remark? This cannot be undone.',
+        isDanger: true
+      })
+    : confirm('Delete this remark?');
+  if (!confirmed) return;
   try {
     const res = await API.deleteStudentRemark(studentId, remarkId);
     if (res && res.success && res.data) {
@@ -5026,6 +5397,52 @@ async function openStudentDetailsModal(studentId) {
       attEl.innerText = 'N/A';
     }
   }
+
+  // 5 Scannable Colored Metric Cards
+  const totalSessions = student.attendanceSessions !== undefined ? student.attendanceSessions : 0;
+  const presentSessions = student.attendancePresent !== undefined ? student.attendancePresent : 0;
+  const absentSessions = student.attendanceAbsent !== undefined ? student.attendanceAbsent : 0;
+  const leaveSessions = student.attendanceLeave !== undefined ? student.attendanceLeave : 0;
+  const rateSessions = (student.attendancePercentage !== undefined && student.attendancePercentage !== null)
+    ? `${student.attendancePercentage}%`
+    : (totalSessions > 0 ? `${Math.round((presentSessions / totalSessions) * 100)}%` : '0%');
+
+  const setCardVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = String(val);
+  };
+  setCardVal('details-stat-sessions', totalSessions);
+  setCardVal('details-stat-present', presentSessions);
+  setCardVal('details-stat-absent', absentSessions);
+  setCardVal('details-stat-leave', leaveSessions);
+  setCardVal('details-stat-percent', rateSessions);
+
+  // Dynamic Class Badges & Academic Status Fields
+  const cat = getClassCategory(student.class);
+  const streamBadge = document.getElementById('details-student-stream-badge');
+  const yearBadge = document.getElementById('details-student-year-badge');
+  const streamVal = student.academicStatus?.stream || student.stream || '';
+  const degreeYearVal = student.academicStatus?.degreeYear || student.degreeYear || '';
+
+  if (cat === 'plus_two' && streamVal) {
+    if (streamBadge) {
+      streamBadge.innerText = `Stream: ${streamVal}`;
+      streamBadge.classList.remove('hidden');
+    }
+    if (yearBadge) yearBadge.classList.add('hidden');
+  } else if (cat === 'degree' && degreeYearVal) {
+    if (streamBadge) streamBadge.classList.add('hidden');
+    if (yearBadge) {
+      yearBadge.innerText = `Year: ${degreeYearVal}`;
+      yearBadge.classList.remove('hidden');
+    }
+  } else {
+    if (streamBadge) streamBadge.classList.add('hidden');
+    if (yearBadge) yearBadge.classList.add('hidden');
+  }
+
+  setDetailsFieldVisibility('details-wrap-stream', 'details-student-stream', cat === 'plus_two' ? streamVal : '');
+  setDetailsFieldVisibility('details-wrap-degreeYear', 'details-student-degreeYear', cat === 'degree' ? degreeYearVal : '');
 
   // Remarks
   const remInput = document.getElementById('details-new-remark-text');
@@ -5200,7 +5617,15 @@ async function downloadCurrentEnlargedPhoto() {
 }
 
 async function confirmDeleteStudent(id, name, studentId) {
-  if (!confirm(`Are you sure you want to delete "${name}" (ID: ${studentId})?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Student',
+        badge: 'Students',
+        message: `Are you sure you want to delete "${name}" (ID: ${studentId})?`,
+        isDanger: true
+      })
+    : confirm(`Are you sure you want to delete "${name}" (ID: ${studentId})?`);
+  if (!confirmed) return;
   triggerNavHaptic('delete');
   try {
     const res = await API.deleteStudent(id);
@@ -5286,24 +5711,35 @@ function renderActivityLogsList() {
       dotBorder = 'ring-blue-500/30';
     }
 
+    const logDate = log.createdAt ? new Date(log.createdAt) : null;
+    const timeFormatted = logDate ? logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const dateFormatted = logDate ? logDate.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    const dateTimeStr = logDate ? `${dateFormatted} • ${timeFormatted}` : '';
+
     return `
-      <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2.5 ${log.isUndone ? 'opacity-50' : ''} hover:border-[#245b70]/40 transition">
+      <div id="log-item-${log._id}" class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-start justify-between gap-3 ${log.isUndone ? 'opacity-50' : ''} hover:border-[#245b70]/40 transition shadow-sm">
         <div class="flex items-start gap-2.5 min-w-0 flex-1">
-          <span class="w-2 h-2 rounded-full ${dotColor} mt-1.5 flex-shrink-0 ring-2 ${dotBorder}"></span>
+          <span class="w-2.5 h-2.5 rounded-full ${dotColor} mt-1.5 flex-shrink-0 ring-2 ${dotBorder}"></span>
           <div class="min-w-0 flex-1">
-            <div class="font-bold text-[var(--text-main)] text-xs truncate">${escapeHtml(log.action)}</div>
-            <div class="text-[10px] text-[var(--text-sub)] line-clamp-2">${escapeHtml(log.details || '')}</div>
-            <div class="text-[9px] text-[#245b70] dark:text-cyan-400 font-semibold mt-0.5">${(() => { const _le = (log.performedByEmail || '').toLowerCase(); let _dn = log.performedBy || ''; if (_le) { if (currentUser && (currentUser.email || '').toLowerCase() === _le) { _dn = currentUser.name || _dn; } else if (cachedTeachersList) { const _f = cachedTeachersList.find(t => (t.email || '').toLowerCase() === _le); if (_f && _f.name) _dn = _f.name; } } return 'by ' + escapeHtml(_dn); })()}</div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-extrabold text-[var(--text-main)] text-xs">${escapeHtml(log.action)}</span>
+              ${dateTimeStr ? `<span class="text-[9.5px] font-semibold text-[var(--text-sub)] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md flex-shrink-0">${dateTimeStr}</span>` : ''}
+            </div>
+            <div class="text-[11px] text-[var(--text-sub)] mt-0.5 line-clamp-2 leading-relaxed">${escapeHtml(log.details || '')}</div>
+            <div class="text-[10px] text-[#245b70] dark:text-cyan-400 font-bold mt-1">${(() => { const _le = (log.performedByEmail || '').toLowerCase(); let _dn = log.performedBy || ''; if (_le) { if (currentUser && (currentUser.email || '').toLowerCase() === _le) { _dn = currentUser.name || _dn; } else if (cachedTeachersList) { const _f = cachedTeachersList.find(t => (t.email || '').toLowerCase() === _le); if (_f && _f.name) _dn = _f.name; } } return 'by ' + escapeHtml(_dn); })()}</div>
           </div>
         </div>
-        ${log.isUndone ? `
-          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 flex-shrink-0">Reverted</span>
-        ` : (isAdmin && log.canUndo ? `
-          <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
-          <button onclick="undoLog('${log._id}')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 hover:bg-amber-200 active:scale-95 transition flex-shrink-0">
-            Undo
-          </button>
-        ` : '')}
+        <div class="flex items-center gap-2 flex-shrink-0 pt-0.5">
+          ${log.isUndone ? `
+            <span class="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Reverted</span>
+          ` : (isAdmin && log.canUndo ? `
+            <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
+            <button onclick="undoLog('${log._id}')" class="px-3 py-1 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-white border border-amber-500/30 active:scale-95 transition flex items-center gap-1 shadow-sm">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+              <span>Undo</span>
+            </button>
+          ` : '')}
+        </div>
       </div>
     `;
   }).join('');
@@ -5485,6 +5921,17 @@ async function updateProfileDashboardKPIs() {
 async function undoLog(logId) {
   const targetLog = (cachedActivityLogs || []).find(l => String(l._id) === String(logId));
   const actionName = targetLog ? targetLog.action : 'Action';
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Undo Activity',
+        badge: 'Revert Action',
+        message: `Are you sure you want to revert "${actionName}"? This will restore the previous state.`,
+        confirmText: 'Revert Action',
+        isDanger: true
+      })
+    : confirm(`Revert "${actionName}"?`);
+  if (!confirmed) return;
+
   try {
     const res = await API.undoLog(logId);
     if (res.success) {
@@ -5494,6 +5941,7 @@ async function undoLog(logId) {
       await loadClasses();
       await loadSubjects();
       await renderStudentsDirectory();
+      if (typeof renderTimetableSlots === 'function') await renderTimetableSlots();
     }
   } catch (error) {
     showToast(error.message || 'Failed to undo action', true);
@@ -5596,7 +6044,15 @@ async function loadAdminTeachersList() {
 async function toggleTeacherAdminRole(id, name, currentRole) {
   const isCurrentlyAdmin = currentRole === 'admin';
   const actionText = isCurrentlyAdmin ? `remove Admin privileges from "${name}"` : `make "${name}" an Admin`;
-  if (!confirm(`Are you sure you want to ${actionText}?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: isCurrentlyAdmin ? 'Demote Admin' : 'Promote to Admin',
+        badge: 'Admin Panel',
+        message: `Are you sure you want to ${actionText}?`,
+        isDanger: isCurrentlyAdmin
+      })
+    : confirm(`Are you sure you want to ${actionText}?`);
+  if (!confirmed) return;
 
   try {
     const res = await API.toggleTeacherAdmin(id);
@@ -5618,7 +6074,15 @@ async function deleteTeacherAccount(id, name, role) {
     showToast('You cannot delete your own logged-in admin account', true);
     return;
   }
-  if (!confirm(`Are you sure you want to permanently remove teacher "${name}"?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Remove Teacher',
+        badge: 'Admin Panel',
+        message: `Are you sure you want to permanently remove teacher "${name}"?`,
+        isDanger: true
+      })
+    : confirm(`Are you sure you want to permanently remove teacher "${name}"?`);
+  if (!confirmed) return;
   triggerNavHaptic('delete');
 
   try {
@@ -5633,7 +6097,14 @@ async function deleteTeacherAccount(id, name, role) {
 }
 
 async function editTeacherName(id, currentName) {
-  const updated = prompt('Edit Teacher Name:', currentName);
+  const updated = typeof showCustomPrompt === 'function'
+    ? await showCustomPrompt({
+        title: 'Edit Teacher Name',
+        badge: 'Admin Panel',
+        message: 'Edit teacher name:',
+        defaultValue: currentName
+      })
+    : prompt('Edit Teacher Name:', currentName);
   if (!updated || updated === currentName) return;
 
   try {
@@ -5720,10 +6191,15 @@ async function importBackupData(event) {
 // USER DIRECTIVE:
 // "clear data for only clear data of attendence of whole class, not teachers, students, class ,subjects,details"
 async function handleClearDataPrompt() {
-  const confirmed = confirm(
-    "⚠ CLEAR ATTENDANCE DATA:\n\n" +
-    "Are you sure you want to clear attendance records? Teachers, students, classes, subjects, and student details will NOT be deleted."
-  );
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Clear Attendance Data',
+        badge: 'Data Controls',
+        message: 'Are you sure you want to clear attendance records? Teachers, students, classes, subjects, and student details will NOT be deleted.',
+        confirmText: 'Clear Attendance',
+        isDanger: true
+      })
+    : confirm("Are you sure you want to clear attendance records? Teachers, students, classes, subjects, and student details will NOT be deleted.");
   if (!confirmed) return;
   triggerNavHaptic('delete');
 
@@ -5746,10 +6222,15 @@ async function handleClearDataPrompt() {
 // USER DIRECTIVE:
 // "reset button for clear all app data...like new"
 async function handleResetAppPrompt() {
-  const confirmed = confirm(
-    "⚠ FULL APP RESET (LIKE NEW):\n\n" +
-    "Are you sure you want to wipe all app data like new? All students, classes, subjects, attendance, logs, and settings will be completely reset."
-  );
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Full App Reset (Like New)',
+        badge: 'System Wipe',
+        message: 'Are you sure you want to wipe all app data like new? All students, classes, subjects, attendance, logs, and settings will be completely reset.',
+        confirmText: 'Wipe Everything',
+        isDanger: true
+      })
+    : confirm("Are you sure you want to wipe all app data like new? All students, classes, subjects, attendance, logs, and settings will be completely reset.");
   if (!confirmed) return;
   triggerNavHaptic('delete');
 
@@ -7764,7 +8245,15 @@ async function handleUpdateTeacher(e) {
 
 // Delete Teacher
 async function handleDeleteTeacher(id, name) {
-  if (!confirm(`Are you sure you want to remove teacher "${name}"?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Remove Teacher',
+        badge: 'Faculty',
+        message: `Are you sure you want to remove teacher "${name}"?`,
+        isDanger: true
+      })
+    : confirm(`Are you sure you want to remove teacher "${name}"?`);
+  if (!confirmed) return;
 
   try {
     const res = await API.deleteTeacher(id);
@@ -8570,7 +9059,15 @@ async function handleSaveTimetableSlot(e) {
 }
 
 async function deleteTimetableSlot(id) {
-  if (!confirm('Delete this timetable slot?')) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Slot',
+        badge: 'Timetable',
+        message: 'Delete this timetable slot?',
+        isDanger: true
+      })
+    : confirm('Delete this timetable slot?');
+  if (!confirmed) return;
   triggerNavHaptic('delete');
   try {
     await API.deleteTimetableSlot(id);
@@ -8655,8 +9152,7 @@ function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
 
   let teacherName = '';
   if (isOwnerCurrent) {
-    const roleTag = currentUser.role === 'admin' ? ' (Admin / You)' : ' (You)';
-    teacherName = `${currentUser.name || 'Admin'}${roleTag}`;
+    teacherName = currentUser.name || 'Admin';
   } else if (subjTeacherName) {
     teacherName = subjTeacherName;
   } else if (matchedTeacher && (matchedTeacher.name || matchedTeacher.username)) {
@@ -9111,7 +9607,14 @@ function closeMessageActionsModal() {
 async function promptEditSelectedMessage() {
   if (!activeSelectedMessage) return;
   const currentText = activeSelectedMessage.text;
-  const newText = prompt('Edit your message:', currentText);
+  const newText = typeof showCustomPrompt === 'function'
+    ? await showCustomPrompt({
+        title: 'Edit Message',
+        badge: 'Messages',
+        message: 'Edit your message below:',
+        defaultValue: currentText
+      })
+    : prompt('Edit your message:', currentText);
   if (newText === null || !newText.trim() || newText.trim() === currentText) {
     closeMessageActionsModal();
     return;
@@ -9131,7 +9634,15 @@ async function promptEditSelectedMessage() {
 
 async function confirmDeleteSelectedMessage() {
   if (!activeSelectedMessage) return;
-  if (!confirm('Are you sure you want to delete this message?')) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Delete Message',
+        badge: 'Messages',
+        message: 'Are you sure you want to delete this message?',
+        isDanger: true
+      })
+    : confirm('Are you sure you want to delete this message?');
+  if (!confirmed) return;
   triggerNavHaptic('delete');
 
   try {
@@ -9147,7 +9658,16 @@ async function confirmDeleteSelectedMessage() {
 }
 
 async function handleClearAllChat() {
-  if (!confirm('Are you sure you want to delete all chat history? This cannot be undone.')) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({
+        title: 'Clear Chat History',
+        badge: 'Messages',
+        message: 'Are you sure you want to delete all chat history? This cannot be undone.',
+        confirmText: 'Clear All Messages',
+        isDanger: true
+      })
+    : confirm('Are you sure you want to delete all chat history? This cannot be undone.');
+  if (!confirmed) return;
   triggerNavHaptic('delete');
   try {
     const res = await API.clearAllMessages();
@@ -9206,6 +9726,655 @@ function selectPrintOption(type) {
   }
 }
 
+function openClassAttendanceExportModal() {
+  closePrintDataChoiceModal();
+  openAttendanceExportModal();
+}
+
+async function openIndividualAttendanceReportModal() {
+  closePrintDataChoiceModal();
+  const modal = document.getElementById('modal-individual-attendance');
+  if (!modal) return;
+
+  if (!classesList || classesList.length === 0) {
+    try { await loadClasses(); } catch (_) {}
+  }
+  if (!cachedAllStudents || cachedAllStudents.length === 0) {
+    try {
+      const res = await API.getStudents('all');
+      if (res && res.data) cachedAllStudents = res.data;
+    } catch (_) {}
+  }
+
+  // Populate Class Select (combines public classes and personal workspace classes)
+  const classSelect = document.getElementById('att-indiv-class');
+  if (classSelect) {
+    const combinedClasses = [...(classesList || []), ...((typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList)) ? pwClassesList : [])];
+    const seenClasses = new Set();
+    const uniqueClasses = [];
+    combinedClasses.forEach(c => {
+      const cName = (c.name || c || '').trim();
+      if (cName && !seenClasses.has(cName.toLowerCase())) {
+        seenClasses.add(cName.toLowerCase());
+        uniqueClasses.push(c);
+      }
+    });
+    classSelect.innerHTML = uniqueClasses.map(c => {
+      const cName = c.name || c;
+      return `<option value="${escapeHtml(cName)}">${escapeHtml(cName)}</option>`;
+    }).join('');
+  }
+
+  // Populate Year Select
+  const yearSelect = document.getElementById('att-indiv-year');
+  if (yearSelect) {
+    const currentYear = new Date().getFullYear();
+    yearSelect.innerHTML = `
+      <option value="${currentYear}">${currentYear}</option>
+      <option value="${currentYear - 1}">${currentYear - 1}</option>
+      <option value="${currentYear + 1}">${currentYear + 1}</option>
+    `;
+  }
+
+  handleIndivAttendanceClassChanged();
+  modal.classList.remove('hidden');
+}
+
+function closeIndividualAttendanceModal() {
+  const modal = document.getElementById('modal-individual-attendance');
+  if (modal) modal.classList.add('hidden');
+}
+
+function handleIndivAttendanceClassChanged() {
+  const classVal = document.getElementById('att-indiv-class')?.value || '';
+  const stuSelect = document.getElementById('att-indiv-student');
+  const subSelect = document.getElementById('att-indiv-subject');
+
+  // Populate Subjects for this class (including workspace subjects)
+  if (subSelect) {
+    const combinedSubs = [...(subjectsList || []), ...((typeof pwSubjectsList !== 'undefined' && Array.isArray(pwSubjectsList)) ? pwSubjectsList : [])];
+    const filteredSubs = combinedSubs.filter(s => {
+      const assigned = Array.isArray(s.assignedClasses) ? s.assignedClasses : [];
+      return assigned.length === 0 || classListIncludes(assigned, classVal) || isClassEqual(s.class, classVal);
+    });
+    let html = `<option value="all">All Subjects (Consolidated)</option>`;
+    html += filteredSubs.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+    subSelect.innerHTML = html;
+  }
+
+  // Populate Students for this class (including workspace students)
+  if (stuSelect) {
+    const combinedStudents = [...(cachedAllStudents || []), ...((typeof pwStudentsList !== 'undefined' && Array.isArray(pwStudentsList)) ? pwStudentsList : [])];
+    const seenStu = new Set();
+    const filteredStudents = [];
+    combinedStudents.forEach(s => {
+      const sId = String(s.studentId || s._id || '');
+      if (isClassEqual(s.class, classVal) && sId && !seenStu.has(sId)) {
+        seenStu.add(sId);
+        filteredStudents.push(s);
+      }
+    });
+    filteredStudents.sort((a, b) => (parseInt(a.roll, 10) || 0) - (parseInt(b.roll, 10) || 0));
+    stuSelect.innerHTML = filteredStudents.map(s => {
+      return `<option value="${s._id || s.studentId}" data-id="${s.studentId}" data-roll="${s.roll || ''}">${escapeHtml(s.name)}</option>`;
+    }).join('') || '<option value="">No students in this class</option>';
+  }
+
+  handleIndivAttendanceStudentChanged();
+}
+
+function handleIndivAttendanceStudentChanged() {
+  const stuSelect = document.getElementById('att-indiv-student');
+  const subEl = document.getElementById('att-indiv-student-sub');
+  if (!stuSelect || !subEl) return;
+  const selOpt = stuSelect.options[stuSelect.selectedIndex];
+  if (selOpt && selOpt.value) {
+    const sId = selOpt.getAttribute('data-id') || '';
+    const roll = selOpt.getAttribute('data-roll') || '';
+    subEl.innerText = `ID: ${sId} • Roll: #${roll}`;
+    subEl.classList.remove('hidden');
+  } else {
+    subEl.innerText = '';
+    subEl.classList.add('hidden');
+  }
+}
+
+async function executeIndividualAttendancePrint() {
+  const stuSelect = document.getElementById('att-indiv-student');
+  const classVal = document.getElementById('att-indiv-class')?.value || '';
+  const subjectVal = document.getElementById('att-indiv-subject')?.value || 'all';
+  const yearVal = document.getElementById('att-indiv-year')?.value || new Date().getFullYear();
+  const monthVal = document.getElementById('att-indiv-month')?.value || 'all-year';
+
+  if (!stuSelect || !stuSelect.value) {
+    showToast('Please select a student', true);
+    return;
+  }
+
+  const studentVal = stuSelect.value;
+  let student = (cachedAllStudents || []).find(s => String(s._id) === String(studentVal) || String(s.studentId) === String(studentVal));
+  if (!student) {
+    try {
+      const res = await API.getStudentById(studentVal);
+      if (res && res.success && res.data) student = res.data;
+    } catch (_) {}
+  }
+  if (!student) {
+    showToast('Student information not found', true);
+    return;
+  }
+
+  showToast('Preparing Individual Attendance Report...');
+
+  let totalSessions = student.attendanceSessions || 0;
+  let presentCount = student.attendancePresent || 0;
+  let absentCount = student.attendanceAbsent || 0;
+  let leaveCount = student.attendanceLeave || 0;
+  let attPercentage = student.attendancePercentage !== undefined ? student.attendancePercentage : (totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0);
+
+  const monthNames = [
+    { code: '06', name: 'June' },
+    { code: '07', name: 'July' },
+    { code: '08', name: 'August' },
+    { code: '09', name: 'September' },
+    { code: '10', name: 'October' },
+    { code: '11', name: 'November' },
+    { code: '12', name: 'December' },
+    { code: '01', name: 'January' },
+    { code: '02', name: 'February' },
+    { code: '03', name: 'March' }
+  ];
+
+  let displayMonths = monthNames;
+  if (monthVal !== 'all-year') {
+    const single = monthNames.find(m => m.code === monthVal || m.code === monthVal.padStart(2, '0'));
+    if (single) displayMonths = [single];
+  }
+
+  const monthRowsHtml = displayMonths.map(m => {
+    return `
+      <tr>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #1e293b;">${escapeHtml(m.name)}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #475569;">—</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #059669; font-weight: 700;">—</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #e11d48; font-weight: 700;">—</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #d97706; font-weight: 700;">—</td>
+      </tr>
+    `;
+  }).join('');
+
+  const cat = getClassCategory(student.class);
+  let streamOrYearText = '';
+  if (cat === 'plus_two' && (student.academicStatus?.stream || student.stream)) {
+    streamOrYearText = ` (${student.academicStatus?.stream || student.stream})`;
+  } else if (cat === 'degree' && (student.academicStatus?.degreeYear || student.degreeYear)) {
+    streamOrYearText = ` (${student.academicStatus?.degreeYear || student.degreeYear})`;
+  }
+
+  const guardianName = student.familyDetails?.guardian === 'Other'
+    ? (student.familyDetails?.guardianName || '-')
+    : (student.familyDetails?.fatherName || student.familyDetails?.motherName || '-');
+  const guardianMobile = student.familyDetails?.fatherMobile || student.familyDetails?.motherNumber || student.familyDetails?.guardianNumber || '-';
+
+  const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 24px; max-width: 820px; margin: 0 auto; line-height: 1.4;">
+      <!-- Header -->
+      <div style="border-bottom: 2.5px solid #1e4d5f; padding-bottom: 12px; margin-bottom: 18px;">
+        <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.1em; color: #1e4d5f; text-transform: uppercase;">STUDENT ATTENDANCE RECORD</div>
+        <h1 style="font-size: 22px; font-weight: 900; color: #0f172a; margin: 4px 0 2px; letter-spacing: -0.02em;">INDIVIDUAL ATTENDANCE REPORT</h1>
+        <div style="font-size: 11px; font-weight: 600; color: #475569;">
+          Academic Year: <strong style="color: #0f172a;">[${escapeHtml(String(yearVal))}]</strong> | Status As Of: <strong style="color: #0f172a;">[${todayStr}]</strong>
+        </div>
+      </div>
+
+      <!-- 1. STUDENT IDENTIFICATION -->
+      <div style="margin-bottom: 18px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px;">
+          1. STUDENT IDENTIFICATION
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 10.5px;">
+          <tbody>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #334155; width: 22%;">Student Name</td>
+              <td style="border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 800; color: #0f172a; width: 28%;">${escapeHtml(student.name)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #334155; width: 22%;">Student ID</td>
+              <td style="border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 800; font-family: monospace; color: #0f172a; width: 28%;">${escapeHtml(String(student.studentId))}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #334155;">Class / Stream</td>
+              <td style="border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #0f172a;">${escapeHtml(student.class)}${escapeHtml(streamOrYearText)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #334155;">Roll No.</td>
+              <td style="border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #0f172a;">${escapeHtml(student.roll || '-')}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #334155;">Guardian Name</td>
+              <td style="border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(guardianName)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 700; color: #334155;">Contact Mobile</td>
+              <td style="border: 1px solid #cbd5e1; padding: 7px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(guardianMobile)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 2. OVERALL ATTENDANCE SUMMARY -->
+      <div style="margin-bottom: 18px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px;">
+          2. OVERALL ATTENDANCE SUMMARY
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 11px; text-align: center;">
+          <thead>
+            <tr style="background: #1e4d5f; color: #ffffff;">
+              <th style="padding: 8px; border: 1px solid #1e4d5f; font-weight: 800; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;">TOTAL SESSIONS</th>
+              <th style="padding: 8px; border: 1px solid #1e4d5f; font-weight: 800; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;">PRESENT</th>
+              <th style="padding: 8px; border: 1px solid #1e4d5f; font-weight: 800; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;">ABSENT</th>
+              <th style="padding: 8px; border: 1px solid #1e4d5f; font-weight: 800; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;">LEAVE</th>
+              <th style="padding: 8px; border: 1px solid #1e4d5f; font-weight: 800; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;">ATTENDANCE %</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="font-weight: 800; font-size: 13px;">
+              <td style="border: 1px solid #cbd5e1; padding: 10px; color: #0f172a;">${totalSessions}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px; color: #059669;">${presentCount}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px; color: #e11d48;">${absentCount}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px; color: #d97706;">${leaveCount}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px; color: #1e4d5f;">${attPercentage}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 3. MONTH-WISE ATTENDANCE BREAKDOWN -->
+      <div style="margin-bottom: 18px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px;">
+          3. MONTH-WISE ATTENDANCE BREAKDOWN
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 10px;">
+          <thead>
+            <tr style="background: #f1f5f9; color: #334155;">
+              <th style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; font-weight: 800; text-transform: uppercase;">MONTH</th>
+              <th style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; font-weight: 800; text-transform: uppercase;">TOTAL SESSIONS</th>
+              <th style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; font-weight: 800; text-transform: uppercase;">PRESENT</th>
+              <th style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; font-weight: 800; text-transform: uppercase;">ABSENT</th>
+              <th style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; font-weight: 800; text-transform: uppercase;">LEAVE</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${monthRowsHtml}
+            <tr style="background: #f8fafc; font-weight: 800; border-top: 2px solid #94a3b8;">
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; color: #0f172a;">Total (Year to Date)</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #0f172a;">${totalSessions}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #059669;">${presentCount}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #e11d48;">${absentCount}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; color: #d97706;">${leaveCount}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 4. TEACHER'S REMARKS & OBSERVATIONS (FREE FOR HANDWRITING) -->
+      <div style="margin-bottom: 24px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px;">
+          4. TEACHER'S REMARKS & OBSERVATIONS
+        </div>
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; min-height: 75px; background: #fafafa; color: #94a3b8; font-size: 10px; font-style: italic;">
+          [Enter remarks regarding attendance regularity, medical leaves, or parent consultation notes...]
+        </div>
+      </div>
+
+      <!-- Signatures -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; padding-top: 35px; text-align: center; margin-bottom: 20px;">
+        <div>
+          <div style="border-top: 1px solid #475569; padding-top: 6px; font-weight: 800; font-size: 10px; color: #1e293b;">Class Teacher Signature</div>
+        </div>
+        <div>
+          <div style="border-top: 1px solid #475569; padding-top: 6px; font-weight: 800; font-size: 10px; color: #1e293b;">Parent / Guardian Signature</div>
+        </div>
+        <div>
+          <div style="border-top: 1px solid #475569; padding-top: 6px; font-weight: 800; font-size: 10px; color: #1e293b;">Principal / Head Signature</div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+        <span>Individual Student Attendance Report</span>
+        <span>Page 1 of 1</span>
+      </div>
+    </div>
+  `;
+
+  const sheet = document.getElementById('profile-report-print-sheet');
+  if (sheet) {
+    sheet.innerHTML = html;
+    closeIndividualAttendanceModal();
+    document.body.classList.add('printing-profile-report');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-profile-report');
+    }, 1200);
+  }
+}
+
+async function openIndividualStudentDataModal() {
+  closePrintDataChoiceModal();
+  const modal = document.getElementById('modal-individual-student-data');
+  if (!modal) return;
+
+  if (!classesList || classesList.length === 0) {
+    try { await loadClasses(); } catch (_) {}
+  }
+  if (!cachedAllStudents || cachedAllStudents.length === 0) {
+    try {
+      const res = await API.getStudents('all');
+      if (res && res.data) cachedAllStudents = res.data;
+    } catch (_) {}
+  }
+
+  const classSelect = document.getElementById('stu-indiv-class');
+  if (classSelect) {
+    const combinedClasses = [...(classesList || []), ...((typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList)) ? pwClassesList : [])];
+    const seenClasses = new Set();
+    const uniqueClasses = [];
+    combinedClasses.forEach(c => {
+      const cName = (c.name || c || '').trim();
+      if (cName && !seenClasses.has(cName.toLowerCase())) {
+        seenClasses.add(cName.toLowerCase());
+        uniqueClasses.push(c);
+      }
+    });
+    classSelect.innerHTML = uniqueClasses.map(c => {
+      const cName = c.name || c;
+      return `<option value="${escapeHtml(cName)}">${escapeHtml(cName)}</option>`;
+    }).join('');
+  }
+
+  handleIndivStudentDataClassChanged();
+  modal.classList.remove('hidden');
+}
+
+function closeIndividualStudentDataModal() {
+  const modal = document.getElementById('modal-individual-student-data');
+  if (modal) modal.classList.add('hidden');
+}
+
+function handleIndivStudentDataClassChanged() {
+  const classVal = document.getElementById('stu-indiv-class')?.value || '';
+  const stuSelect = document.getElementById('stu-indiv-student');
+  if (stuSelect) {
+    const combinedStudents = [...(cachedAllStudents || []), ...((typeof pwStudentsList !== 'undefined' && Array.isArray(pwStudentsList)) ? pwStudentsList : [])];
+    const seenStu = new Set();
+    const filteredStudents = [];
+    combinedStudents.forEach(s => {
+      const sId = String(s.studentId || s._id || '');
+      if (isClassEqual(s.class, classVal) && sId && !seenStu.has(sId)) {
+        seenStu.add(sId);
+        filteredStudents.push(s);
+      }
+    });
+    filteredStudents.sort((a, b) => (parseInt(a.roll, 10) || 0) - (parseInt(b.roll, 10) || 0));
+    stuSelect.innerHTML = filteredStudents.map(s => {
+      return `<option value="${s._id || s.studentId}" data-id="${s.studentId}" data-roll="${s.roll || ''}">${escapeHtml(s.name)}</option>`;
+    }).join('') || '<option value="">No students in this class</option>';
+  }
+  handleIndivStudentDataStudentChanged();
+}
+
+function handleIndivStudentDataStudentChanged() {
+  const stuSelect = document.getElementById('stu-indiv-student');
+  const subEl = document.getElementById('stu-indiv-student-sub');
+  if (!stuSelect || !subEl) return;
+  const selOpt = stuSelect.options[stuSelect.selectedIndex];
+  if (selOpt && selOpt.value) {
+    const sId = selOpt.getAttribute('data-id') || '';
+    const roll = selOpt.getAttribute('data-roll') || '';
+    subEl.innerText = `ID: ${sId} • Roll: #${roll}`;
+    subEl.classList.remove('hidden');
+  } else {
+    subEl.innerText = '';
+    subEl.classList.add('hidden');
+  }
+}
+
+async function executeIndividualStudentDataPrint() {
+  const stuSelect = document.getElementById('stu-indiv-student');
+  if (!stuSelect || !stuSelect.value) {
+    showToast('Please select a student', true);
+    return;
+  }
+
+  const studentVal = stuSelect.value;
+  let student = (cachedAllStudents || []).find(s => String(s._id) === String(studentVal) || String(s.studentId) === String(studentVal));
+  if (!student) {
+    try {
+      const res = await API.getStudentById(studentVal);
+      if (res && res.success && res.data) student = res.data;
+    } catch (_) {}
+  }
+  if (!student) {
+    showToast('Student information not found', true);
+    return;
+  }
+
+  showToast('Preparing Student Information Record...');
+
+  const cat = getClassCategory(student.class);
+  const dob = student.personalDetails?.dob || '-';
+  const age = calculateAgeFromDob(dob) || '-';
+  const gender = student.personalDetails?.gender || '-';
+  const blood = student.personalDetails?.bloodGroup || '-';
+  const email = student.personalDetails?.studentEmail || '-';
+
+  const fullAddr = student.address?.fullAddress || student.address || '-';
+  const place = student.address?.place || '-';
+  const district = student.address?.district || '-';
+  const state = student.address?.state || '-';
+  const pin = student.address?.pinCode || '-';
+
+  const father = student.familyDetails?.fatherName || '-';
+  const fatherMobile = student.familyDetails?.fatherMobile || '-';
+  const mother = student.familyDetails?.motherName || '-';
+  const motherMobile = student.familyDetails?.motherNumber || '-';
+  const guardian = student.familyDetails?.guardian === 'Other'
+    ? (student.familyDetails?.guardianName || student.familyDetails?.guardianRelation || '-')
+    : (student.familyDetails?.guardian || 'Father');
+  const guardianOcc = student.familyDetails?.guardianOccupation || '-';
+
+  // Dynamic Academic Status Rows
+  let dynamicAcademicRow = '';
+  if (cat === 'plus_two') {
+    dynamicAcademicRow = `
+      <tr>
+        <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Class</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #0f172a; width: 28%;">${escapeHtml(student.class)}</td>
+        <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Stream</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #0f172a; width: 28%;">${escapeHtml(student.academicStatus?.stream || student.stream || 'Not specified (e.g. Science, Commerce, Humanities)')}</td>
+      </tr>
+    `;
+  } else if (cat === 'degree') {
+    dynamicAcademicRow = `
+      <tr>
+        <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Class</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #0f172a; width: 28%;">${escapeHtml(student.class)}</td>
+        <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Year</td>
+        <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #0f172a; width: 28%;">${escapeHtml(student.academicStatus?.degreeYear || student.degreeYear || 'Not specified')}</td>
+      </tr>
+    `;
+  } else {
+    // 5 to 10
+    dynamicAcademicRow = `
+      <tr>
+        <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Class</td>
+        <td colspan="3" style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #0f172a;">${escapeHtml(student.class)}</td>
+      </tr>
+    `;
+  }
+
+  const prevCollege = student.academicStatus?.previousCollege || '-';
+  const rank = student.academicStatus?.rank || '-';
+  const admNo = student.academicStatus?.admissionNo || '-';
+  const admDate = student.academicStatus?.admissionDate || '-';
+  const attPct = student.attendancePercentage !== undefined ? `${student.attendancePercentage}%` : 'No sessions recorded yet';
+
+  const photoSrc = isCustomPhoto(student.photoUrl) ? student.photoUrl : '';
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 24px; max-width: 820px; margin: 0 auto; line-height: 1.35;">
+      <!-- Header with Photo Box in Top Right (Template 2) -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #1e4d5f; padding-bottom: 12px; margin-bottom: 16px;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.1em; color: #1e4d5f; text-transform: uppercase;">STUDENT INFORMATION RECORD</div>
+          <h1 style="font-size: 22px; font-weight: 900; color: #0f172a; margin: 3px 0 2px; letter-spacing: -0.02em; text-transform: uppercase;">${escapeHtml(student.name)}</h1>
+          <div style="font-size: 11px; font-weight: 700; color: #475569;">
+            Student ID: <strong style="color: #0f172a;">${escapeHtml(String(student.studentId))}</strong> | Roll No.: <strong style="color: #0f172a;">${escapeHtml(student.roll || '-')}</strong> | Class: <strong style="color: #0f172a;">${escapeHtml(student.class)}</strong>
+          </div>
+        </div>
+        <div style="width: 88px; height: 100px; border: 1.5px solid #cbd5e1; border-radius: 6px; overflow: hidden; background: #f8fafc; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 16px;">
+          ${photoSrc ? `<img src="${escapeQuotes(photoSrc)}" style="width: 100%; height: 100%; object-fit: cover;" alt="Student Photo">` : `<span style="font-size: 9px; font-weight: 700; color: #94a3b8; text-align: center; padding: 4px;">Student Photo</span>`}
+        </div>
+      </div>
+
+      <!-- 1. PERSONAL DETAILS -->
+      <div style="margin-bottom: 14px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 5px;">
+          1. PERSONAL DETAILS
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 10.5px;">
+          <tbody>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Date of Birth</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a; width: 28%;">${escapeHtml(dob)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Age</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a; width: 28%;">${escapeHtml(age)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Gender</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(gender)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Blood Group</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(blood)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Student Email ID</td>
+              <td colspan="3" style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(email)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 2. ADDRESS DETAILS -->
+      <div style="margin-bottom: 14px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 5px;">
+          2. ADDRESS DETAILS
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 10.5px;">
+          <tbody>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Full Address</td>
+              <td colspan="3" style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(fullAddr)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Place</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a; width: 28%;">${escapeHtml(place)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">District</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a; width: 28%;">${escapeHtml(district)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">State</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(state)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">PIN Code</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(pin)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 3. FAMILY & GUARDIAN DETAILS -->
+      <div style="margin-bottom: 14px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 5px;">
+          3. FAMILY & GUARDIAN DETAILS
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 10.5px;">
+          <tbody>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Father</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a; width: 28%;">${escapeHtml(father)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155; width: 22%;">Father's Mobile</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a; width: 28%;">${escapeHtml(fatherMobile)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Mother</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(mother)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Mother's Mobile</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(motherMobile)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Guardian</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(guardian)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Guardian Occupation</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(guardianOcc)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 4. ACADEMIC STATUS (DYNAMIC) -->
+      <div style="margin-bottom: 14px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 5px;">
+          4. ACADEMIC STATUS
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 10.5px;">
+          <tbody>
+            ${dynamicAcademicRow}
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Previous College</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(prevCollege)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Rank</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(rank)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Admission No.</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(admNo)}</td>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Admission Date</td>
+              <td style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 600; color: #0f172a;">${escapeHtml(admDate)}</td>
+            </tr>
+            <tr>
+              <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #334155;">Attendance %</td>
+              <td colspan="3" style="border: 1px solid #cbd5e1; padding: 6px 10px; font-weight: 700; color: #0f172a;">${escapeHtml(attPct)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 5. TEACHERS' REMARKS (FREE FOR HANDWRITING) -->
+      <div style="margin-bottom: 24px;">
+        <div style="font-size: 11px; font-weight: 900; color: #1e4d5f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 5px;">
+          5. TEACHERS' REMARKS
+        </div>
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; min-height: 80px; background: #fafafa; color: #94a3b8; font-size: 10px; font-style: italic;">
+          [Teacher handwritten evaluation, conduct remarks, and academic progress notes...]
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+        <span>Student Profile Record — ${escapeHtml(student.name)}</span>
+        <span>Page 1 of 1</span>
+      </div>
+    </div>
+  `;
+
+  const sheet = document.getElementById('profile-report-print-sheet');
+  if (sheet) {
+    sheet.innerHTML = html;
+    closeIndividualStudentDataModal();
+    document.body.classList.add('printing-profile-report');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-profile-report');
+    }, 1200);
+  }
+}
+
 // ================= STUDENT DETAILS PRINT & CSV EXPORT =================
 async function openStudentExportModal() {
   const modal = document.getElementById('modal-student-export');
@@ -9218,8 +10387,18 @@ async function openStudentExportModal() {
   const classSelect = document.getElementById('export-student-class');
   if (classSelect) {
     const currentVal = classSelect.value || 'all';
+    const combinedClasses = [...(classesList || []), ...((typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList)) ? pwClassesList : [])];
+    const seenClasses = new Set();
+    const uniqueClasses = [];
+    combinedClasses.forEach(c => {
+      const cName = (c.name || c || '').trim();
+      if (cName && !seenClasses.has(cName.toLowerCase())) {
+        seenClasses.add(cName.toLowerCase());
+        uniqueClasses.push(c);
+      }
+    });
     classSelect.innerHTML = `<option value="all">All Classes</option>` +
-      classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
+      uniqueClasses.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
     classSelect.value = currentVal;
   }
 
@@ -9250,24 +10429,37 @@ function toggleAllExportCheckboxes() {
   checkboxes.forEach(c => c.checked = !allChecked);
 }
 
-// Exact order: photo, id, name, class, roll no, address, place, district, state, father's name, father's number, mother's name, year joined, rank, previous college
+// Exact order: all 28 fields matching Add Student modal
 function _getSelectedExportFields() {
   return {
     photo: Boolean(document.getElementById('chk-export-photo')?.checked),
     id: Boolean(document.getElementById('chk-export-id')?.checked),
     name: Boolean(document.getElementById('chk-export-name')?.checked),
     class: Boolean(document.getElementById('chk-export-class')?.checked),
+    stream: Boolean(document.getElementById('chk-export-stream')?.checked),
     roll: Boolean(document.getElementById('chk-export-roll')?.checked),
+    dob: Boolean(document.getElementById('chk-export-dob')?.checked),
+    age: Boolean(document.getElementById('chk-export-age')?.checked),
+    gender: Boolean(document.getElementById('chk-export-gender')?.checked),
+    bloodGroup: Boolean(document.getElementById('chk-export-bloodGroup')?.checked),
+    email: Boolean(document.getElementById('chk-export-email')?.checked),
     address: Boolean(document.getElementById('chk-export-address')?.checked),
     place: Boolean(document.getElementById('chk-export-place')?.checked),
     district: Boolean(document.getElementById('chk-export-district')?.checked),
     state: Boolean(document.getElementById('chk-export-state')?.checked),
+    pinCode: Boolean(document.getElementById('chk-export-pinCode')?.checked),
     father: Boolean(document.getElementById('chk-export-father')?.checked),
     mobile: Boolean(document.getElementById('chk-export-mobile')?.checked),
     mother: Boolean(document.getElementById('chk-export-mother')?.checked),
+    motherNumber: Boolean(document.getElementById('chk-export-motherNumber')?.checked),
+    guardian: Boolean(document.getElementById('chk-export-guardian')?.checked),
+    guardianOcc: Boolean(document.getElementById('chk-export-guardianOcc')?.checked),
+    admNo: Boolean(document.getElementById('chk-export-admNo')?.checked),
+    admDate: Boolean(document.getElementById('chk-export-admDate')?.checked),
     year: Boolean(document.getElementById('chk-export-year')?.checked),
     rank: Boolean(document.getElementById('chk-export-rank')?.checked),
-    college: Boolean(document.getElementById('chk-export-college')?.checked)
+    college: Boolean(document.getElementById('chk-export-college')?.checked),
+    attendance: Boolean(document.getElementById('chk-export-attendance')?.checked)
   };
 }
 
@@ -9419,8 +10611,7 @@ window.addEventListener('afterprint', () => {
   if (printContainer) printContainer.innerHTML = '';
 });
 
-// CSV Export in the exact order requested by user:
-// photo, id, name, class, roll no, address, place, district, state, father's name, father's number, mother's name, year joined, rank, previous college
+// CSV Export for chosen fields across student model:
 async function executeStudentExportCSV() {
   const classFilter = document.getElementById('export-student-class')?.value || 'all';
   const fields = _getSelectedExportFields();
@@ -9445,17 +10636,30 @@ async function executeStudentExportCSV() {
     if (fields.id) headers.push('Student ID');
     if (fields.name) headers.push('Name');
     if (fields.class) headers.push('Class');
+    if (fields.stream) headers.push('Stream / Year');
     if (fields.roll) headers.push('Roll No');
+    if (fields.dob) headers.push('Date of Birth');
+    if (fields.age) headers.push('Age');
+    if (fields.gender) headers.push('Gender');
+    if (fields.bloodGroup) headers.push('Blood Group');
+    if (fields.email) headers.push('Student Email');
     if (fields.address) headers.push('Address');
     if (fields.place) headers.push('Place');
     if (fields.district) headers.push('District');
     if (fields.state) headers.push('State');
+    if (fields.pinCode) headers.push('PIN Code');
     if (fields.father) headers.push("Father's Name");
     if (fields.mobile) headers.push("Father's Number");
     if (fields.mother) headers.push("Mother's Name");
+    if (fields.motherNumber) headers.push("Mother's Number");
+    if (fields.guardian) headers.push('Guardian');
+    if (fields.guardianOcc) headers.push('Guardian Occupation');
+    if (fields.admNo) headers.push('Admission No.');
+    if (fields.admDate) headers.push('Admission Date');
     if (fields.year) headers.push('Year Joined');
     if (fields.rank) headers.push('Rank');
     if (fields.college) headers.push('Previous College');
+    if (fields.attendance) headers.push('Attendance %');
 
     const csvRows = [headers.join(',')];
 
@@ -9464,29 +10668,55 @@ async function executeStudentExportCSV() {
       const fatherName = (st.familyDetails && st.familyDetails.fatherName) || '';
       const fatherMobile = (st.familyDetails && st.familyDetails.fatherMobile) || '';
       const motherName = (st.familyDetails && st.familyDetails.motherName) || '';
+      const motherNumber = (st.familyDetails && (st.familyDetails.motherNumber || st.familyDetails.motherMobile)) || '';
+      const guardian = (st.familyDetails && st.familyDetails.guardianName) ? `${st.familyDetails.guardianName} (${st.familyDetails.guardianRelation || 'Guardian'})` : ((st.familyDetails && (st.familyDetails.guardian || st.familyDetails.guardianType)) || '');
+      const guardianOcc = (st.familyDetails && st.familyDetails.guardianOccupation) || '';
       const address = (st.address && st.address.fullAddress) || '';
       const place = (st.address && st.address.place) || '';
       const district = (st.address && st.address.district) || '';
       const state = (st.address && st.address.state) || '';
+      const pinCode = (st.address && st.address.pinCode) || '';
+      const dob = (st.personalDetails && st.personalDetails.dob) || '';
+      const age = (st.personalDetails && st.personalDetails.age) ? String(st.personalDetails.age) : (dob && typeof calculateAge === 'function' ? String(calculateAge(dob) || '') : '');
+      const gender = (st.personalDetails && st.personalDetails.gender) || '';
+      const bloodGroup = (st.personalDetails && st.personalDetails.bloodGroup) || '';
+      const email = (st.personalDetails && st.personalDetails.studentEmail) || '';
+      const streamOrYear = (st.academicStatus && (st.academicStatus.stream || st.academicStatus.degreeYear)) || '';
+      const admNo = (st.academicStatus && st.academicStatus.admissionNo) || '';
+      const admDate = (st.academicStatus && st.academicStatus.admissionDate) || '';
       const yearJoined = (st.academicStatus && st.academicStatus.yearJoined) || '';
       const rank = (st.academicStatus && st.academicStatus.rank) || '';
       const prevCollege = (st.academicStatus && st.academicStatus.previousCollege) || '';
+      const attPercent = st.attendancePercentage !== undefined ? `${st.attendancePercentage}%` : '';
 
       if (fields.photo) row.push(`"${(st.photoUrl || '').replace(/"/g, '""')}"`);
       if (fields.id) row.push(`"${st.studentId}"`);
       if (fields.name) row.push(`"${(st.name || '').replace(/"/g, '""')}"`);
       if (fields.class) row.push(`"${(st.class || '').replace(/"/g, '""')}"`);
+      if (fields.stream) row.push(`"${streamOrYear.replace(/"/g, '""')}"`);
       if (fields.roll) row.push(`"${st.roll !== undefined ? st.roll : ''}"`);
+      if (fields.dob) row.push(`"${dob.replace(/"/g, '""')}"`);
+      if (fields.age) row.push(`"${age.replace(/"/g, '""')}"`);
+      if (fields.gender) row.push(`"${gender.replace(/"/g, '""')}"`);
+      if (fields.bloodGroup) row.push(`"${bloodGroup.replace(/"/g, '""')}"`);
+      if (fields.email) row.push(`"${email.replace(/"/g, '""')}"`);
       if (fields.address) row.push(`"${address.replace(/"/g, '""')}"`);
       if (fields.place) row.push(`"${place.replace(/"/g, '""')}"`);
       if (fields.district) row.push(`"${district.replace(/"/g, '""')}"`);
       if (fields.state) row.push(`"${state.replace(/"/g, '""')}"`);
+      if (fields.pinCode) row.push(`"${pinCode.replace(/"/g, '""')}"`);
       if (fields.father) row.push(`"${fatherName.replace(/"/g, '""')}"`);
       if (fields.mobile) row.push(`"${fatherMobile.replace(/"/g, '""')}"`);
       if (fields.mother) row.push(`"${motherName.replace(/"/g, '""')}"`);
+      if (fields.motherNumber) row.push(`"${motherNumber.replace(/"/g, '""')}"`);
+      if (fields.guardian) row.push(`"${guardian.replace(/"/g, '""')}"`);
+      if (fields.guardianOcc) row.push(`"${guardianOcc.replace(/"/g, '""')}"`);
+      if (fields.admNo) row.push(`"${admNo.replace(/"/g, '""')}"`);
+      if (fields.admDate) row.push(`"${admDate.replace(/"/g, '""')}"`);
       if (fields.year) row.push(`"${yearJoined.replace(/"/g, '""')}"`);
       if (fields.rank) row.push(`"${rank.replace(/"/g, '""')}"`);
       if (fields.college) row.push(`"${prevCollege.replace(/"/g, '""')}"`);
+      if (fields.attendance) row.push(`"${attPercent.replace(/"/g, '""')}"`);
 
       csvRows.push(row.join(','));
     });
@@ -9544,16 +10774,29 @@ async function executeStudentRosterPrintA4() {
     if (fields.roll) cols.push({ label: 'Roll', align: 'center', width: '45px', render: st => st.roll !== undefined ? st.roll : '-' });
     if (fields.name) cols.push({ label: 'Student Name', align: 'left', render: st => `<b>${escapeHtml(st.name || '-')}</b>` });
     if (fields.class) cols.push({ label: 'Class', align: 'center', render: st => escapeHtml(st.class || classFilter) });
+    if (fields.stream) cols.push({ label: 'Stream/Year', align: 'center', render: st => escapeHtml((st.academicStatus && (st.academicStatus.stream || st.academicStatus.degreeYear)) || '-') });
+    if (fields.dob) cols.push({ label: 'DOB', align: 'center', render: st => escapeHtml((st.personalDetails && st.personalDetails.dob) || '-') });
+    if (fields.age) cols.push({ label: 'Age', align: 'center', render: st => escapeHtml((st.personalDetails && st.personalDetails.age) ? `${st.personalDetails.age}` : (st.personalDetails?.dob && typeof calculateAge === 'function' ? `${calculateAge(st.personalDetails.dob) || '-'}` : '-')) });
+    if (fields.gender) cols.push({ label: 'Gender', align: 'center', render: st => escapeHtml((st.personalDetails && st.personalDetails.gender) || '-') });
+    if (fields.bloodGroup) cols.push({ label: 'Blood', align: 'center', render: st => escapeHtml((st.personalDetails && st.personalDetails.bloodGroup) || '-') });
+    if (fields.email) cols.push({ label: 'Email', align: 'left', render: st => escapeHtml((st.personalDetails && st.personalDetails.studentEmail) || '-') });
     if (fields.mobile) cols.push({ label: "Father's No.", align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.fatherMobile) || '-') });
     if (fields.father) cols.push({ label: "Father's Name", align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.fatherName) || '-') });
     if (fields.mother) cols.push({ label: "Mother's Name", align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.motherName) || '-') });
+    if (fields.motherNumber) cols.push({ label: "Mother's No.", align: 'left', render: st => escapeHtml((st.familyDetails && (st.familyDetails.motherNumber || st.familyDetails.motherMobile)) || '-') });
+    if (fields.guardian) cols.push({ label: 'Guardian', align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.guardianName) ? `${st.familyDetails.guardianName} (${st.familyDetails.guardianRelation || 'Guardian'})` : ((st.familyDetails && (st.familyDetails.guardian || st.familyDetails.guardianType)) || '-')) });
+    if (fields.guardianOcc) cols.push({ label: 'Guardian Occ.', align: 'left', render: st => escapeHtml((st.familyDetails && st.familyDetails.guardianOccupation) || '-') });
     if (fields.place) cols.push({ label: 'Place', align: 'left', render: st => escapeHtml((st.address && st.address.place) || '-') });
     if (fields.district) cols.push({ label: 'District', align: 'left', render: st => escapeHtml((st.address && st.address.district) || '-') });
     if (fields.state) cols.push({ label: 'State', align: 'left', render: st => escapeHtml((st.address && st.address.state) || '-') });
+    if (fields.pinCode) cols.push({ label: 'PIN', align: 'center', render: st => escapeHtml((st.address && st.address.pinCode) || '-') });
     if (fields.address) cols.push({ label: 'Address', align: 'left', render: st => escapeHtml((st.address && st.address.fullAddress) || '-') });
+    if (fields.admNo) cols.push({ label: 'Adm No.', align: 'center', render: st => escapeHtml((st.academicStatus && st.academicStatus.admissionNo) || '-') });
+    if (fields.admDate) cols.push({ label: 'Adm Date', align: 'center', render: st => escapeHtml((st.academicStatus && st.academicStatus.admissionDate) || '-') });
     if (fields.year) cols.push({ label: 'Year Joined', align: 'center', render: st => escapeHtml((st.academicStatus && st.academicStatus.yearJoined) || '-') });
     if (fields.rank) cols.push({ label: 'Rank', align: 'center', render: st => escapeHtml((st.academicStatus && st.academicStatus.rank) || '-') });
     if (fields.college) cols.push({ label: 'Previous College', align: 'left', render: st => escapeHtml((st.academicStatus && st.academicStatus.previousCollege) || '-') });
+    if (fields.attendance) cols.push({ label: 'Attendance %', align: 'center', render: st => escapeHtml(st.attendancePercentage !== undefined ? `${st.attendancePercentage}%` : '-') });
     cols.push({ label: 'Remarks / Sign', align: 'center', width: '90px', render: () => '' });
 
     const classLabel = classFilter === 'all' ? 'All Classes' : classFilter;
@@ -9627,8 +10870,18 @@ async function openAttendanceExportModal() {
   const classSelect = document.getElementById('export-att-class');
   if (classSelect) {
     const currentVal = classSelect.value || 'all';
+    const combinedClasses = [...(classesList || []), ...((typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList)) ? pwClassesList : [])];
+    const seenClasses = new Set();
+    const uniqueClasses = [];
+    combinedClasses.forEach(c => {
+      const cName = (c.name || c || '').trim();
+      if (cName && !seenClasses.has(cName.toLowerCase())) {
+        seenClasses.add(cName.toLowerCase());
+        uniqueClasses.push(c);
+      }
+    });
     classSelect.innerHTML = `<option value="all">All Classes</option>` +
-      classesList.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
+      uniqueClasses.map(c => `<option value="${escapeHtml(c.name || c)}">${escapeHtml(c.name || c)}</option>`).join('');
     classSelect.value = currentVal;
   }
 
@@ -9657,9 +10910,11 @@ async function handleExportAttClassChange() {
     try { await loadSubjects(); } catch(_) {}
   }
 
-  let filteredSubjects = subjectsList || [];
+  let filteredSubjects = [...(subjectsList || []), ...((typeof pwSubjectsList !== 'undefined' && Array.isArray(pwSubjectsList)) ? pwSubjectsList : [])];
   if (classVal !== 'all') {
     const classSubs = filteredSubjects.filter(s => {
+      const assigned = Array.isArray(s.assignedClasses) ? s.assignedClasses : [];
+      if (assigned.length > 0 && classListIncludes(assigned, classVal)) return true;
       if (!s.class || s.class === 'all' || s.class === 'All') return true;
       return isClassEqual(s.class, classVal);
     });
@@ -9713,7 +10968,7 @@ async function executeAttendanceExportCSV() {
       `"Year","${yearDisplay.replace(/"/g, '""')}"`,
       `"Month","${monthDisplay.replace(/"/g, '""')}"`,
       `""`,
-      `"Student ID","Name","Roll No","Total Sessions","Present","Absent","Leave","Percentage (%)","Status"`
+      `"Student ID","Name","Roll No","Class","Subject","Year","Month","Total Sessions","Present","Absent","Leave","Percentage (%)","Status"`
     ];
 
     data.forEach(row => {
@@ -9722,6 +10977,10 @@ async function executeAttendanceExportCSV() {
         `"${row.studentId !== undefined ? row.studentId : ''}"`,
         `"${(row.name || '').replace(/"/g, '""')}"`,
         `"${row.roll !== undefined ? row.roll : ''}"`,
+        `"${(row.class || classDisplay).replace(/"/g, '""')}"`,
+        `"${subjectDisplay.replace(/"/g, '""')}"`,
+        `"${yearDisplay.replace(/"/g, '""')}"`,
+        `"${monthDisplay.replace(/"/g, '""')}"`,
         `"${row.sessions !== undefined ? row.sessions : 0}"`,
         `"${row.present !== undefined ? row.present : 0}"`,
         `"${row.absent !== undefined ? row.absent : 0}"`,

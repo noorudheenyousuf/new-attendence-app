@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Timetable = require('../models/Timetable');
 const User = require('../models/User');
+const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
@@ -97,6 +98,21 @@ router.post('/', authMiddleware, async (req, res) => {
     });
 
     await slot.save();
+
+    await ActivityLog.create({
+      action: `Timetable Slot Added: ${slot.subject} (${slot.class})`,
+      details: `Days: ${slot.day} • Time: ${slot.timeSlot} • Teacher: ${slot.teacherEmail}`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'timetable',
+      entityId: slot._id.toString(),
+      canUndo: true,
+      previousState: null,
+      isPrivate: false,
+      ownerEmail: ''
+    });
+
     res.status(201).json({ success: true, data: slot });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -141,6 +157,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to edit this timetable slot' });
     }
 
+    const previousSnapshot = slot.toObject ? slot.toObject() : { ...slot };
+
     let { day, days, timeSlot, class: className, subject, teacherEmail, room } = req.body;
     if (Array.isArray(days) && days.length > 0) {
       if (!day) day = days.join(', ');
@@ -166,6 +184,21 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
 
     await slot.save();
+
+    await ActivityLog.create({
+      action: `Timetable Slot Updated: ${slot.subject} (${slot.class})`,
+      details: `Days: ${slot.day} • Time: ${slot.timeSlot} • Teacher: ${slot.teacherEmail}`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'timetable',
+      entityId: slot._id.toString(),
+      canUndo: true,
+      previousState: previousSnapshot,
+      isPrivate: false,
+      ownerEmail: ''
+    });
+
     res.json({ success: true, data: slot });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -190,7 +223,24 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this timetable slot' });
     }
 
+    const previousSnapshot = slot.toObject ? slot.toObject() : { ...slot };
+
     await Timetable.findByIdAndDelete(req.params.id);
+
+    await ActivityLog.create({
+      action: `Timetable Slot Deleted: ${slot.subject} (${slot.class})`,
+      details: `Days: ${slot.day} • Time: ${slot.timeSlot} • Teacher: ${slot.teacherEmail}`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'timetable',
+      entityId: req.params.id,
+      canUndo: true,
+      previousState: previousSnapshot,
+      isPrivate: false,
+      ownerEmail: ''
+    });
+
     res.json({ success: true, message: 'Timetable slot deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

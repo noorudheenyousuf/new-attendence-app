@@ -193,6 +193,31 @@ function renderWorkspaceHub() {
           </div>
           <svg class="w-5 h-5 text-pink-400 group-hover:translate-x-0.5 transition flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
+
+        <!-- Row 3: Attendance Taking & Print Reports (50/50 row) -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <!-- Take Attendance Button -->
+          <button type="button" onclick="pwOpenAttendance()" class="touch-btn flex flex-col items-center justify-center gap-2 py-4 rounded-2xl bg-white/80 dark:bg-pink-950/30 border-2 border-pink-200 dark:border-pink-800 hover:bg-pink-50 dark:hover:bg-pink-950/60 active:scale-95 transition group shadow-sm">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center group-hover:scale-105 transition shadow-md">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div>
+              <div class="text-sm font-black text-pink-800 dark:text-pink-200">Attendance</div>
+              <div class="text-[10px] text-pink-500">Take & Record</div>
+            </div>
+          </button>
+
+          <!-- Reports Button -->
+          <button type="button" onclick="pwOpenReports()" class="touch-btn flex flex-col items-center justify-center gap-2 py-4 rounded-2xl bg-white/80 dark:bg-pink-950/30 border-2 border-pink-200 dark:border-pink-800 hover:bg-pink-50 dark:hover:bg-pink-950/60 active:scale-95 transition group shadow-sm">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center group-hover:scale-105 transition shadow-md">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+            </div>
+            <div>
+              <div class="text-sm font-black text-pink-800 dark:text-pink-200">Print Report</div>
+              <div class="text-[10px] text-pink-500">Records & Data</div>
+            </div>
+          </button>
+        </div>
       </div>
 
       <!-- Illustration / Greeting -->
@@ -218,6 +243,28 @@ function renderWorkspaceHub() {
         </button>
       </div>
     </div>`;
+}
+
+// ================================================================
+// ATTENDANCE & REPORTING in Workspace
+// ================================================================
+async function pwOpenAttendance() {
+  triggerNavHaptic('light');
+  if (!pwClassesList || pwClassesList.length === 0) {
+    showToast('Please add at least one private class first', true);
+    return;
+  }
+  const firstClass = pwClassesList[0].name;
+  const subs = (pwSubjectsList || []).filter(s =>
+    (s.assignedClasses || []).some(ac => isClassEqual(ac, firstClass)) || isClassEqual(s.class, firstClass)
+  );
+  const firstSub = subs.length > 0 ? subs[0].name : '';
+  await jumpToTakeAttendance(firstClass, firstSub);
+}
+
+function pwOpenReports() {
+  triggerNavHaptic('light');
+  openPrintDataChoiceModal();
 }
 
 // ================================================================
@@ -527,7 +574,10 @@ async function pwSaveClass(e) {
 }
 
 async function pwDeleteClass(id, name) {
-  if (!confirm(`Delete private class "${name}"? This cannot be undone.`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({ title: 'Delete Class', badge: 'Workspace', message: `Delete private class "${name}"? This cannot be undone.`, isDanger: true })
+    : confirm(`Delete private class "${name}"? This cannot be undone.`);
+  if (!confirmed) return;
   try {
     await API.deleteClass(id);
     showToast(`Class "${name}" deleted`);
@@ -601,7 +651,10 @@ async function pwSaveSubject(e) {
 }
 
 async function pwDeleteSubject(id, name) {
-  if (!confirm(`Delete private subject "${name}"?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({ title: 'Delete Subject', badge: 'Workspace', message: `Delete private subject "${name}"?`, isDanger: true })
+    : confirm(`Delete private subject "${name}"?`);
+  if (!confirmed) return;
   try {
     await API.deleteSubject(id);
     showToast(`Subject "${name}" deleted`);
@@ -651,6 +704,25 @@ function pwHandleStudentNameInput() {
   }
 }
 
+function pwHandleStudentClassChange() {
+  const classSelect = document.getElementById('pw-input-student-class');
+  if (!classSelect) return;
+  const selClass = classSelect.value || '';
+  const cat = typeof getClassCategory === 'function' ? getClassCategory(selClass) : 'general';
+  const streamWrap = document.getElementById('pw-wrap-stream');
+  const degreeWrap = document.getElementById('pw-wrap-degreeYear');
+  if (cat === 'plus_two') {
+    if (streamWrap) streamWrap.classList.remove('hidden');
+    if (degreeWrap) degreeWrap.classList.add('hidden');
+  } else if (cat === 'degree') {
+    if (streamWrap) streamWrap.classList.add('hidden');
+    if (degreeWrap) degreeWrap.classList.remove('hidden');
+  } else {
+    if (streamWrap) streamWrap.classList.add('hidden');
+    if (degreeWrap) degreeWrap.classList.add('hidden');
+  }
+}
+
 function pwResetStudentModal() {
   pwStudentPhotoUrl = '';
   const DEFAULT_PW_AVATAR = (typeof getInitialsAvatar === 'function')
@@ -661,6 +733,7 @@ function pwResetStudentModal() {
   const fileInput = document.getElementById('pw-student-photo-file');
   if (fileInput) fileInput.value = '';
   ['pw-input-student-id','pw-input-student-name','pw-input-student-roll',
+   'pw-input-student-stream','pw-input-student-degreeYear',
    'pw-input-student-address','pw-input-student-place','pw-input-student-district','pw-input-student-state',
    'pw-input-student-fatherName','pw-input-student-motherName',
    'pw-input-student-fatherMobile','pw-input-student-fatherWhatsapp',
@@ -668,6 +741,7 @@ function pwResetStudentModal() {
   ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dbId = document.getElementById('pw-input-student-db-id');
   if (dbId) dbId.value = '';
+  pwHandleStudentClassChange();
 }
 
 async function pwOpenAddStudentModal() {
@@ -686,6 +760,7 @@ async function pwOpenAddStudentModal() {
   const cls = document.getElementById('pw-input-student-class');
   cls.innerHTML = pwClassesList.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('')
     || '<option value="">No classes — add one first</option>';
+  pwHandleStudentClassChange();
   document.getElementById('pw-modal-student').classList.remove('hidden');
 }
 
@@ -702,6 +777,10 @@ async function pwEditStudent(id) {
   document.getElementById('pw-input-student-id').readOnly = false;
   document.getElementById('pw-input-student-name').value = st.name || '';
   document.getElementById('pw-input-student-roll').value = st.roll || '';
+  const streamEl = document.getElementById('pw-input-student-stream');
+  if (streamEl) streamEl.value = st.stream || st.academicStatus?.stream || '';
+  const yrEl = document.getElementById('pw-input-student-degreeYear');
+  if (yrEl) yrEl.value = st.degreeYear || st.academicStatus?.degreeYear || '';
   document.getElementById('pw-input-student-address').value = st.address || '';
   document.getElementById('pw-input-student-place').value = st.place || '';
   document.getElementById('pw-input-student-district').value = st.district || '';
@@ -733,6 +812,7 @@ async function pwEditStudent(id) {
     `<option value="${escapeHtml(c.name)}" ${isClassEqual(c.name, st.class) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
   ).join('') || '<option value="">No classes</option>';
 
+  pwHandleStudentClassChange();
   document.getElementById('pw-modal-student').classList.remove('hidden');
 }
 
@@ -748,6 +828,8 @@ async function pwSaveStudent(e) {
   const name        = document.getElementById('pw-input-student-name').value.trim();
   const roll        = document.getElementById('pw-input-student-roll').value.trim();
   const cls         = document.getElementById('pw-input-student-class').value;
+  const stream      = (document.getElementById('pw-input-student-stream')?.value || '').trim();
+  const degreeYear  = (document.getElementById('pw-input-student-degreeYear')?.value || '').trim();
   const address     = document.getElementById('pw-input-student-address').value.trim();
   const place       = document.getElementById('pw-input-student-place').value.trim();
   const district    = document.getElementById('pw-input-student-district').value.trim();
@@ -772,11 +854,18 @@ async function pwSaveStudent(e) {
   if (dup) return showToast(`ID "${studentId}" already exists in your workspace!`, true);
 
   const payload = {
-    name, class: cls, roll, studentId,
+    name, class: cls, roll, studentId, stream, degreeYear,
     photoUrl: pwStudentPhotoUrl || undefined,
     address, place, district, state,
     fatherName, motherName, fatherMobile, fatherWhatsapp,
-    yearJoined, rank, previousCollege
+    yearJoined, rank, previousCollege,
+    academicStatus: {
+      stream,
+      degreeYear,
+      yearJoined,
+      rank,
+      previousCollege
+    }
   };
 
   try {
@@ -794,7 +883,10 @@ async function pwSaveStudent(e) {
 }
 
 async function pwDeleteStudent(id, name) {
-  if (!confirm(`Delete private student "${name}"?`)) return;
+  const confirmed = typeof showCustomConfirm === 'function'
+    ? await showCustomConfirm({ title: 'Delete Student', badge: 'Workspace', message: `Delete private student "${name}"?`, isDanger: true })
+    : confirm(`Delete private student "${name}"?`);
+  if (!confirmed) return;
   try {
     await API.deleteStudent(id);
     showToast(`Student "${name}" deleted`);
