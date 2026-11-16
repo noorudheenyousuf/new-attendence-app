@@ -204,6 +204,30 @@ const API = {
     });
   },
 
+  async getStudentById(id) {
+    return this.request(`/students/${encodeURIComponent(id)}`);
+  },
+
+  async addStudentRemark(studentId, text, subject = '') {
+    return this.request(`/students/${encodeURIComponent(studentId)}/remarks`, {
+      method: 'POST',
+      body: JSON.stringify({ text, subject })
+    });
+  },
+
+  async editStudentRemark(studentId, remarkId, text) {
+    return this.request(`/students/${encodeURIComponent(studentId)}/remarks/${encodeURIComponent(remarkId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ text })
+    });
+  },
+
+  async deleteStudentRemark(studentId, remarkId) {
+    return this.request(`/students/${encodeURIComponent(studentId)}/remarks/${encodeURIComponent(remarkId)}`, {
+      method: 'DELETE'
+    });
+  },
+
   // Attendance
   async getAttendance(date, className, subject) {
     const params = new URLSearchParams();

@@ -327,10 +327,8 @@ router.post('/', authMiddleware, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password || 'teacher123', salt);
 
-    // Fallback avatar: provided photoUrl, or email gravatar, or empty (simple account avatar)
-    const finalAvatar = avatarUrl && avatarUrl.trim()
-      ? avatarUrl.trim()
-      : (normalizedEmail ? getGravatarUrl(normalizedEmail) : '');
+    // Fallback avatar: provided custom photoUrl, or empty (defaults to clean initials avatar)
+    const finalAvatar = avatarUrl && avatarUrl.trim() ? avatarUrl.trim() : '';
 
     const classesArray = Array.isArray(assignedClasses)
       ? assignedClasses.map(c => String(c).trim()).filter(Boolean)

@@ -23,24 +23,49 @@ const studentSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  personalDetails: {
+    dob: { type: String, default: '' },
+    gender: { type: String, default: '' },
+    bloodGroup: { type: String, default: '' },
+    studentEmail: { type: String, default: '', trim: true, lowercase: true }
+  },
   address: {
     fullAddress: { type: String, default: '' },
     place: { type: String, default: '' },
     district: { type: String, default: '' },
-    state: { type: String, default: '' }
+    state: { type: String, default: '' },
+    pinCode: { type: String, default: '' }
   },
   familyDetails: {
     fatherName: { type: String, default: '' },
     motherName: { type: String, default: '' },
     fatherMobile: { type: String, default: '' },
-    fatherWhatsapp: { type: String, default: '' }
+    fatherWhatsapp: { type: String, default: '' },
+    motherNumber: { type: String, default: '' },
+    guardian: { type: String, default: '' },
+    guardianName: { type: String, default: '' },
+    guardianNumber: { type: String, default: '' },
+    guardianRelation: { type: String, default: '' },
+    guardianOccupation: { type: String, default: '' }
   },
   academicStatus: {
+    admissionNo: { type: String, default: '' },
+    admissionDate: { type: String, default: '' },
     yearJoined: { type: String, default: '' },
     admissionStatus: { type: String, default: 'Confirmed' },
     rank: { type: String, default: '' },
     previousCollege: { type: String, default: '' }
   },
+  remarks: [{
+    teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    teacherName: { type: String, default: '' },
+    teacherEmail: { type: String, default: '' },
+    teacherSubject: { type: String, default: '' },
+    teacherAvatar: { type: String, default: '' },
+    text: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+  }],
   customFields: {
     type: Map,
     of: mongoose.Schema.Types.Mixed,

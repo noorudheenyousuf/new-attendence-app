@@ -9,6 +9,7 @@ function isCustomPhoto(url) {
   if (clean === DEFAULT_AVATAR || clean === '/default_avatar.jpg') return false;
   if (clean.includes('default_avatar.jpg')) return false;
   if (clean.includes('unsplash.com')) return false;
+  if (clean.includes('gravatar.com')) return false;
   if (clean.startsWith("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'") ||
       clean.startsWith('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"')) return false;
   return true;
@@ -3431,9 +3432,9 @@ async function openProfileEditPage(targetUserId = null) {
     if (titleEl) titleEl.textContent = `Edit Teacher: ${teacher.name}`;
     if (subtitleEl) subtitleEl.textContent = 'Update profile, contact & assigned subjects';
 
-    editProfileCurrentAvatarUrl = teacher.avatarUrl || '';
+    editProfileCurrentAvatarUrl = isCustomPhoto(teacher.avatarUrl) ? teacher.avatarUrl : '';
     if (preview) {
-      preview.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
+      preview.src = isCustomPhoto(teacher.avatarUrl) ? teacher.avatarUrl : getEmailAvatarPreview(teacher.email, teacher.name);
     }
 
     if (nameInput) nameInput.value = teacher.name || '';
@@ -4220,6 +4221,161 @@ function handleNewStudentClassChanged() {
   rollInput.value = maxRoll > 0 ? (maxRoll + 1) : 1;
 }
 
+// ================= STUDENT MODAL HELPERS (AGE, GUARDIAN, VALIDATION, DISCARD, REMARKS) =================
+let studentModalInitialSnapshot = { new: '', edit: '' };
+
+function calculateAgeFromDob(dobStr) {
+  if (!dobStr) return '';
+  const b = new Date(dobStr);
+  if (isNaN(b.getTime())) return '';
+  const n = new Date();
+  let a = n.getFullYear() - b.getFullYear();
+  if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) {
+    a--;
+  }
+  return a >= 0 ? `${a} years` : '';
+}
+
+function handleStudentDobChange(prefix) {
+  const dobEl = document.getElementById(`${prefix}-student-dob`);
+  const ageEl = document.getElementById(`${prefix}-student-age`);
+  if (!dobEl || !ageEl) return;
+  ageEl.value = calculateAgeFromDob(dobEl.value);
+}
+
+function handleGuardianChange(prefix) {
+  const sel = document.getElementById(`${prefix}-student-guardian`);
+  const box = document.getElementById(`${prefix}-guardian-other-box`);
+  if (!sel || !box) return;
+  if (sel.value === 'Other') {
+    box.classList.remove('hidden');
+  } else {
+    box.classList.add('hidden');
+  }
+}
+
+function getSelectedStudentGender(prefix) {
+  const checked = document.querySelector(`input[name="${prefix}-student-gender"]:checked`);
+  return checked ? checked.value : '';
+}
+
+function setSelectedStudentGender(prefix, val) {
+  const radios = document.querySelectorAll(`input[name="${prefix}-student-gender"]`);
+  radios.forEach(r => {
+    r.checked = Boolean(val && r.value.toLowerCase() === String(val).toLowerCase());
+  });
+}
+
+function clearFieldError(prefix, field) {
+  const errEl = document.getElementById(`err-${prefix}-${field}`);
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
+}
+
+function showFieldError(prefix, field, msg) {
+  const errEl = document.getElementById(`err-${prefix}-${field}`);
+  if (errEl) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+}
+
+function clearAllStudentModalErrors(prefix) {
+  ['name', 'studentId', 'roll', 'class', 'studentEmail', 'pinCode', 'fatherMobile', 'motherNumber', 'guardianNumber'].forEach(f => {
+    clearFieldError(prefix, f);
+  });
+}
+
+function validateStudentModalForm(prefix) {
+  clearAllStudentModalErrors(prefix);
+  let isValid = true;
+
+  const name = getStudentInputValue(prefix, 'name');
+  const studentIdEl = document.getElementById(prefix === 'new' ? 'auto-student-id' : 'edit-student-id');
+  const studentIdVal = studentIdEl ? studentIdEl.value.trim() : '';
+  const roll = getStudentInputValue(prefix, 'roll');
+  const studentClass = getStudentInputValue(prefix, 'class');
+
+  if (!name) {
+    showFieldError(prefix, 'name', 'Full Name is required');
+    isValid = false;
+  }
+  if (!studentIdVal) {
+    showFieldError(prefix, 'studentId', 'Student ID is required');
+    isValid = false;
+  }
+  if (!roll || isNaN(Number(roll))) {
+    showFieldError(prefix, 'roll', 'Valid Roll No. is required');
+    isValid = false;
+  }
+  if (!studentClass) {
+    showFieldError(prefix, 'class', 'Class is required');
+    isValid = false;
+  }
+
+  // Optional fields: validate ONLY when filled
+  const email = getStudentInputValue(prefix, 'studentEmail');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showFieldError(prefix, 'studentEmail', 'Enter a valid email address');
+    isValid = false;
+  }
+
+  const pin = getStudentInputValue(prefix, 'pinCode');
+  if (pin && !/^\d{6}$/.test(pin)) {
+    showFieldError(prefix, 'pinCode', 'PIN Code must be 6 digits');
+    isValid = false;
+  }
+
+  const mobile = getStudentInputValue(prefix, 'fatherMobile');
+  if (mobile && !/^\d{10}$/.test(mobile)) {
+    showFieldError(prefix, 'fatherMobile', 'Mobile must be 10 digits');
+    isValid = false;
+  }
+
+  const motherNum = getStudentInputValue(prefix, 'motherNumber');
+  if (motherNum && !/^\d{10}$/.test(motherNum)) {
+    showFieldError(prefix, 'motherNumber', "Mother's number must be 10 digits");
+    isValid = false;
+  }
+
+  const guardian = getStudentInputValue(prefix, 'guardian');
+  const guardianNum = getStudentInputValue(prefix, 'guardianNumber');
+  if (guardian === 'Other' && guardianNum && !/^\d{10}$/.test(guardianNum)) {
+    showFieldError(prefix, 'guardianNumber', 'Guardian number must be 10 digits');
+    isValid = false;
+  }
+
+  return isValid;
+}
+
+function getStudentFormStateSerialized(prefix) {
+  const keys = [
+    'name', 'class', 'roll', 'dob', 'bloodGroup', 'studentEmail',
+    'address', 'place', 'district', 'state', 'pinCode',
+    'fatherName', 'motherName', 'fatherMobile', 'motherNumber',
+    'guardian', 'guardianName', 'guardianNumber', 'guardianRelation', 'guardianOccupation',
+    'admissionNo', 'admissionDate', 'rank', 'previousCollege', 'initialRemark'
+  ];
+  const state = {};
+  keys.forEach(k => {
+    state[k] = getStudentInputValue(prefix, k);
+  });
+  state.gender = getSelectedStudentGender(prefix);
+  state.photo = prefix === 'new' ? (newStudentPhotoUrl || newStudentBase64Photo || '') : (editStudentPhotoUrl || editStudentBase64Photo || '');
+  return JSON.stringify(state);
+}
+
+function captureStudentFormSnapshot(prefix) {
+  studentModalInitialSnapshot[prefix] = getStudentFormStateSerialized(prefix);
+}
+
+function isStudentFormDirty(prefix) {
+  const current = getStudentFormStateSerialized(prefix);
+  return Boolean(studentModalInitialSnapshot[prefix] && current !== studentModalInitialSnapshot[prefix]);
+}
+
 // Add Student Modal (Auto Student ID starting at 2000, read-only)
 async function openStudentModal() {
   const titleEl = document.getElementById('modal-add-student-title');
@@ -4233,19 +4389,29 @@ async function openStudentModal() {
   const preview = document.getElementById('new-preview-photo');
   if (preview) preview.src = getInitialsAvatar('', '245b70');
 
+  clearAllStudentModalErrors('new');
+
   // Clear all inputs
   const clearIds = [
-    'new-student-name', 'new-student-roll', 'new-student-address',
-    'new-student-place', 'new-student-district', 'new-student-state',
-    'new-student-fatherName', 'new-student-motherName', 'new-student-fatherMobile',
-    'new-student-fatherWhatsapp', 'new-student-rank', 'new-student-previousCollege'
+    'new-student-name', 'new-student-roll',
+    'new-student-dob', 'new-student-age', 'new-student-bloodGroup', 'new-student-studentEmail',
+    'new-student-address', 'new-student-place', 'new-student-district', 'new-student-state', 'new-student-pinCode',
+    'new-student-fatherName', 'new-student-motherName', 'new-student-fatherMobile', 'new-student-motherNumber',
+    'new-student-guardian', 'new-student-guardianName', 'new-student-guardianNumber', 'new-student-guardianRelation', 'new-student-guardianOccupation',
+    'new-student-admissionNo', 'new-student-admissionDate', 'new-student-rank', 'new-student-previousCollege',
+    'new-student-initialRemark'
   ];
   clearIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  const yearEl = document.getElementById('new-student-yearJoined');
-  if (yearEl) yearEl.value = '2024';
+
+  // Pre-select Male in Add Student form only
+  setSelectedStudentGender('new', 'Male');
+  handleGuardianChange('new');
+
+  const attEl = document.getElementById('new-student-attendancePercent');
+  if (attEl) attEl.value = 'Auto from app report';
 
   // Populate classes dropdown
   const classSelect = document.getElementById('new-student-class');
@@ -4267,31 +4433,57 @@ async function openStudentModal() {
   } catch (e) {
     document.getElementById('auto-student-id').value = 2000;
   }
+
+  captureStudentFormSnapshot('new');
   document.getElementById('modal-add-student').classList.remove('hidden');
 }
 
-function closeStudentModal() {
+function closeStudentModal(force = false) {
+  if (!force && isStudentFormDirty('new')) {
+    if (!confirm('Discard changes?')) return;
+  }
   document.getElementById('modal-add-student').classList.add('hidden');
+  clearAllStudentModalErrors('new');
   newStudentPhotoUrl = '';
   newStudentBase64Photo = '';
 }
 
 async function handleSaveNewStudent(e) {
   e.preventDefault();
+  if (!validateStudentModalForm('new')) {
+    return;
+  }
+
   const name = getStudentInputValue('new', 'name');
   const studentClass = getStudentInputValue('new', 'class') || (classesList[0]?.name || '');
   const roll = getStudentInputValue('new', 'roll');
+
+  const dob = getStudentInputValue('new', 'dob');
+  const gender = getSelectedStudentGender('new');
+  const bloodGroup = getStudentInputValue('new', 'bloodGroup');
+  const studentEmail = getStudentInputValue('new', 'studentEmail');
+
   const fullAddress = getStudentInputValue('new', 'address');
   const place = getStudentInputValue('new', 'place');
   const district = getStudentInputValue('new', 'district');
   const state = getStudentInputValue('new', 'state');
+  const pinCode = getStudentInputValue('new', 'pinCode');
+
   const fatherName = getStudentInputValue('new', 'fatherName');
   const motherName = getStudentInputValue('new', 'motherName');
   const fatherMobile = getStudentInputValue('new', 'fatherMobile');
-  const fatherWhatsapp = getStudentInputValue('new', 'fatherWhatsapp');
-  const yearJoined = getStudentInputValue('new', 'yearJoined') || '2024';
+  const motherNumber = getStudentInputValue('new', 'motherNumber');
+  const guardian = getStudentInputValue('new', 'guardian');
+  const guardianName = guardian === 'Other' ? getStudentInputValue('new', 'guardianName') : '';
+  const guardianNumber = guardian === 'Other' ? getStudentInputValue('new', 'guardianNumber') : '';
+  const guardianRelation = guardian === 'Other' ? getStudentInputValue('new', 'guardianRelation') : '';
+  const guardianOccupation = getStudentInputValue('new', 'guardianOccupation');
+
+  const admissionNo = getStudentInputValue('new', 'admissionNo');
+  const admissionDate = getStudentInputValue('new', 'admissionDate');
   const rank = getStudentInputValue('new', 'rank');
   const previousCollege = getStudentInputValue('new', 'previousCollege');
+  const initialRemark = getStudentInputValue('new', 'initialRemark');
   const customFields = collectStudentCustomFields('new');
 
   const photoUrl = newStudentPhotoUrl || newStudentBase64Photo || DEFAULT_AVATAR;
@@ -4301,9 +4493,21 @@ async function handleSaveNewStudent(e) {
     class: studentClass,
     roll,
     photoUrl,
-    address: { fullAddress, place, district, state },
-    familyDetails: { fatherName, motherName, fatherMobile, fatherWhatsapp },
-    academicStatus: { yearJoined, rank, previousCollege },
+    personalDetails: { dob, gender, bloodGroup, studentEmail },
+    address: { fullAddress, place, district, state, pinCode },
+    familyDetails: {
+      fatherName,
+      motherName,
+      fatherMobile,
+      motherNumber,
+      guardian,
+      guardianName,
+      guardianNumber,
+      guardianRelation,
+      guardianOccupation
+    },
+    academicStatus: { admissionNo, admissionDate, rank, previousCollege },
+    initialRemark,
     customFields
   };
 
@@ -4311,25 +4515,46 @@ async function handleSaveNewStudent(e) {
     const res = await API.addStudent(payload);
     if (res.success) {
       showToast(`Student "${name}" enrolled with ID ${res.data.studentId}!`);
-      closeStudentModal();
+      closeStudentModal(true);
       await renderStudentsDirectory();
       await loadAttendanceRoster();
       await loadReport();
     }
   } catch (error) {
+    if (error.message && error.message.toLowerCase().includes('email')) {
+      showFieldError('new', 'studentEmail', error.message);
+    } else if (error.message && error.message.toLowerCase().includes('pin')) {
+      showFieldError('new', 'pinCode', error.message);
+    } else if (error.message && error.message.toLowerCase().includes('mobile')) {
+      showFieldError('new', 'fatherMobile', error.message);
+    }
     showToast(error.message, true);
   }
 }
 
 // USER DIRECTIVE: "when update student show the all inputs to edit"
 let activeEditStudentObjId = null;
+let activeEditStudentRecord = null;
+
 async function openEditStudentModal(id) {
   activeEditStudentObjId = id;
+  clearAllStudentModalErrors('edit');
   try {
-    const res = await API.getStudents();
-    const student = res.data.find(s => s._id === id);
+    let student = null;
+    try {
+      const singleRes = await API.getStudentById(id);
+      if (singleRes && singleRes.success && singleRes.data) {
+        student = singleRes.data;
+      }
+    } catch (_) {}
+
+    if (!student) {
+      const res = await API.getStudents();
+      student = (res.data || []).find(s => s._id === id || String(s.studentId) === String(id));
+    }
     if (!student) return;
 
+    activeEditStudentRecord = student;
     editStudentPhotoUrl = student.photoUrl || '';
     editStudentBase64Photo = student.photoUrl || '';
     document.getElementById('edit-student-modal-title').innerText = `Edit Student: ${student.name}`;
@@ -4355,27 +4580,64 @@ async function openEditStudentModal(id) {
     setVal('edit-student-name', student.name);
     setVal('edit-student-class', student.class);
     setVal('edit-student-roll', student.roll);
+
+    // Personal Details (never force Male on old records if missing)
+    const dob = student.personalDetails?.dob || '';
+    setVal('edit-student-dob', dob);
+    setVal('edit-student-age', calculateAgeFromDob(dob));
+    setSelectedStudentGender('edit', student.personalDetails?.gender || '');
+    setVal('edit-student-bloodGroup', student.personalDetails?.bloodGroup || '');
+    setVal('edit-student-studentEmail', student.personalDetails?.studentEmail || '');
+
+    // Address Details
     setVal('edit-student-address', student.address?.fullAddress);
     setVal('edit-student-place', student.address?.place);
     setVal('edit-student-district', student.address?.district);
     setVal('edit-student-state', student.address?.state);
+    setVal('edit-student-pinCode', student.address?.pinCode);
+
+    // Family Details (motherNumber is separate from fatherWhatsapp)
     setVal('edit-student-fatherName', student.familyDetails?.fatherName);
     setVal('edit-student-motherName', student.familyDetails?.motherName);
     setVal('edit-student-fatherMobile', student.familyDetails?.fatherMobile);
-    setVal('edit-student-fatherWhatsapp', student.familyDetails?.fatherWhatsapp);
-    setVal('edit-student-yearJoined', student.academicStatus?.yearJoined || student.academicStatus?.admissionStatus || '2024');
+    setVal('edit-student-motherNumber', student.familyDetails?.motherNumber);
+    setVal('edit-student-guardian', student.familyDetails?.guardian || '');
+    setVal('edit-student-guardianName', student.familyDetails?.guardianName);
+    setVal('edit-student-guardianNumber', student.familyDetails?.guardianNumber);
+    setVal('edit-student-guardianRelation', student.familyDetails?.guardianRelation);
+    setVal('edit-student-guardianOccupation', student.familyDetails?.guardianOccupation);
+    handleGuardianChange('edit');
+
+    // Academic Status
+    setVal('edit-student-admissionNo', student.academicStatus?.admissionNo);
+    setVal('edit-student-admissionDate', student.academicStatus?.admissionDate);
     setVal('edit-student-rank', student.academicStatus?.rank);
     setVal('edit-student-previousCollege', student.academicStatus?.previousCollege);
 
+    const attPct = student.attendancePercentage !== undefined && student.attendancePercentage !== null
+      ? `${student.attendancePercentage}% (${student.attendancePresent || 0}/${student.attendanceSessions || 0} sessions)`
+      : 'No sessions recorded yet';
+    setVal('edit-student-attendancePercent', attPct);
+
+    const newRemInput = document.getElementById('edit-student-new-remark');
+    if (newRemInput) newRemInput.value = '';
+    renderStudentRemarksList(student, 'edit-student-remarks-list');
+
+    captureStudentFormSnapshot('edit');
     document.getElementById('modal-edit-student').classList.remove('hidden');
   } catch (error) {
     showToast('Failed to load student details', true);
   }
 }
 
-function closeEditStudentModal() {
+function closeEditStudentModal(force = false) {
+  if (!force && isStudentFormDirty('edit')) {
+    if (!confirm('Discard changes?')) return;
+  }
   document.getElementById('modal-edit-student').classList.add('hidden');
+  clearAllStudentModalErrors('edit');
   activeEditStudentObjId = null;
+  activeEditStudentRecord = null;
   editStudentPhotoUrl = '';
   editStudentBase64Photo = '';
 }
@@ -4383,19 +4645,37 @@ function closeEditStudentModal() {
 async function handleSaveEditedStudent(e) {
   e.preventDefault();
   if (!activeEditStudentObjId) return;
+  if (!validateStudentModalForm('edit')) {
+    return;
+  }
 
   const name = getStudentInputValue('edit', 'name');
   const studentClass = getStudentInputValue('edit', 'class');
   const roll = getStudentInputValue('edit', 'roll');
+
+  const dob = getStudentInputValue('edit', 'dob');
+  const gender = getSelectedStudentGender('edit');
+  const bloodGroup = getStudentInputValue('edit', 'bloodGroup');
+  const studentEmail = getStudentInputValue('edit', 'studentEmail');
+
   const fullAddress = getStudentInputValue('edit', 'address');
   const place = getStudentInputValue('edit', 'place');
   const district = getStudentInputValue('edit', 'district');
   const state = getStudentInputValue('edit', 'state');
+  const pinCode = getStudentInputValue('edit', 'pinCode');
+
   const fatherName = getStudentInputValue('edit', 'fatherName');
   const motherName = getStudentInputValue('edit', 'motherName');
   const fatherMobile = getStudentInputValue('edit', 'fatherMobile');
-  const fatherWhatsapp = getStudentInputValue('edit', 'fatherWhatsapp');
-  const yearJoined = getStudentInputValue('edit', 'yearJoined');
+  const motherNumber = getStudentInputValue('edit', 'motherNumber');
+  const guardian = getStudentInputValue('edit', 'guardian');
+  const guardianName = guardian === 'Other' ? getStudentInputValue('edit', 'guardianName') : '';
+  const guardianNumber = guardian === 'Other' ? getStudentInputValue('edit', 'guardianNumber') : '';
+  const guardianRelation = guardian === 'Other' ? getStudentInputValue('edit', 'guardianRelation') : '';
+  const guardianOccupation = getStudentInputValue('edit', 'guardianOccupation');
+
+  const admissionNo = getStudentInputValue('edit', 'admissionNo');
+  const admissionDate = getStudentInputValue('edit', 'admissionDate');
   const rank = getStudentInputValue('edit', 'rank');
   const previousCollege = getStudentInputValue('edit', 'previousCollege');
   const customFields = collectStudentCustomFields('edit');
@@ -4405,9 +4685,25 @@ async function handleSaveEditedStudent(e) {
     class: studentClass,
     roll,
     photoUrl: editStudentPhotoUrl || editStudentBase64Photo,
-    address: { fullAddress, place, district, state },
-    familyDetails: { fatherName, motherName, fatherMobile, fatherWhatsapp },
-    academicStatus: { yearJoined, rank, previousCollege },
+    personalDetails: { dob, gender, bloodGroup, studentEmail },
+    address: { fullAddress, place, district, state, pinCode },
+    familyDetails: {
+      fatherName,
+      motherName,
+      fatherMobile,
+      motherNumber,
+      guardian,
+      guardianName,
+      guardianNumber,
+      guardianRelation,
+      guardianOccupation
+    },
+    academicStatus: {
+      admissionNo,
+      admissionDate,
+      rank,
+      previousCollege
+    },
     customFields
   };
 
@@ -4415,7 +4711,7 @@ async function handleSaveEditedStudent(e) {
     const res = await API.updateStudent(activeEditStudentObjId, payload);
     if (res.success) {
       showToast(`Student "${name}" details updated!`);
-      closeEditStudentModal();
+      closeEditStudentModal(true);
       await renderStudentsDirectory();
       await loadAttendanceRoster();
       await loadReport();
@@ -4438,7 +4734,6 @@ function getHighClarityPhotoUrl(url) {
 
   // 1. Cloudinary: strip any downscaling/transformations from URL path
   if (cleanUrl.includes('cloudinary.com') && cleanUrl.includes('/image/upload/')) {
-    // Strip transforms like /c_thumb,w_...,h_.../ or /w_100,h_100/
     cleanUrl = cleanUrl.replace(/\/image\/upload\/(?:[a-zA-Z0-9_-]+:[a-zA-Z0-9_.-]+,?|[a-zA-Z0-9_-]+_[a-zA-Z0-9_.-]+,?)+\//i, '/image/upload/');
   }
   // 2. Unsplash: upgrade low resolution thumbnails to high resolution
@@ -4455,42 +4750,206 @@ function getHighClarityPhotoUrl(url) {
   return cleanUrl;
 }
 
+function formatRemarkDate(dateVal) {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function renderStudentRemarksList(student, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const remarks = Array.isArray(student?.remarks) ? [...student.remarks] : [];
+  remarks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+  if (remarks.length === 0) {
+    container.innerHTML = `<p class="text-[11px] text-[var(--text-sub)] italic py-1">No teacher remarks added yet.</p>`;
+    return;
+  }
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const myEmail = (currentUser && currentUser.email) ? currentUser.email.toLowerCase().trim() : '';
+  const myId = currentUser ? String(currentUser._id || currentUser.id || '') : '';
+
+  container.innerHTML = remarks.map(rem => {
+    const tName = rem.teacherName || 'Teacher';
+    const tSub = rem.teacherSubject || 'Faculty';
+    const dateStr = formatRemarkDate(rem.createdAt);
+    const avatarSrc = isCustomPhoto(rem.teacherAvatar)
+      ? rem.teacherAvatar
+      : getInitialsAvatar(tName, '245b70', 'ffffff', true);
+
+    const isOwner = (rem.teacherId && myId && String(rem.teacherId) === myId) ||
+                    (rem.teacherEmail && myEmail && rem.teacherEmail.toLowerCase().trim() === myEmail);
+    const canModify = Boolean(isAdmin || isOwner);
+
+    const actionsHtml = canModify ? `
+      <div class="flex items-center gap-1 ml-auto flex-shrink-0">
+        <button type="button" onclick="handleEditStudentRemark('${student._id}', '${rem._id}')" title="Edit Remark" class="px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700/70 text-[10px] font-bold text-[var(--text-main)] hover:bg-[#245b70] hover:text-white transition">Edit</button>
+        <button type="button" onclick="handleDeleteStudentRemark('${student._id}', '${rem._id}')" title="Delete Remark" class="px-1.5 py-0.5 rounded bg-rose-500/10 text-[10px] font-bold text-rose-600 hover:bg-rose-600 hover:text-white transition">Delete</button>
+      </div>
+    ` : '';
+
+    return `
+      <div class="flex items-start gap-2.5 p-2.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)]">
+        <img src="${avatarSrc}" alt="${escapeHtml(tName)}" class="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-[#245b70]/30">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-1">
+            <h5 class="text-xs font-extrabold text-[var(--text-main)] truncate">${escapeHtml(tName)}</h5>
+            ${actionsHtml}
+          </div>
+          <p class="text-[10px] text-[var(--text-sub)] font-semibold">${escapeHtml(tSub)}${dateStr ? ` &middot; ${escapeHtml(dateStr)}` : ''}</p>
+          <p class="text-xs text-[var(--text-main)] mt-1 leading-relaxed break-words">${escapeHtml(rem.text || '')}</p>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function handleAddRemarkFromDetailsModal() {
+  if (!currentDetailsStudent || !currentDetailsStudent._id) return;
+  const input = document.getElementById('details-new-remark-text');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) {
+    showToast('Please write a remark first', true);
+    return;
+  }
+  try {
+    const res = await API.addStudentRemark(currentDetailsStudent._id, text);
+    if (res && res.success && res.data) {
+      input.value = '';
+      currentDetailsStudent = res.data;
+      renderStudentRemarksList(currentDetailsStudent, 'details-student-remarks-list');
+      await renderStudentsDirectory();
+      showToast('Remark added!');
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to add remark', true);
+  }
+}
+
+async function handleAddRemarkFromEditModal() {
+  if (!activeEditStudentObjId) return;
+  const input = document.getElementById('edit-student-new-remark');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) {
+    showToast('Please write a remark first', true);
+    return;
+  }
+  try {
+    const res = await API.addStudentRemark(activeEditStudentObjId, text);
+    if (res && res.success && res.data) {
+      input.value = '';
+      activeEditStudentRecord = res.data;
+      renderStudentRemarksList(activeEditStudentRecord, 'edit-student-remarks-list');
+      await renderStudentsDirectory();
+      showToast('Remark added!');
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to add remark', true);
+  }
+}
+
+async function handleEditStudentRemark(studentId, remarkId) {
+  const targetStudent = (currentDetailsStudent && String(currentDetailsStudent._id) === String(studentId))
+    ? currentDetailsStudent
+    : activeEditStudentRecord;
+  const rem = (targetStudent?.remarks || []).find(r => String(r._id) === String(remarkId));
+  const nextText = prompt('Edit your remark:', rem ? rem.text : '');
+  if (nextText === null) return;
+  if (!nextText.trim()) {
+    showToast('Remark text cannot be empty', true);
+    return;
+  }
+  try {
+    const res = await API.editStudentRemark(studentId, remarkId, nextText.trim());
+    if (res && res.success && res.data) {
+      if (currentDetailsStudent && String(currentDetailsStudent._id) === String(studentId)) {
+        currentDetailsStudent = res.data;
+        renderStudentRemarksList(currentDetailsStudent, 'details-student-remarks-list');
+      }
+      if (activeEditStudentRecord && String(activeEditStudentRecord._id) === String(studentId)) {
+        activeEditStudentRecord = res.data;
+        renderStudentRemarksList(activeEditStudentRecord, 'edit-student-remarks-list');
+      }
+      await renderStudentsDirectory();
+      showToast('Remark updated!');
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to update remark', true);
+  }
+}
+
+async function handleDeleteStudentRemark(studentId, remarkId) {
+  if (!confirm('Delete this remark?')) return;
+  try {
+    const res = await API.deleteStudentRemark(studentId, remarkId);
+    if (res && res.success && res.data) {
+      if (currentDetailsStudent && String(currentDetailsStudent._id) === String(studentId)) {
+        currentDetailsStudent = res.data;
+        renderStudentRemarksList(currentDetailsStudent, 'details-student-remarks-list');
+      }
+      if (activeEditStudentRecord && String(activeEditStudentRecord._id) === String(studentId)) {
+        activeEditStudentRecord = res.data;
+        renderStudentRemarksList(activeEditStudentRecord, 'edit-student-remarks-list');
+      }
+      await renderStudentsDirectory();
+      showToast('Remark deleted');
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to delete remark', true);
+  }
+}
+
+function setDetailsFieldVisibility(wrapId, valId, value) {
+  const wrap = document.getElementById(wrapId);
+  const valEl = document.getElementById(valId);
+  const clean = value !== undefined && value !== null ? String(value).trim() : '';
+  if (clean && clean !== '-') {
+    if (valEl) valEl.innerText = clean;
+    if (wrap) wrap.classList.remove('hidden');
+    return true;
+  } else {
+    if (valEl) valEl.innerText = '';
+    if (wrap) wrap.classList.add('hidden');
+    return false;
+  }
+}
+
 async function openStudentDetailsModal(studentId) {
   const targetId = String(studentId);
-  // Look in main students list first, then PW students list
-  let student = (studentsList || []).find(s => String(s.studentId) === targetId);
+  let student = null;
+
+  try {
+    const singleRes = await API.getStudentById(targetId);
+    if (singleRes && singleRes.success && singleRes.data) {
+      student = singleRes.data;
+    }
+  } catch (_) {}
+
+  if (!student) {
+    student = (studentsList || []).find(s => String(s.studentId) === targetId || String(s._id) === targetId);
+  }
   if (!student && typeof pwStudentsList !== 'undefined' && Array.isArray(pwStudentsList)) {
-    student = pwStudentsList.find(s => String(s.studentId) === targetId);
+    student = pwStudentsList.find(s => String(s.studentId) === targetId || String(s._id) === targetId);
   }
   if (!student) {
     try {
       const res = await API.getStudents('all');
       if (res && res.data) {
-        student = res.data.find(s => String(s.studentId) === targetId);
+        student = res.data.find(s => String(s.studentId) === targetId || String(s._id) === targetId);
       }
-    } catch (e) {
-      console.log(e);
-    }
-  }
-  if (!student && typeof auth !== 'undefined' && auth && auth.token) {
-    try {
-      const pwRes = await fetch('/api/students?scope=private', {
-        headers: { Authorization: `Bearer ${auth.token}` }
-      });
-      const pwJson = await pwRes.json();
-      if (pwJson && pwJson.data) {
-        student = pwJson.data.find(s => String(s.studentId) === targetId);
-      }
-    } catch (e) {
-      console.log(e);
-    }
+    } catch (e) {}
   }
   if (!student) {
     showToast('Student information not found', true);
     return;
   }
 
-  // Store active student reference for enlargement and download actions
   currentDetailsStudent = student;
 
   const photo = isCustomPhoto(student.photoUrl) ? student.photoUrl : getInitialsAvatar(student.name, '245b70');
@@ -4500,20 +4959,78 @@ async function openStudentDetailsModal(studentId) {
   document.getElementById('details-student-class').innerText = `Class: ${student.class}`;
   document.getElementById('details-student-roll').innerText = `Roll #${student.roll}`;
 
+  // Personal Details (show section only if at least one field is non-empty)
+  const dob = student.personalDetails?.dob || '';
+  const age = calculateAgeFromDob(dob);
+  const hasDob = setDetailsFieldVisibility('details-wrap-dob', 'details-student-dob', dob);
+  const hasAge = setDetailsFieldVisibility('details-wrap-age', 'details-student-age', age);
+  const hasGender = setDetailsFieldVisibility('details-wrap-gender', 'details-student-gender', student.personalDetails?.gender);
+  const hasBlood = setDetailsFieldVisibility('details-wrap-blood', 'details-student-blood', student.personalDetails?.bloodGroup);
+  const hasEmail = setDetailsFieldVisibility('details-wrap-email', 'details-student-email', student.personalDetails?.studentEmail);
+  const personalSec = document.getElementById('details-personal-section');
+  if (personalSec) {
+    if (hasDob || hasAge || hasGender || hasBlood || hasEmail) {
+      personalSec.classList.remove('hidden');
+    } else {
+      personalSec.classList.add('hidden');
+    }
+  }
+
+  // Address Details
   document.getElementById('details-student-address').innerText = (student.address && student.address.fullAddress) || '-';
   document.getElementById('details-student-place').innerText = (student.address && student.address.place) || '-';
   document.getElementById('details-student-district').innerText = (student.address && student.address.district) || '-';
   document.getElementById('details-student-state').innerText = (student.address && student.address.state) || '-';
+  setDetailsFieldVisibility('details-wrap-pin', 'details-student-pin', student.address?.pinCode);
 
+  // Family Details
   document.getElementById('details-student-father').innerText = (student.familyDetails && student.familyDetails.fatherName) || '-';
   document.getElementById('details-student-mother').innerText = (student.familyDetails && student.familyDetails.motherName) || '-';
   document.getElementById('details-student-mobile').innerText = (student.familyDetails && student.familyDetails.fatherMobile) || '-';
-  document.getElementById('details-student-wa').innerText = (student.familyDetails && student.familyDetails.fatherWhatsapp) || '-';
+  setDetailsFieldVisibility('details-wrap-motherNumber', 'details-student-motherNumber', student.familyDetails?.motherNumber);
+  // Show legacy WhatsApp only if old student has it and motherNumber is empty
+  if (!student.familyDetails?.motherNumber && student.familyDetails?.fatherWhatsapp) {
+    setDetailsFieldVisibility('details-wrap-wa', 'details-student-wa', student.familyDetails.fatherWhatsapp);
+  } else {
+    setDetailsFieldVisibility('details-wrap-wa', 'details-student-wa', '');
+  }
 
-  const yr = (student.academicStatus && (student.academicStatus.yearJoined || student.academicStatus.admissionStatus)) || '-';
-  document.getElementById('details-student-year').innerText = yr;
+  const hasGType = setDetailsFieldVisibility('details-wrap-guardianType', 'details-student-guardian', student.familyDetails?.guardian);
+  const hasGOcc = setDetailsFieldVisibility('details-wrap-guardianOcc', 'details-student-guardianOcc', student.familyDetails?.guardianOccupation);
+  const isGOther = student.familyDetails?.guardian === 'Other';
+  const hasGName = setDetailsFieldVisibility('details-wrap-guardianName', 'details-student-guardianName', isGOther ? student.familyDetails?.guardianName : '');
+  const hasGNum = setDetailsFieldVisibility('details-wrap-guardianNum', 'details-student-guardianNum', isGOther ? student.familyDetails?.guardianNumber : '');
+  const hasGRel = setDetailsFieldVisibility('details-wrap-guardianRel', 'details-student-guardianRel', isGOther ? student.familyDetails?.guardianRelation : '');
+  const gWrap = document.getElementById('details-wrap-guardian');
+  if (gWrap) {
+    if (hasGType || hasGOcc || hasGName || hasGNum || hasGRel) {
+      gWrap.classList.remove('hidden');
+    } else {
+      gWrap.classList.add('hidden');
+    }
+  }
+
+  // Academic Status
+  setDetailsFieldVisibility('details-wrap-admNo', 'details-student-admNo', student.academicStatus?.admissionNo);
+  setDetailsFieldVisibility('details-wrap-admDate', 'details-student-admDate', student.academicStatus?.admissionDate);
+  const yr = student.academicStatus?.yearJoined || '';
+  setDetailsFieldVisibility('details-wrap-year', 'details-student-year', yr);
   document.getElementById('details-student-rank').innerText = (student.academicStatus && student.academicStatus.rank) || '-';
   document.getElementById('details-student-college').innerText = (student.academicStatus && student.academicStatus.previousCollege) || '-';
+
+  const attEl = document.getElementById('details-student-attendance');
+  if (attEl) {
+    if (student.attendancePercentage !== undefined && student.attendancePercentage !== null) {
+      attEl.innerText = `${student.attendancePercentage}%`;
+    } else {
+      attEl.innerText = 'N/A';
+    }
+  }
+
+  // Remarks
+  const remInput = document.getElementById('details-new-remark-text');
+  if (remInput) remInput.value = '';
+  renderStudentRemarksList(student, 'details-student-remarks-list');
 
   document.getElementById('modal-student-details').classList.remove('hidden');
 }
@@ -7297,7 +7814,7 @@ async function openTeacherLogModal(teacherId) {
 
       if (nameEl) nameEl.innerText = teacher.name;
       if (emailEl) emailEl.innerText = teacher.email || 'No email linked';
-      if (avatarEl) avatarEl.src = teacher.avatarUrl || getEmailAvatarPreview(teacher.email, teacher.name);
+      if (avatarEl) avatarEl.src = isCustomPhoto(teacher.avatarUrl) ? teacher.avatarUrl : getEmailAvatarPreview(teacher.email, teacher.name);
 
       const statusEl = document.getElementById('tlog-google-status');
       if (statusEl) {

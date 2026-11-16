@@ -1,10 +1,77 @@
 const express = require('express');
 const router = express.Router();
 const Student = require('../models/Student');
+const Attendance = require('../models/Attendance');
+const Subject = require('../models/Subject');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
 const optionalAuth = require('../middleware/optionalAuth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+
+// Helper: Validate optional fields only when filled
+function validateStudentOptionalFields({ personalDetails, address, familyDetails }) {
+  if (personalDetails && personalDetails.studentEmail) {
+    const email = String(personalDetails.studentEmail).trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { valid: false, field: 'studentEmail', message: 'Invalid student email format' };
+    }
+  }
+  if (address && address.pinCode) {
+    const pin = String(address.pinCode).trim();
+    if (pin && !/^\d{6}$/.test(pin)) {
+      return { valid: false, field: 'pinCode', message: 'PIN Code must be 6 digits' };
+    }
+  }
+  if (familyDetails) {
+    if (familyDetails.fatherMobile) {
+      const mob = String(familyDetails.fatherMobile).trim();
+      if (mob && !/^\d{10}$/.test(mob)) {
+        return { valid: false, field: 'fatherMobile', message: 'Mobile number must be 10 digits' };
+      }
+    }
+    if (familyDetails.motherNumber) {
+      const mMob = String(familyDetails.motherNumber).trim();
+      if (mMob && !/^\d{10}$/.test(mMob)) {
+        return { valid: false, field: 'motherNumber', message: "Mother's number must be 10 digits" };
+      }
+    }
+    if (familyDetails.guardian === 'Other' && familyDetails.guardianNumber) {
+      const gMob = String(familyDetails.guardianNumber).trim();
+      if (gMob && !/^\d{10}$/.test(gMob)) {
+        return { valid: false, field: 'guardianNumber', message: 'Guardian number must be 10 digits' };
+      }
+    }
+  }
+  return { valid: true };
+}
+
+// Helper: Compute attendance % for a list of students or single student from existing Attendance data
+async function attachAttendanceStatsToStudents(studentsList) {
+  if (!Array.isArray(studentsList) || studentsList.length === 0) return [];
+  const allAttendance = await Attendance.find({}, 'records isPrivate ownerEmail').lean();
+  return studentsList.map(stDoc => {
+    const st = stDoc.toObject ? stDoc.toObject() : { ...stDoc };
+    const stIdStr = String(st.studentId);
+    let sessions = 0;
+    let present = 0;
+    for (const att of allAttendance) {
+      if (Boolean(att.isPrivate) !== Boolean(st.isPrivate)) continue;
+      if (st.isPrivate && (att.ownerEmail || '').toLowerCase() !== (st.ownerEmail || '').toLowerCase()) continue;
+      if (Array.isArray(att.records)) {
+        const rec = att.records.find(r => String(r.studentId) === stIdStr);
+        if (rec) {
+          sessions++;
+          if (rec.status === 'P') present++;
+        }
+      }
+    }
+    const percentage = sessions > 0 ? Number(((present / sessions) * 100).toFixed(1)) : null;
+    st.attendancePercentage = percentage;
+    st.attendanceSessions = sessions;
+    st.attendancePresent = present;
+    return st;
+  });
+}
 
 // @route   GET /api/students
 // @desc    Get all students (with class filter, search, and scope: 'all' | 'private' | 'public')
@@ -66,7 +133,8 @@ router.get('/', optionalAuth, async (req, res) => {
     }
 
     const students = await Student.find(query).sort({ class: 1, roll: 1 });
-    res.json({ success: true, data: students });
+    const enrichedStudents = await attachAttendanceStatsToStudents(students);
+    res.json({ success: true, data: enrichedStudents });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -88,6 +156,33 @@ router.get('/next-id', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/students/:id
+// @desc    Get single student with server-calculated attendance % and remarks sorted newest first
+router.get('/:id', optionalAuth, async (req, res) => {
+  try {
+    const paramId = req.params.id;
+    let student = null;
+    if (/^[0-9a-fA-F]{24}$/.test(paramId)) {
+      student = await Student.findById(paramId);
+    }
+    if (!student) {
+      const numId = Number(paramId);
+      const idQuery = !isNaN(numId) ? { $in: [paramId, numId] } : paramId;
+      student = await Student.findOne({ studentId: idQuery });
+    }
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+    const [enriched] = await attachAttendanceStatsToStudents([student]);
+    if (Array.isArray(enriched.remarks)) {
+      enriched.remarks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+    res.json({ success: true, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   POST /api/students
 // @desc    Add new student (auto assigns studentId; allows private workspace student with prefix P-101 & editable ID)
 router.post('/', authMiddleware, async (req, res) => {
@@ -97,16 +192,23 @@ router.post('/', authMiddleware, async (req, res) => {
       class: studentClass,
       roll,
       photoUrl,
+      personalDetails,
       address,
       familyDetails,
       academicStatus,
+      initialRemark,
       customFields,
       isPrivate,
       studentId: customStudentId
     } = req.body;
 
-    if (!name || !studentClass || !roll) {
-      return res.status(400).json({ success: false, message: 'Name, class, and roll number are required' });
+    if (!name || !String(name).trim() || !studentClass || !String(studentClass).trim() || roll === undefined || roll === null || String(roll).trim() === '') {
+      return res.status(400).json({ success: false, message: 'Full Name, Student ID, Roll No., and Class are required' });
+    }
+
+    const validation = validateStudentOptionalFields({ personalDetails, address, familyDetails });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, field: validation.field, message: validation.message });
     }
 
     const isPrivateBool = Boolean(isPrivate);
@@ -122,7 +224,6 @@ router.post('/', authMiddleware, async (req, res) => {
         studentId = await Student.getNextPrivateStudentId(userEmail);
       }
 
-      // Strict backend validation: Duplicate Private Student ID check for this user
       const existing = await Student.findOne({
         studentId: studentId,
         isPrivate: true,
@@ -135,19 +236,83 @@ router.post('/', authMiddleware, async (req, res) => {
         });
       }
     } else {
-      // Auto-generate institutional studentId starting at 2000
       studentId = await Student.getNextStudentId();
+    }
+
+    const whitelistedPersonal = {
+      dob: personalDetails?.dob ? String(personalDetails.dob).trim() : '',
+      gender: personalDetails?.gender ? String(personalDetails.gender).trim() : '',
+      bloodGroup: personalDetails?.bloodGroup ? String(personalDetails.bloodGroup).trim() : '',
+      studentEmail: personalDetails?.studentEmail ? String(personalDetails.studentEmail).trim().toLowerCase() : ''
+    };
+
+    const whitelistedAddress = {
+      fullAddress: address?.fullAddress ? String(address.fullAddress).trim() : '',
+      place: address?.place ? String(address.place).trim() : '',
+      district: address?.district ? String(address.district).trim() : '',
+      state: address?.state ? String(address.state).trim() : '',
+      pinCode: address?.pinCode ? String(address.pinCode).trim() : ''
+    };
+
+    const isGuardianOther = familyDetails?.guardian === 'Other';
+    const whitelistedFamily = {
+      fatherName: familyDetails?.fatherName ? String(familyDetails.fatherName).trim() : '',
+      motherName: familyDetails?.motherName ? String(familyDetails.motherName).trim() : '',
+      fatherMobile: familyDetails?.fatherMobile ? String(familyDetails.fatherMobile).trim() : '',
+      fatherWhatsapp: familyDetails?.fatherWhatsapp ? String(familyDetails.fatherWhatsapp).trim() : '',
+      motherNumber: familyDetails?.motherNumber ? String(familyDetails.motherNumber).trim() : '',
+      guardian: familyDetails?.guardian ? String(familyDetails.guardian).trim() : '',
+      guardianName: isGuardianOther && familyDetails?.guardianName ? String(familyDetails.guardianName).trim() : '',
+      guardianNumber: isGuardianOther && familyDetails?.guardianNumber ? String(familyDetails.guardianNumber).trim() : '',
+      guardianRelation: isGuardianOther && familyDetails?.guardianRelation ? String(familyDetails.guardianRelation).trim() : '',
+      guardianOccupation: familyDetails?.guardianOccupation ? String(familyDetails.guardianOccupation).trim() : ''
+    };
+
+    const whitelistedAcademic = {
+      admissionNo: academicStatus?.admissionNo ? String(academicStatus.admissionNo).trim() : '',
+      admissionDate: academicStatus?.admissionDate ? String(academicStatus.admissionDate).trim() : '',
+      yearJoined: academicStatus?.yearJoined ? String(academicStatus.yearJoined).trim() : '',
+      admissionStatus: academicStatus?.admissionStatus || 'Confirmed',
+      rank: academicStatus?.rank ? String(academicStatus.rank).trim() : '',
+      previousCollege: academicStatus?.previousCollege ? String(academicStatus.previousCollege).trim() : ''
+    };
+
+    const remarksArray = [];
+    if (initialRemark && String(initialRemark).trim()) {
+      let resolvedSub = userRole === 'admin' ? 'Admin' : 'Faculty';
+      try {
+        const subDoc = await Subject.findOne({
+          $or: [
+            ...(userEmail ? [{ ownerEmail: userEmail }] : []),
+            ...(userName ? [{ teacher: caseInsensitiveRegex(userName) }] : [])
+          ]
+        }).lean();
+        if (subDoc && subDoc.name) resolvedSub = subDoc.name;
+      } catch (_) {}
+
+      remarksArray.push({
+        teacherId: req.user ? req.user._id : null,
+        teacherName: userName,
+        teacherEmail: userEmail,
+        teacherSubject: resolvedSub,
+        teacherAvatar: (req.user && req.user.avatarUrl) ? req.user.avatarUrl : '',
+        text: String(initialRemark).trim(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
     }
 
     const newStudent = await Student.create({
       studentId,
-      name,
-      class: studentClass,
+      name: String(name).trim(),
+      class: String(studentClass).trim(),
       roll: Number(roll),
       photoUrl: photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face',
-      address: address || {},
-      familyDetails: familyDetails || {},
-      academicStatus: academicStatus || {},
+      personalDetails: whitelistedPersonal,
+      address: whitelistedAddress,
+      familyDetails: whitelistedFamily,
+      academicStatus: whitelistedAcademic,
+      remarks: remarksArray,
       customFields: customFields || {},
       isPrivate: isPrivateBool,
       ownerEmail: isPrivateBool ? userEmail : '',
@@ -169,14 +334,15 @@ router.post('/', authMiddleware, async (req, res) => {
       ownerEmail: isPrivateBool ? userEmail : ''
     });
 
-    res.status(201).json({ success: true, data: newStudent });
+    const [enriched] = await attachAttendanceStatsToStudents([newStudent]);
+    res.status(201).json({ success: true, data: enriched });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // @route   PUT /api/students/:id
-// @desc    Edit student (ALL fields editable, studentId editable for private students without admin restriction)
+// @desc    Edit student (Admin and all teachers can edit main profile; preserves existing old fields untouched)
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const oldStudent = await Student.findById(req.params.id);
@@ -195,6 +361,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       class: studentClass,
       roll,
       photoUrl,
+      personalDetails,
       address,
       familyDetails,
       academicStatus,
@@ -202,14 +369,65 @@ router.put('/:id', authMiddleware, async (req, res) => {
       studentId: newStudentId
     } = req.body;
 
+    const validation = validateStudentOptionalFields({ personalDetails, address, familyDetails });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, field: validation.field, message: validation.message });
+    }
+
+    const oldPersonal = oldStudent.personalDetails || {};
+    const mergedPersonal = personalDetails !== undefined ? {
+      dob: personalDetails.dob !== undefined ? String(personalDetails.dob).trim() : (oldPersonal.dob || ''),
+      gender: personalDetails.gender !== undefined ? String(personalDetails.gender).trim() : (oldPersonal.gender || ''),
+      bloodGroup: personalDetails.bloodGroup !== undefined ? String(personalDetails.bloodGroup).trim() : (oldPersonal.bloodGroup || ''),
+      studentEmail: personalDetails.studentEmail !== undefined ? String(personalDetails.studentEmail).trim().toLowerCase() : (oldPersonal.studentEmail || '')
+    } : oldPersonal;
+
+    const oldAddress = oldStudent.address || {};
+    const mergedAddress = address !== undefined ? {
+      fullAddress: address.fullAddress !== undefined ? String(address.fullAddress).trim() : (oldAddress.fullAddress || ''),
+      place: address.place !== undefined ? String(address.place).trim() : (oldAddress.place || ''),
+      district: address.district !== undefined ? String(address.district).trim() : (oldAddress.district || ''),
+      state: address.state !== undefined ? String(address.state).trim() : (oldAddress.state || ''),
+      pinCode: address.pinCode !== undefined ? String(address.pinCode).trim() : (oldAddress.pinCode || '')
+    } : oldAddress;
+
+    const oldFamily = oldStudent.familyDetails || {};
+    const nextGuardian = familyDetails?.guardian !== undefined ? String(familyDetails.guardian).trim() : (oldFamily.guardian || '');
+    const isGuardianOther = nextGuardian === 'Other';
+    const mergedFamily = familyDetails !== undefined ? {
+      fatherName: familyDetails.fatherName !== undefined ? String(familyDetails.fatherName).trim() : (oldFamily.fatherName || ''),
+      motherName: familyDetails.motherName !== undefined ? String(familyDetails.motherName).trim() : (oldFamily.motherName || ''),
+      fatherMobile: familyDetails.fatherMobile !== undefined ? String(familyDetails.fatherMobile).trim() : (oldFamily.fatherMobile || ''),
+      // Strictly keep old fatherWhatsapp untouched unless explicitly sent
+      fatherWhatsapp: familyDetails.fatherWhatsapp !== undefined ? String(familyDetails.fatherWhatsapp).trim() : (oldFamily.fatherWhatsapp || ''),
+      motherNumber: familyDetails.motherNumber !== undefined ? String(familyDetails.motherNumber).trim() : (oldFamily.motherNumber || ''),
+      guardian: nextGuardian,
+      guardianName: isGuardianOther ? (familyDetails.guardianName !== undefined ? String(familyDetails.guardianName).trim() : (oldFamily.guardianName || '')) : '',
+      guardianNumber: isGuardianOther ? (familyDetails.guardianNumber !== undefined ? String(familyDetails.guardianNumber).trim() : (oldFamily.guardianNumber || '')) : '',
+      guardianRelation: isGuardianOther ? (familyDetails.guardianRelation !== undefined ? String(familyDetails.guardianRelation).trim() : (oldFamily.guardianRelation || '')) : '',
+      guardianOccupation: familyDetails.guardianOccupation !== undefined ? String(familyDetails.guardianOccupation).trim() : (oldFamily.guardianOccupation || '')
+    } : oldFamily;
+
+    const oldAcademic = oldStudent.academicStatus || {};
+    const mergedAcademic = academicStatus !== undefined ? {
+      admissionNo: academicStatus.admissionNo !== undefined ? String(academicStatus.admissionNo).trim() : (oldAcademic.admissionNo || ''),
+      admissionDate: academicStatus.admissionDate !== undefined ? String(academicStatus.admissionDate).trim() : (oldAcademic.admissionDate || ''),
+      // Strictly keep old yearJoined untouched unless explicitly sent
+      yearJoined: academicStatus.yearJoined !== undefined ? String(academicStatus.yearJoined).trim() : (oldAcademic.yearJoined || ''),
+      admissionStatus: academicStatus.admissionStatus !== undefined ? academicStatus.admissionStatus : (oldAcademic.admissionStatus || 'Confirmed'),
+      rank: academicStatus.rank !== undefined ? String(academicStatus.rank).trim() : (oldAcademic.rank || ''),
+      previousCollege: academicStatus.previousCollege !== undefined ? String(academicStatus.previousCollege).trim() : (oldAcademic.previousCollege || '')
+    } : oldAcademic;
+
     const updatePayload = {
-      name: name || oldStudent.name,
-      class: studentClass || oldStudent.class,
-      roll: roll !== undefined ? Number(roll) : oldStudent.roll,
+      name: name ? String(name).trim() : oldStudent.name,
+      class: studentClass ? String(studentClass).trim() : oldStudent.class,
+      roll: roll !== undefined && String(roll).trim() !== '' ? Number(roll) : oldStudent.roll,
       photoUrl: photoUrl || oldStudent.photoUrl,
-      address: address !== undefined ? address : oldStudent.address,
-      familyDetails: familyDetails !== undefined ? familyDetails : oldStudent.familyDetails,
-      academicStatus: academicStatus !== undefined ? academicStatus : oldStudent.academicStatus,
+      personalDetails: mergedPersonal,
+      address: mergedAddress,
+      familyDetails: mergedFamily,
+      academicStatus: mergedAcademic,
       customFields: customFields !== undefined ? customFields : oldStudent.customFields
     };
 
@@ -256,7 +474,150 @@ router.put('/:id', authMiddleware, async (req, res) => {
       ownerEmail: oldStudent.isPrivate ? oldStudent.ownerEmail : ''
     });
 
-    res.json({ success: true, data: updated });
+    const [enriched] = await attachAttendanceStatsToStudents([updated]);
+    res.json({ success: true, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/students/:id/remarks
+// @desc    Add a teacher remark to a student (All authenticated teachers & admin)
+router.post('/:id/remarks', authMiddleware, async (req, res) => {
+  try {
+    const { text, subject } = req.body;
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ success: false, message: 'Remark text is required' });
+    }
+
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const userName = (req.user && req.user.name) ? req.user.name.trim() : 'Teacher';
+    const userRole = (req.user && req.user.role) ? req.user.role : 'teacher';
+
+    let resolvedSubject = subject && String(subject).trim() ? String(subject).trim() : '';
+    if (!resolvedSubject) {
+      try {
+        const subDoc = await Subject.findOne({
+          $or: [
+            ...(userEmail ? [{ ownerEmail: userEmail }] : []),
+            ...(userName ? [{ teacher: caseInsensitiveRegex(userName) }] : [])
+          ]
+        }).lean();
+        if (subDoc && subDoc.name) resolvedSubject = subDoc.name;
+      } catch (_) {}
+      if (!resolvedSubject) {
+        resolvedSubject = userRole === 'admin' ? 'Admin' : 'Faculty';
+      }
+    }
+
+    const remarkObj = {
+      teacherId: req.user._id || null,
+      teacherName: userName,
+      teacherEmail: userEmail,
+      teacherSubject: resolvedSubject,
+      teacherAvatar: (req.user && req.user.avatarUrl) ? req.user.avatarUrl : '',
+      text: String(text).trim(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    if (!Array.isArray(student.remarks)) {
+      student.remarks = [];
+    }
+    student.remarks.push(remarkObj);
+    await student.save();
+
+    const [enriched] = await attachAttendanceStatsToStudents([student]);
+    if (Array.isArray(enriched.remarks)) {
+      enriched.remarks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+
+    res.status(201).json({ success: true, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/students/:id/remarks/:remarkId
+// @desc    Edit a remark (Teachers can edit only their own; Admin can edit any)
+router.put('/:id/remarks/:remarkId', authMiddleware, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ success: false, message: 'Remark text is required' });
+    }
+
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const remark = (student.remarks || []).id(req.params.remarkId);
+    if (!remark) {
+      return res.status(404).json({ success: false, message: 'Remark not found' });
+    }
+
+    const isAdmin = req.user && req.user.role === 'admin';
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const isOwner = (remark.teacherId && req.user._id && String(remark.teacherId) === String(req.user._id)) ||
+                    (remark.teacherEmail && userEmail && remark.teacherEmail.toLowerCase().trim() === userEmail);
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ success: false, message: 'Permission denied: You can only edit your own remarks' });
+    }
+
+    remark.text = String(text).trim();
+    remark.updatedAt = new Date();
+    await student.save();
+
+    const [enriched] = await attachAttendanceStatsToStudents([student]);
+    if (Array.isArray(enriched.remarks)) {
+      enriched.remarks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+
+    res.json({ success: true, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   DELETE /api/students/:id/remarks/:remarkId
+// @desc    Delete a remark (Teachers can delete only their own; Admin can delete any)
+router.delete('/:id/remarks/:remarkId', authMiddleware, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const remark = (student.remarks || []).id(req.params.remarkId);
+    if (!remark) {
+      return res.status(404).json({ success: false, message: 'Remark not found' });
+    }
+
+    const isAdmin = req.user && req.user.role === 'admin';
+    const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+    const isOwner = (remark.teacherId && req.user._id && String(remark.teacherId) === String(req.user._id)) ||
+                    (remark.teacherEmail && userEmail && remark.teacherEmail.toLowerCase().trim() === userEmail);
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ success: false, message: 'Permission denied: You can only delete your own remarks' });
+    }
+
+    student.remarks.pull({ _id: req.params.remarkId });
+    await student.save();
+
+    const [enriched] = await attachAttendanceStatsToStudents([student]);
+    if (Array.isArray(enriched.remarks)) {
+      enriched.remarks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
+
+    res.json({ success: true, data: enriched });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
