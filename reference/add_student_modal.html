@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add New Student</title>
+<style>
+:root{--navy:#2c526a;--teal:#3e8c82;--green:#3fa66e;--ink:#1c2630;--mute:#697884;--line:#cbd5dd;--card:#f3f6f8;--bg:#d6dfe6;--red:#d64646}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);padding:16px}
+.modal{max-width:520px;margin:0 auto;background:#fff;border-radius:32px;padding:20px 18px 28px}
+.top{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1.5px solid #e1e7ec}
+.top h1{font-size:22px;display:flex;align-items:center;gap:10px}
+.top h1:before{content:"";width:13px;height:13px;border-radius:50%;background:var(--green)}
+.x{width:42px;height:42px;border:0;border-radius:50%;background:#eef1f6;color:var(--navy);font-size:20px;cursor:pointer}
+.photo{display:flex;flex-direction:column;align-items:center;margin:20px 0 6px}
+.pbox{position:relative;width:128px;height:128px;border-radius:30px;background:var(--navy);display:grid;place-items:center;cursor:pointer;overflow:hidden;border:3px solid var(--navy)}
+.pbox img{width:100%;height:100%;object-fit:cover;display:none}
+.pbox span{font-size:44px;color:#fff}
+.photo small{margin-top:10px;color:var(--navy);font-weight:700;font-size:14px}
+.card{background:var(--card);border:1.5px solid #d6dfe6;border-radius:24px;padding:16px;margin-top:16px}
+.card h2{font-size:14px;letter-spacing:.6px;color:var(--navy);margin-bottom:12px}
+.g2,.g3{display:grid;gap:12px;align-items:start}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}
+.f{margin-bottom:12px;min-width:0}.g2 .f,.g3 .f{margin-bottom:0}.g2,.g3{margin-bottom:12px}
+.card>.f:last-child,.card>.g2:last-child{margin-bottom:0}
+label{display:block;font-size:13px;color:var(--mute);margin:0 0 5px 3px}
+label b{color:var(--red)}
+input,select,textarea{width:100%;height:46px;border:1.5px solid var(--line);border-radius:14px;padding:0 13px;font:inherit;font-size:15px;color:var(--ink);background:#fff;outline:none}
+input:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(62,140,130,.18)}
+input[readonly]{background:#ecf1f4;color:var(--mute)}
+select{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%23697884' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 14px center}
+.radios{display:flex;gap:10px}
+.radios label{flex:1;margin:0;white-space:nowrap;display:flex;align-items:center;gap:8px;height:46px;padding:0 13px;border:1.5px solid var(--line);border-radius:14px;background:#fff;color:var(--ink);font-size:15px;cursor:pointer}
+.radios input{width:18px;height:18px;flex:none;accent-color:var(--teal);padding:0}
+.radios label:has(input:checked){border-color:var(--teal);background:#e6f2f0;font-weight:600}
+.other{display:none;margin-top:12px;padding:12px;border:1.5px dashed var(--teal);border-radius:16px;background:#fff}
+.other.show{display:block}
+.note{font-size:12px;color:var(--mute);margin:6px 0 0 3px}
+.rem{display:flex;gap:12px;padding:12px 0;border-top:1px solid #dde4ea}
+.rem:first-of-type{border-top:0;padding-top:0}
+.av{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px}
+.rem h3{font-size:15px;line-height:1.2}
+.rem h3 small{display:block;font-size:12px;font-weight:400;color:var(--mute);margin-top:2px}
+.rem p{font-size:14px;margin-top:6px;line-height:1.45}
+.btn{display:block;width:100%;height:58px;margin-top:20px;border-radius:30px;font-size:18px;font-weight:700;cursor:pointer}
+.save{border:0;color:#fff;background:linear-gradient(90deg,#355a73,#52877f)}
+.cancel{margin-top:12px;background:#fff;border:1.5px solid var(--line);color:var(--navy)}
+#msg{display:none;margin-top:14px;text-align:center;color:var(--green);font-weight:600}
+@media(max-width:430px){.g3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<form class="modal" id="form" autocomplete="off">
+  <div class="top"><h1>Add New Student</h1><button type="button" class="x" aria-label="Close">&#10005;</button></div>
+
+  <div class="photo">
+    <label class="pbox" for="photo"><img id="pimg" alt=""><span id="pico">&#128247;</span></label>
+    <input type="file" id="photo" accept="image/*" hidden>
+    <small>(Tap photo to upload / change)</small>
+  </div>
+
+  <section class="card">
+    <h2>BASIC INFORMATION</h2>
+    <div class="f"><label>Full Name <b>*</b></label><input name="name" value="NOORUDHEEN YOUSUF" required></div>
+    <div class="g2">
+      <div class="f"><label>Student ID <b>*</b></label><input name="sid" value="2026" required></div>
+      <div class="f"><label>Roll No. <b>*</b></label><input name="roll" value="1" required></div>
+    </div>
+    <div class="f"><label>Class <b>*</b></label>
+      <select name="class" required><option>SAMPLE</option><option>Class 11</option><option>Class 12</option></select></div>
+  </section>
+
+  <section class="card">
+    <h2>PERSONAL DETAILS</h2>
+    <div class="g2">
+      <div class="f"><label>Date of Birth</label><input type="date" name="dob" id="dob"></div>
+      <div class="f"><label>Age</label><input id="age" placeholder="Auto-calculated" readonly></div>
+    </div>
+    <div class="f"><label>Gender</label>
+      <div class="radios">
+        <label><input type="radio" name="gender" value="Male" checked> Male</label>
+        <label><input type="radio" name="gender" value="Female"> Female</label>
+      </div></div>
+    <div class="f"><label>Blood Group</label>
+      <select name="blood"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+    <div class="f"><label>Student Email ID</label><input type="email" name="email" placeholder="student@email.com"></div>
+  </section>
+
+  <section class="card">
+    <h2>ADDRESS DETAILS</h2>
+    <div class="f"><label>Full Address</label><input name="address" value="ANJIKKATH PANAYAPILLY HOUSE"></div>
+    <div class="g2">
+      <div class="f"><label>Place</label><input name="place" value="Thrikkakara"></div>
+      <div class="f"><label>District</label>
+        <select name="district"><option>Ernakulam</option><option>Thiruvananthapuram</option><option>Kollam</option><option>Pathanamthitta</option><option>Alappuzha</option><option>Kottayam</option><option>Idukki</option><option>Thrissur</option><option>Palakkad</option><option>Malappuram</option><option>Kozhikode</option><option>Wayanad</option><option>Kannur</option><option>Kasaragod</option></select></div>
+    </div>
+    <div class="g2">
+      <div class="f"><label>State</label><select name="state"><option>Kerala</option><option>Tamil Nadu</option><option>Karnataka</option><option>Other</option></select></div>
+      <div class="f"><label>PIN Code</label><input name="pin" inputmode="numeric" maxlength="6" placeholder="6 digits"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>FAMILY DETAILS</h2>
+    <div class="g2">
+      <div class="f"><label>Father</label><input name="father" value="Yousuf"></div>
+      <div class="f"><label>Mother</label><input name="mother" value="Kadheeja"></div>
+    </div>
+    <div class="g2">
+      <div class="f"><label>Mobile</label><input type="tel" name="mobile" value="08086786432"></div>
+      <div class="f"><label>Mother's Number</label><input type="tel" name="mothernum" placeholder="Mother's mobile"></div>
+    </div>
+    <div class="f"><label>Guardian</label>
+      <select name="guardian" id="guardian"><option>Father</option><option>Mother</option><option>Other</option></select></div>
+    <div class="other" id="other">
+      <div class="g2">
+        <div class="f"><label>Guardian Name</label><input name="gname" id="gname" placeholder="Full name"></div>
+        <div class="f"><label>Guardian Number</label><input type="tel" name="gnum" id="gnum" placeholder="Mobile number"></div>
+      </div>
+      <div class="f"><label>Relationship to Student</label><input name="grel" id="grel" placeholder="e.g. Uncle"></div>
+    </div>
+    <div class="f" style="margin-top:12px"><label>Guardian Occupation</label><input name="gocc" placeholder="e.g. Business"></div>
+  </section>
+
+  <section class="card">
+    <h2>ACADEMIC STATUS</h2>
+    <div class="g2">
+      <div class="f"><label>Admission No.</label><input name="admno" placeholder="e.g. ADM-2024-001"></div>
+      <div class="f"><label>Admission Date</label><input type="date" name="admdate"></div>
+    </div>
+    <div class="g2">
+      <div class="f"><label>Rank</label><input name="rank" value="1"></div>
+      <div class="f"><label>Prev College</label><input name="prev" value="Irshad"></div>
+    </div>
+    <div class="f"><label>Attendance %</label><input value="Auto from app report" readonly>
+      <p class="note">Calculated automatically from the attendance report. Not editable.</p></div>
+  </section>
+
+  <section class="card">
+    <h2>TEACHERS' REMARKS</h2>
+    <div class="rem"><div class="av" style="background:#2c526a">AK</div><div><h3>Mr. Anwar K<small>Class Teacher &middot; 12 Nov 2026</small></h3><p>Very disciplined and punctual. Leads group discussions well.</p></div></div>
+    <div class="rem"><div class="av" style="background:#3e8c82">FS</div><div><h3>Ms. Fathima S<small>Arabic &middot; 05 Nov 2026</small></h3><p>Excellent recitation and grammar. Keep up the practice.</p></div></div>
+    <div class="rem"><div class="av" style="background:#b0733a">RM</div><div><h3>Mr. Rahim M<small>Sociology &middot; 28 Oct 2026</small></h3><p>Good understanding of concepts; should submit assignments earlier.</p></div></div>
+    <p class="note">Sample remarks. In the app, each remark shows the teacher's logo, name and note, added by that teacher.</p>
+  </section>
+
+  <button class="btn save" type="submit">Save Student</button>
+  <button class="btn cancel" type="reset">Cancel</button>
+  <p id="msg">Student saved (demo)</p>
+</form>
+
+<script>
+const $=id=>document.getElementById(id);
+$("photo").onchange=e=>{const f=e.target.files[0];if(!f)return;$("pimg").src=URL.createObjectURL(f);$("pimg").style.display="block";$("pico").style.display="none"};
+$("dob").onchange=e=>{const b=new Date(e.target.value),n=new Date();if(isNaN(b)){$("age").value="";return}
+  let a=n.getFullYear()-b.getFullYear();if(n<new Date(n.getFullYear(),b.getMonth(),b.getDate()))a--;$("age").value=a>=0?a+" years":""};
+$("guardian").onchange=e=>{const o=e.target.value==="Other";$("other").classList.toggle("show",o);};
+$("form").onsubmit=e=>{e.preventDefault();console.log(Object.fromEntries(new FormData(e.target)));$("msg").style.display="block"};
+$("form").onreset=()=>setTimeout(()=>{$("other").classList.remove("show");$("age").value="";$("msg").style.display="none"});
+</script>
+</body>
+</html>
