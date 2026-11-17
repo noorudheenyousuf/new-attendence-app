@@ -4859,6 +4859,12 @@ async function handleSaveNewStudent(e) {
 let activeEditStudentObjId = null;
 let activeEditStudentRecord = null;
 
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = (val !== undefined && val !== null) ? val : '';
+}
+
 function handleEditProfileFromDetailsModal() {
   if (!currentDetailsStudent) return;
   const st = currentDetailsStudent;
@@ -5001,6 +5007,7 @@ async function openEditStudentModal(id) {
     captureStudentFormSnapshot('edit');
     document.getElementById('modal-edit-student').classList.remove('hidden');
   } catch (error) {
+    console.error('Error opening edit student modal:', error);
     showToast('Failed to load student details', true);
   }
 }
@@ -8651,37 +8658,24 @@ function renderMessagesStream() {
           <div class="${isMine
             ? 'bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white border border-white/15 shadow-md rounded-2xl rounded-tr-xs'
             : 'bg-gradient-to-br from-[var(--bg-page)] via-[var(--card-bg)] to-[#245b70]/10 dark:to-[#245b70]/20 text-[var(--text-main)] border border-[var(--border-color)] border-l-4 border-l-[#245b70] dark:border-l-cyan-400 shadow-sm rounded-2xl rounded-tl-xs'
-          } px-3.5 py-2.5 sm:px-4 sm:py-3 relative select-none cursor-pointer active:scale-98 transition group-hover:shadow-md"
+          } px-3.5 py-2.5 sm:px-4 sm:py-3 relative select-none cursor-pointer active:scale-[0.99] transition group-hover:shadow-md"
             onmousedown="handleMsgStartHold(event, '${m._id}')"
             onmouseup="handleMsgEndHold(event)"
             onmouseleave="handleMsgEndHold(event)"
             ontouchstart="handleMsgStartHold(event, '${m._id}')"
             ontouchend="handleMsgEndHold(event)"
+            ontouchmove="handleMsgEndHold(event)"
             ontouchcancel="handleMsgEndHold(event)"
             oncontextmenu="handleMsgContextMenu(event, '${m._id}')"
-            title="Click & hold to edit or delete"
-            style="white-space:pre-wrap;word-break:break-word;">
+            title="Press and hold to edit or delete"
+            style="-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;white-space:pre-wrap;word-break:break-word;">
 
             <!-- Chat Text Only with Dynamic Font Scaling -->
-            <p class="${getMessageFontSizeClass(m.text)} ${isMine ? 'text-white' : 'text-[var(--text-main)]'}">
+            <p class="${getMessageFontSizeClass(m.text)} ${isMine ? 'text-white' : 'text-[var(--text-main)]'} pointer-events-none">
               ${escapeHtml(m.text)}
             </p>
 
-            ${m.isEdited ? `<span class="text-[9px] ${isMine ? 'text-teal-200/80' : 'text-[var(--text-sub)]'} italic block mt-1">(edited)</span>` : ''}
-
-            <!-- Direct Quick Action Buttons for Owner or Admin -->
-            ${canManage ? `
-              <div class="flex items-center gap-1.5 pt-2 mt-1 border-t ${isMine ? 'border-white/15 justify-end' : 'border-[var(--border-color)] justify-start'} opacity-75 group-hover:opacity-100 transition">
-                <button type="button" onclick="event.stopPropagation(); openEditMessageModal('${m._id}')" class="touch-btn px-2.5 py-1 rounded-lg ${isMine ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-[#245b70]/10 hover:bg-[#245b70]/20 text-[#245b70] dark:text-cyan-300'} font-bold text-[10px] flex items-center gap-1 active:scale-95 transition" title="Edit Announcement">
-                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                  <span>Edit</span>
-                </button>
-                <button type="button" onclick="event.stopPropagation(); triggerDeleteMessage('${m._id}')" class="touch-btn px-2.5 py-1 rounded-lg ${isMine ? 'bg-rose-500/25 hover:bg-rose-500/40 text-rose-200' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400'} font-bold text-[10px] flex items-center gap-1 active:scale-95 transition" title="Delete Announcement">
-                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                  <span>Delete</span>
-                </button>
-              </div>
-            ` : ''}
+            ${m.isEdited ? `<span class="text-[9px] ${isMine ? 'text-teal-200/80' : 'text-[var(--text-sub)]'} italic block mt-1 pointer-events-none">(edited)</span>` : ''}
           </div>
         </div>
       </div>
@@ -9646,6 +9640,9 @@ function handleMsgStartHold(e, msgId) {
   if (!msg) return;
 
   msgHoldTimer = setTimeout(() => {
+    if (navigator.vibrate) {
+      try { navigator.vibrate(40); } catch (_) {}
+    }
     openMessageActionsModal(msg);
   }, 450);
 }
@@ -9664,21 +9661,43 @@ function handleMsgContextMenu(e, msgId) {
   if (msg) openMessageActionsModal(msg);
 }
 
+function canManageMessage(msg) {
+  if (!msg) return false;
+  if (!currentUser) return false;
+  if (currentUser.role === 'admin') return true;
+
+  const myId = String(currentUser._id || currentUser.id || '').trim();
+  const myEmail = String(currentUser.email || '').trim().toLowerCase();
+  const myName = String(currentUser.name || '').trim().toLowerCase();
+
+  const sId = String(msg.senderId || '').trim();
+  const sEmail = String(msg.senderEmail || '').trim().toLowerCase();
+  const sName = String(msg.senderName || '').trim().toLowerCase();
+
+  if (myId && sId && myId === sId) return true;
+  if (myEmail && sEmail && myEmail === sEmail) return true;
+  if (myName && sName && myName === sName) return true;
+  return false;
+}
+
 function openMessageActionsModal(msg) {
+  if (!msg) return;
   activeSelectedMessage = msg;
   const modal = document.getElementById('modal-message-actions');
   const preview = document.getElementById('message-actions-preview');
+  const senderEl = document.getElementById('message-actions-sender');
   const btnEdit = document.getElementById('btn-msg-action-edit');
   const btnDelete = document.getElementById('btn-msg-action-delete');
 
-  if (preview) preview.textContent = msg.text;
+  if (preview) preview.textContent = msg.text || '';
+  if (senderEl) {
+    const time = (typeof _timeAgo === 'function') ? _timeAgo(msg.createdAt) : '';
+    senderEl.textContent = `By ${msg.senderName || 'Teacher'}${time ? ' • ' + time : ''}`;
+  }
 
-  const myId = currentUser && (currentUser._id || currentUser.id);
-  const isAdmin = currentUser && currentUser.role === 'admin';
-  const isMine = String(msg.senderId) === String(myId);
-
-  if (btnEdit) btnEdit.style.display = (isMine || isAdmin) ? 'flex' : 'none';
-  if (btnDelete) btnDelete.style.display = (isMine || isAdmin) ? 'flex' : 'none';
+  const canManage = canManageMessage(msg);
+  if (btnEdit) btnEdit.style.display = canManage ? 'flex' : 'none';
+  if (btnDelete) btnDelete.style.display = canManage ? 'flex' : 'none';
 
   if (modal) modal.classList.remove('hidden');
 }
@@ -9687,6 +9706,38 @@ function closeMessageActionsModal() {
   const modal = document.getElementById('modal-message-actions');
   if (modal) modal.classList.add('hidden');
   activeSelectedMessage = null;
+}
+
+function copySelectedMessageText() {
+  if (!activeSelectedMessage || !activeSelectedMessage.text) return;
+  const text = activeSelectedMessage.text;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Notice copied to clipboard');
+      closeMessageActionsModal();
+    }).catch(() => {
+      fallbackCopyMsgText(text);
+    });
+  } else {
+    fallbackCopyMsgText(text);
+  }
+}
+
+function fallbackCopyMsgText(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Notice copied to clipboard');
+    closeMessageActionsModal();
+  } catch (_) {
+    showToast('Failed to copy notice', true);
+  }
 }
 
 let activeEditingMessageObj = null;

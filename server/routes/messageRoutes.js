@@ -113,7 +113,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     const currentUserId = req.user ? req.user._id.toString() : '';
     const isAdmin = req.user && req.user.role === 'admin';
-    const isSender = message.senderId && message.senderId.toString() === currentUserId;
+    const isSender = (message.senderId && message.senderId.toString() === currentUserId) ||
+      (req.user && req.user.email && message.senderEmail && req.user.email.toLowerCase() === message.senderEmail.toLowerCase()) ||
+      (req.user && req.user.name && message.senderName && req.user.name.toLowerCase() === message.senderName.toLowerCase());
 
     if (!isAdmin && !isSender) {
       return res.status(403).json({ success: false, message: 'Permission denied: You can only edit your own messages' });
@@ -143,7 +145,9 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
     const currentUserId = req.user ? req.user._id.toString() : '';
     const isAdmin = req.user && req.user.role === 'admin';
-    const isSender = message.senderId && message.senderId.toString() === currentUserId;
+    const isSender = (message.senderId && message.senderId.toString() === currentUserId) ||
+      (req.user && req.user.email && message.senderEmail && req.user.email.toLowerCase() === message.senderEmail.toLowerCase()) ||
+      (req.user && req.user.name && message.senderName && req.user.name.toLowerCase() === message.senderName.toLowerCase());
 
     if (!isAdmin && !isSender) {
       return res.status(403).json({ success: false, message: 'Permission denied: You can only delete your own messages' });
