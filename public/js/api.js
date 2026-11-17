@@ -49,10 +49,10 @@ const API = {
     return res;
   },
 
-  async login(email, password) {
+  async login(email, password, extra = {}) {
     const res = await this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, ...extra })
     });
     if (res.token) this.setToken(res.token);
     return res;
@@ -576,6 +576,47 @@ const API = {
 
   async getStudentAttendance() {
     return this.request('/student-portal/attendance');
+  },
+
+  async getStudentDashboard() {
+    return this.request('/student-portal/dashboard');
+  },
+
+  async getStudentSubjects() {
+    return this.request('/student-portal/subjects');
+  },
+
+  async getStudentAttendanceCalendar(year, month) {
+    const params = new URLSearchParams();
+    if (year) params.append('year', year);
+    if (month) params.append('month', month);
+    return this.request(`/student-portal/attendance-calendar?${params.toString()}`);
+  },
+
+  async getStudentLeaveRequests() {
+    return this.request('/student-portal/leave-requests');
+  },
+
+  async submitStudentLeaveRequest(data) {
+    return this.request('/student-portal/leave-requests', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getStudentMaterials() {
+    return this.request('/student-portal/materials');
+  },
+
+  async getStudentExamResults() {
+    return this.request('/student-portal/exam-results');
+  },
+
+  async changeStudentPassword(data) {
+    return this.request('/student-portal/change-password', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   },
 
   // ===================== OUTCOMERS API (Teacher Review & Enrollment) =====================

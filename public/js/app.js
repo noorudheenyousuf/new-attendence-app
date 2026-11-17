@@ -49,6 +49,62 @@ let subjectsList = [];
 let studentsList = [];
 let cachedAllStudents = [];
 let attendanceRecords = []; // [{ studentId, status, note }]
+
+// ================= DUAL PORTAL ROUTING STATE & HELPERS =================
+let authPortalRole = 'staff';
+
+function getRequestedPortal() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const portalParam = (urlParams.get('portal') || '').toLowerCase().trim();
+  if (portalParam === 'student' || window.location.pathname.endsWith('/student')) {
+    return 'student';
+  }
+  if (portalParam === 'teacher' || window.location.pathname.endsWith('/teacher')) {
+    return 'teacher';
+  }
+  const sessionPortal = sessionStorage.getItem('registerly_active_portal');
+  if (sessionPortal === 'student' || sessionPortal === 'teacher') {
+    return sessionPortal;
+  }
+  if (currentUser && currentUser.role === 'student') {
+    return 'student';
+  }
+  return 'teacher';
+}
+
+function isStudentPortalActive() {
+  return getRequestedPortal() === 'student';
+}
+
+function switchPortal(portal) {
+  if (portal === 'teacher') {
+    sessionStorage.setItem('registerly_active_portal', 'teacher');
+    window.location.href = '/?portal=teacher';
+  } else {
+    sessionStorage.setItem('registerly_active_portal', 'student');
+    window.location.href = '/?portal=student';
+  }
+}
+
+function updateAuthModalPortalUI() {
+  const isStudent = (getRequestedPortal() === 'student' || authPortalRole === 'student');
+  const titleEl = document.getElementById('auth-modal-title');
+  const subEl = document.getElementById('auth-modal-subtitle');
+  const regNoteEl = document.getElementById('auth-modal-reg-note');
+  if (isStudent) {
+    if (titleEl) titleEl.textContent = 'Student Portal';
+    if (subEl) subEl.textContent = 'Sign in to access your timetable, attendance & notices';
+    if (regNoteEl) {
+      regNoteEl.innerHTML = '<svg class="w-4 h-4 text-teal-600 inline-block mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg><span>Enter with your student email or Gmail to self-register your details.</span>';
+    }
+  } else {
+    if (titleEl) titleEl.textContent = 'REGISTERLY';
+    if (subEl) subEl.textContent = 'Teacher Portal & Attendance Management';
+    if (regNoteEl) {
+      regNoteEl.innerHTML = '<svg class="w-4 h-4 text-amber-500 inline-block mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg><span>First registered account is granted full <b>Admin</b> privileges automatically.</span>';
+    }
+  }
+}
 function formatLocalDate(d = new Date()) {
   const dateObj = (d instanceof Date && !isNaN(d)) ? d : new Date();
   const year = dateObj.getFullYear();
@@ -441,17 +497,45 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof initI18n === 'function') initI18n();
   initServiceWorker();
   updateDateDisplay();
-  selectTab('home');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const portalParam = (urlParams.get('portal') || '').toLowerCase().trim();
+  if (portalParam === 'student' || window.location.pathname.endsWith('/student')) {
+    sessionStorage.setItem('registerly_active_portal', 'student');
+  } else if (portalParam === 'teacher' || window.location.pathname.endsWith('/teacher')) {
+    sessionStorage.setItem('registerly_active_portal', 'teacher');
+  }
+
+  const isStudentPortal = isStudentPortalActive();
+  authPortalRole = isStudentPortal ? 'student' : 'staff';
+
+  if (isStudentPortal) {
+    selectTab('student-portal');
+  } else {
+    selectTab('home');
+  }
+
   try {
     await initGoogleAuth();
     await loadCurrentUser();
     if (currentUser) {
-      if (currentUser.role === 'student') {
+      if (isStudentPortal) {
         selectTab('student-portal');
-        initStudentPortal();
+        await initStudentPortal();
         hideSplashLoader();
         return;
       }
+
+      // If user is a student account trying to open teacher portal:
+      if (currentUser.role === 'student') {
+        showToast('Student accounts can only access the Student Portal.');
+        sessionStorage.setItem('registerly_active_portal', 'student');
+        selectTab('student-portal');
+        await initStudentPortal();
+        hideSplashLoader();
+        return;
+      }
+
       await loadAppSettings();
       await loadClasses();
       await loadSubjects();
@@ -480,12 +564,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Flow sequence: Language -> Guide -> Morning Modal -> Dashboard
       proceedAppWorkflowSequence();
     } else {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('portal') === 'student' || window.location.pathname.endsWith('/student')) {
+      if (isStudentPortal) {
+        selectTab('student-portal');
         setAuthPortalRole('student');
         openAuthModal();
+      } else {
+        await loadHomeDashboard();
+        setAuthPortalRole('staff');
+        openAuthModal();
       }
-      await loadHomeDashboard();
       hideSplashLoader();
     }
   } catch (err) {
@@ -1383,9 +1470,18 @@ async function loadAppSettings() {
 }
 
 function applyHeaderButtonPreference() {
+  const isStudent = (typeof isStudentPortalActive === 'function' && isStudentPortalActive()) || (currentUser && currentUser.role === 'student') || currentActiveTab === 'student-portal';
   const btnGuide = document.getElementById('header-guide-btn');
   const btnTheme = document.getElementById('dark-mode-btn');
   const btnLang = document.getElementById('header-language-btn');
+  const btnNotif = document.getElementById('header-notif-btn');
+
+  if (isStudent) {
+    if (btnGuide) btnGuide.classList.add('hidden');
+    if (btnNotif) btnNotif.classList.add('hidden');
+    if (btnLang) btnLang.classList.add('hidden');
+    return;
+  }
   const pref = (appSettings && appSettings.headerActionButton) ? appSettings.headerActionButton : 'guide';
 
   if (btnGuide) btnGuide.classList.add('hidden');
@@ -6558,17 +6654,30 @@ async function selectTab(tab) {
     }
   }
 
-  if (currentUser && currentUser.role === 'student') {
+  if (currentUser && currentUser.role === 'student' && tab !== 'student-portal') {
     tab = 'student-portal';
   }
 
+  const isStudent = (currentUser && currentUser.role === 'student') || tab === 'student-portal' || isStudentPortalActive();
   const bottomNav = document.getElementById('app-bottom-nav');
-  if (bottomNav) {
-    if (currentUser && currentUser.role === 'student') {
-      bottomNav.classList.add('hidden');
-    } else {
-      bottomNav.classList.remove('hidden');
+  const studentBottomNav = document.getElementById('student-bottom-nav');
+  const headerGuideBtn = document.getElementById('header-guide-btn');
+  const headerNotifBtn = document.getElementById('header-notif-btn');
+
+  if (isStudent) {
+    if (bottomNav) bottomNav.classList.add('hidden');
+    if (studentBottomNav) studentBottomNav.classList.remove('hidden');
+    if (headerGuideBtn) headerGuideBtn.classList.add('hidden');
+    if (headerNotifBtn) headerNotifBtn.classList.add('hidden');
+  } else {
+    if (bottomNav) bottomNav.classList.remove('hidden');
+    if (studentBottomNav) studentBottomNav.classList.add('hidden');
+    if (typeof applyHeaderButtonPreference === 'function') {
+      applyHeaderButtonPreference();
+    } else if (headerGuideBtn) {
+      headerGuideBtn.classList.remove('hidden');
     }
+    if (headerNotifBtn) headerNotifBtn.classList.remove('hidden');
   }
 
   if (currentActiveTab !== tab) {
@@ -7192,6 +7301,7 @@ function openAuthModal() {
       closeBtn.classList.remove('hidden');
     }
   }
+  updateAuthModalPortalUI();
   clearAuthAlert();
   renderGoogleButton();
 }
@@ -7405,13 +7515,16 @@ async function handleGoogleTokenResponse(tokenResponse) {
       closeAuthModal(true);
       showToast(res.message || `Welcome, ${res.user.name}!`);
 
-      if (res.user.role === 'student') {
+      const inStudentPortal = isStudentPortalActive() || authPortalRole === 'student' || res.user.role === 'student';
+      if (inStudentPortal) {
+        sessionStorage.setItem('registerly_active_portal', 'student');
         selectTab('student-portal');
-        initStudentPortal();
+        await initStudentPortal();
         hideSplashLoader();
         return;
       }
 
+      sessionStorage.setItem('registerly_active_portal', 'teacher');
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -7457,13 +7570,16 @@ async function handleGoogleCredentialResponse(response) {
       closeAuthModal(true);
       showToast(res.message || `Welcome, ${res.user.name}!`);
 
-      if (res.user.role === 'student') {
+      const inStudentPortal = isStudentPortalActive() || authPortalRole === 'student' || res.user.role === 'student';
+      if (inStudentPortal) {
+        sessionStorage.setItem('registerly_active_portal', 'student');
         selectTab('student-portal');
-        initStudentPortal();
+        await initStudentPortal();
         hideSplashLoader();
         return;
       }
 
+      sessionStorage.setItem('registerly_active_portal', 'teacher');
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -7513,7 +7629,7 @@ async function handleEmailLogin(e) {
   }
 
   try {
-    const res = await API.login(email, password);
+    const res = await API.login(email, password, { portal: authPortalRole });
     if (res.success && res.user) {
       currentUser = res.user;
       currentRole = res.user.role;
@@ -7521,13 +7637,16 @@ async function handleEmailLogin(e) {
       closeAuthModal(true);
       showToast(res.message || `Welcome back, ${res.user.name}!`);
 
-      if (res.user.role === 'student') {
+      const inStudentPortal = isStudentPortalActive() || authPortalRole === 'student' || res.user.role === 'student';
+      if (inStudentPortal) {
+        sessionStorage.setItem('registerly_active_portal', 'student');
         selectTab('student-portal');
-        initStudentPortal();
+        await initStudentPortal();
         hideSplashLoader();
         return;
       }
 
+      sessionStorage.setItem('registerly_active_portal', 'teacher');
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -7605,13 +7724,16 @@ async function handleEmailRegister(e) {
       closeAuthModal(true);
       showToast(res.message || 'Account created successfully!');
 
-      if (res.user.role === 'student') {
+      const inStudentPortal = isStudentPortalActive() || authPortalRole === 'student' || res.user.role === 'student';
+      if (inStudentPortal) {
+        sessionStorage.setItem('registerly_active_portal', 'student');
         selectTab('student-portal');
-        initStudentPortal();
+        await initStudentPortal();
         hideSplashLoader();
         return;
       }
 
+      sessionStorage.setItem('registerly_active_portal', 'teacher');
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -12516,7 +12638,6 @@ async function jumpToAttendanceSession(className, subjectName, dateStr) {
 // =========================================================================
 // ================= STUDENT PORTAL & SELF-REGISTRATION SYSTEM =============
 // =========================================================================
-let authPortalRole = 'staff';
 let currentStudentData = null;
 let currentStudentPortalTab = 'profile';
 let currentStudentTimetableDay = 'all';
@@ -12524,17 +12645,7 @@ let currentStudentTimetableSlots = [];
 
 function setAuthPortalRole(role) {
   authPortalRole = role === 'student' ? 'student' : 'staff';
-  const staffBtn = document.getElementById('auth-role-staff');
-  const studentBtn = document.getElementById('auth-role-student');
-  if (staffBtn && studentBtn) {
-    if (authPortalRole === 'student') {
-      studentBtn.className = "flex-1 py-1.5 rounded-lg bg-[#245b70] text-white shadow-2xs font-black transition";
-      staffBtn.className = "flex-1 py-1.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-bold transition";
-    } else {
-      staffBtn.className = "flex-1 py-1.5 rounded-lg bg-[#245b70] text-white shadow-2xs font-black transition";
-      studentBtn.className = "flex-1 py-1.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-bold transition";
-    }
-  }
+  updateAuthModalPortalUI();
 }
 
 // Teacher Share Modal
@@ -12589,9 +12700,34 @@ function triggerNativeShareStudentLink() {
   }
 }
 
+// =========================================================================
+// ================= ADVANCED REGISTERLY STUDENT PORTAL CONTROLLER =========
+// =========================================================================
+currentStudentPortalTab = 'home';
+let currentClassesSubTab = 'timetable';
+let currentCalendarYear = new Date().getFullYear();
+let currentCalendarMonth = new Date().getMonth() + 1; // 1-12
+let currentCalendarDaysMap = {};
+let currentStudentAllSessions = [];
+let currentStudentSessionsFilter = 'all';
+let currentStudentAnnouncements = [];
+let currentStudentEvents = [];
+let currentStudentUpdatesFilter = 'all';
+let currentStudentUpdatesSearch = '';
+let currentStudentSubjectsList = [];
+let currentStudentLeaveRequests = [];
+currentStudentTimetableSlots = [];
+currentStudentTimetableDay = 'all';
+
 // Initialize Student Portal View
 async function initStudentPortal() {
   try {
+    // Hide guide and messages button from header in student link / portal
+    const btnGuide = document.getElementById('header-guide-btn');
+    const btnNotif = document.getElementById('header-notif-btn');
+    if (btnGuide) btnGuide.classList.add('hidden');
+    if (btnNotif) btnNotif.classList.add('hidden');
+
     // Populate class options in the registration form
     const classSelect = document.getElementById('spf-class');
     if (classSelect) {
@@ -12609,6 +12745,52 @@ async function initStudentPortal() {
       });
     }
 
+    // Teacher preview banner
+    const teacherBanner = document.getElementById('sp-teacher-preview-banner');
+    const teacherNameSpan = document.getElementById('sp-teacher-account-name');
+    if (currentUser && currentUser.role !== 'student') {
+      if (teacherBanner) teacherBanner.classList.remove('hidden');
+      if (teacherNameSpan) teacherNameSpan.textContent = `${currentUser.name} (${currentUser.role})`;
+    } else {
+      if (teacherBanner) teacherBanner.classList.add('hidden');
+    }
+
+    // Time-based greeting
+    const hr = new Date().getHours();
+    const greetingText = hr < 12 ? 'Good Morning' : (hr < 17 ? 'Good Afternoon' : 'Good Evening');
+
+    // Guest / Unauthenticated Student Handling
+    if (!currentUser) {
+      const nameEl = document.getElementById('sp-name');
+      const avatarEl = document.getElementById('sp-avatar');
+      const classBadgeEl = document.getElementById('sp-class-badge');
+      const subtitleEl = document.getElementById('sp-subtitle');
+      const greetEl = document.getElementById('sp-greeting');
+
+      if (greetEl) greetEl.textContent = `${greetingText}, Welcome`;
+      if (nameEl) nameEl.textContent = 'Welcome, Student';
+      if (avatarEl) avatarEl.src = DEFAULT_AVATAR;
+      if (classBadgeEl) classBadgeEl.classList.add('hidden');
+      if (subtitleEl) subtitleEl.textContent = 'Sign in to access your student portal';
+
+      const unregBanner = document.getElementById('sp-unregistered-banner');
+      if (unregBanner) {
+        unregBanner.classList.remove('hidden');
+        unregBanner.className = "p-4 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-teal-900 dark:text-teal-200 space-y-2";
+        unregBanner.innerHTML = `
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="font-black text-sm flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-teal-700 dark:text-teal-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+              <span>Welcome to REGISTERLY Student Portal</span>
+            </div>
+            <button type="button" onclick="openAuthModal()" class="touch-btn px-3.5 py-1.5 rounded-xl custom-gradient-btn text-white text-xs font-black shadow-xs">Sign In / Register</button>
+          </div>
+          <p class="text-xs leading-relaxed opacity-90">Please sign in with your student email or Google account to access your personalized timetable, attendance calendar, and campus circulars.</p>
+        `;
+      }
+      return;
+    }
+
     const res = await API.getStudentPortalMe();
     if (!res.success) {
       showToast('Error loading student profile');
@@ -12624,8 +12806,11 @@ async function initStudentPortal() {
     const avatarEl = document.getElementById('sp-avatar');
     const classBadgeEl = document.getElementById('sp-class-badge');
     const subtitleEl = document.getElementById('sp-subtitle');
+    const greetEl = document.getElementById('sp-greeting');
 
-    if (nameEl) nameEl.textContent = student ? student.name : (user.name || 'Student');
+    const displayName = student ? student.name : (user.name || 'Student');
+    if (greetEl) greetEl.textContent = `${greetingText}, ${displayName}`;
+    if (nameEl) nameEl.textContent = displayName;
     if (avatarEl) avatarEl.src = (student && student.photoUrl) || (user && user.avatarUrl) || DEFAULT_AVATAR;
 
     if (student) {
@@ -12634,26 +12819,25 @@ async function initStudentPortal() {
         classBadgeEl.classList.remove('hidden');
       }
       if (subtitleEl) {
-        subtitleEl.textContent = `Roll: #${student.roll ?? '-'} • Student ID: ${student.studentId || '-'}`;
+        const yearStr = student.academicStatus?.yearJoined ? `${student.academicStatus.yearJoined}-${Number(student.academicStatus.yearJoined) + 1}` : '2026-27';
+        subtitleEl.textContent = `Roll: #${student.roll ?? '-'} • Student ID: ${student.studentId || '-'} • Year: ${yearStr}`;
       }
 
-      // Populate Digital ID Card
+      // Populate Digital ID Card & Details
       renderStudentIdCard(student);
-
-      // Populate Form inputs for editing
       populateStudentFormFields(student);
+      populateProfileOrganizedSections(student);
 
-      // Unregistered / Pending banner logic
       const unregBanner = document.getElementById('sp-unregistered-banner');
       if (student.registrationStatus === 'pending') {
         if (unregBanner) {
           unregBanner.className = "p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1";
           unregBanner.innerHTML = `
             <div class="font-black text-sm flex items-center gap-2">
-              <span>⏳</span>
-              <span>Registration Submitted - Pending Teacher Verification</span>
+              <svg class="w-4 h-4 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>Registration Submitted — Pending Teacher Verification</span>
             </div>
-            <p class="text-xs leading-relaxed opacity-90">Your student details have been saved and sent to your teacher's Outcomers queue. Once verified by your teacher, your official class roster and attendance records will be activated.</p>
+            <p class="text-xs leading-relaxed opacity-90">Your student registration has been received and queued in your teacher's Outcomers directory. Once verified, official records will be fully synchronized.</p>
           `;
           unregBanner.classList.remove('hidden');
         }
@@ -12661,8 +12845,6 @@ async function initStudentPortal() {
         if (unregBanner) unregBanner.classList.add('hidden');
       }
 
-      const idCard = document.getElementById('sp-id-card');
-      if (idCard) idCard.classList.remove('hidden');
       const formCard = document.getElementById('sp-form-card');
       if (formCard) formCard.classList.add('hidden');
       const toggleBtnText = document.getElementById('sp-toggle-edit-btn-text');
@@ -12671,6 +12853,9 @@ async function initStudentPortal() {
       if (formTitle) formTitle.textContent = 'Edit My Details';
       const submitBtnText = document.getElementById('spf-submit-btn-text');
       if (submitBtnText) submitBtnText.textContent = 'Update Profile';
+
+      // Default to Home Dashboard
+      switchStudentPortalTab('home');
     } else {
       // First time self-registration
       if (classBadgeEl) classBadgeEl.classList.add('hidden');
@@ -12678,8 +12863,6 @@ async function initStudentPortal() {
 
       const unregBanner = document.getElementById('sp-unregistered-banner');
       if (unregBanner) unregBanner.classList.remove('hidden');
-      const idCard = document.getElementById('sp-id-card');
-      if (idCard) idCard.classList.add('hidden');
       const formCard = document.getElementById('sp-form-card');
       if (formCard) formCard.classList.remove('hidden');
 
@@ -12689,46 +12872,105 @@ async function initStudentPortal() {
       if (previewEl && user && user.avatarUrl) previewEl.src = user.avatarUrl;
       const photoUrlInput = document.getElementById('spf-photo-url');
       if (photoUrlInput && user && user.avatarUrl) photoUrlInput.value = user.avatarUrl;
-    }
 
-    switchStudentPortalTab('profile');
+      switchStudentPortalTab('profile');
+    }
   } catch (err) {
     console.error('[StudentPortal Init Error]', err);
     showToast('Failed to load student portal');
   }
 }
 
+// Render PVC Digital Student ID Card
 function renderStudentIdCard(student) {
+  if (!student) return;
   const p = student.personalDetails || {};
   const a = student.address || {};
   const f = student.familyDetails || {};
+  const ac = student.academicStatus || {};
 
-  const classRollEl = document.getElementById('sp-display-class-roll');
-  if (classRollEl) classRollEl.textContent = `${student.class || '-'} • Roll #${student.roll ?? '-'}`;
+  const nameEl = document.getElementById('sp-card-name');
+  if (nameEl) nameEl.textContent = student.name || 'Student';
 
-  const idEl = document.getElementById('sp-display-id');
+  const photoEl = document.getElementById('sp-card-photo');
+  if (photoEl) photoEl.src = student.photoUrl || DEFAULT_AVATAR;
+
+  const classEl = document.getElementById('sp-card-class');
+  if (classEl) classEl.textContent = student.class || '-';
+
+  const rollEl = document.getElementById('sp-card-roll');
+  if (rollEl) rollEl.textContent = `#${student.roll ?? '-'}`;
+
+  const idEl = document.getElementById('sp-card-id');
   if (idEl) idEl.textContent = String(student.studentId || '-');
 
-  const bgGenderEl = document.getElementById('sp-display-bg-gender');
-  if (bgGenderEl) bgGenderEl.textContent = `${p.bloodGroup || 'Blood: -'} • ${p.gender || 'Gender: -'}`;
-
-  const dobEl = document.getElementById('sp-display-dob');
-  if (dobEl) dobEl.textContent = p.dob || 'Not specified';
-
-  const emailEl = document.getElementById('sp-display-email');
-  if (emailEl) emailEl.textContent = p.studentEmail || (currentUser && currentUser.email) || '-';
-
-  const fatherEl = document.getElementById('sp-display-father');
-  if (fatherEl) fatherEl.textContent = f.fatherName ? `${f.fatherName} (${f.fatherMobile || 'No phone'})` : '-';
-
-  const motherEl = document.getElementById('sp-display-mother');
-  if (motherEl) motherEl.textContent = f.motherName ? `${f.motherName} (${f.motherNumber || 'No phone'})` : '-';
-
-  const addrEl = document.getElementById('sp-display-address');
-  if (addrEl) {
-    const parts = [a.fullAddress, a.place, a.district, a.state, a.pinCode ? `PIN: ${a.pinCode}` : ''].filter(Boolean);
-    addrEl.textContent = parts.length > 0 ? parts.join(', ') : 'Not specified';
+  const yearEl = document.getElementById('sp-card-year');
+  if (yearEl) {
+    yearEl.textContent = ac.yearJoined ? `${ac.yearJoined}-${Number(ac.yearJoined) + 1}` : '2026-2027';
   }
+
+  const contactEl = document.getElementById('sp-card-contact');
+  if (contactEl) {
+    contactEl.textContent = f.fatherMobile || f.motherNumber || f.guardianNumber || 'Institution Verified';
+  }
+
+  const verCodeEl = document.getElementById('sp-card-verification-code');
+  if (verCodeEl) {
+    verCodeEl.textContent = `ID-${student.studentId || '2000'}`;
+  }
+
+  const instNameEl = document.getElementById('sp-card-inst-name');
+  if (instNameEl && appSettings && appSettings.schoolName) {
+    instNameEl.textContent = appSettings.schoolName;
+  }
+}
+
+// Populate the organized profile sections (Personal, Academic, Contact, Family)
+function populateProfileOrganizedSections(student) {
+  if (!student) return;
+  const p = student.personalDetails || {};
+  const a = student.address || {};
+  const f = student.familyDetails || {};
+  const ac = student.academicStatus || {};
+
+  const pName = document.getElementById('sp-prof-name');
+  if (pName) pName.textContent = student.name || '-';
+
+  const pDob = document.getElementById('sp-prof-dob');
+  if (pDob) pDob.textContent = p.dob || 'Not specified';
+
+  const pGender = document.getElementById('sp-prof-gender');
+  if (pGender) pGender.textContent = p.gender || 'Not specified';
+
+  const pBlood = document.getElementById('sp-prof-blood');
+  if (pBlood) pBlood.textContent = p.bloodGroup || 'Not specified';
+
+  const pId = document.getElementById('sp-prof-id');
+  if (pId) pId.textContent = String(student.studentId || '-');
+
+  const pAdmNo = document.getElementById('sp-prof-admno');
+  if (pAdmNo) pAdmNo.textContent = ac.admissionNo || `ADM-${student.studentId || '-'}`;
+
+  const pClassRoll = document.getElementById('sp-prof-class-roll');
+  if (pClassRoll) pClassRoll.textContent = `Class ${student.class || '-'} • Roll #${student.roll ?? '-'}`;
+
+  const pAdmStatus = document.getElementById('sp-prof-admstatus');
+  if (pAdmStatus) pAdmStatus.textContent = ac.admissionStatus || 'Confirmed';
+
+  const pEmail = document.getElementById('sp-prof-email');
+  if (pEmail) pEmail.textContent = p.studentEmail || (currentUser && currentUser.email) || '-';
+
+  const pAddress = document.getElementById('sp-prof-address');
+  if (pAddress) {
+    const parts = [a.fullAddress, a.place, a.district, a.state, a.pinCode ? `PIN: ${a.pinCode}` : ''].filter(Boolean);
+    pAddress.textContent = parts.length > 0 ? parts.join(', ') : 'Not specified';
+  }
+
+  const pFather = document.getElementById('sp-prof-father');
+  if (pFather) pFather.textContent = f.fatherName ? `${f.fatherName} (${f.fatherMobile || 'No phone'})` : '-';
+
+  const pMother = document.getElementById('sp-prof-mother');
+  if (pMother) pMother.textContent = f.motherName ? `${f.motherName} (${f.motherNumber || 'No phone'})` : '-';
 }
 
 function populateStudentFormFields(student) {
@@ -12881,32 +13123,198 @@ async function handleStudentDetailsSubmit(e) {
   }
 }
 
-function switchStudentPortalTab(tab) {
+// Switch between the 5 primary Student Portal tabs
+function switchStudentPortalTab(tab, subTab) {
   currentStudentPortalTab = tab;
-  const tabs = ['profile', 'timetable', 'announcements', 'attendance'];
+  const tabs = ['home', 'classes', 'attendance', 'updates', 'profile'];
+
   tabs.forEach(t => {
-    const btn = document.getElementById(`sp-tab-${t}`);
+    // Desktop top tabs
+    const dBtn = document.getElementById(`sp-tab-${t}`);
+    // Mobile bottom bar tabs
+    const bBtn = document.getElementById(`sp-bnav-${t}`);
+    // Content containers
     const content = document.getElementById(`sp-content-${t}`);
+
     if (t === tab) {
-      if (btn) {
-        btn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap custom-gradient-btn shadow-sm";
+      if (dBtn) {
+        dBtn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap custom-gradient-btn text-white shadow-sm";
+      }
+      if (bBtn) {
+        bBtn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[#245b70] dark:text-cyan-400 font-black tab-transition scale-105";
       }
       if (content) content.classList.remove('hidden');
     } else {
-      if (btn) {
-        btn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition flex items-center justify-center gap-1.5 whitespace-nowrap";
+      if (dBtn) {
+        dBtn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition flex items-center justify-center gap-1.5 whitespace-nowrap";
+      }
+      if (bBtn) {
+        bBtn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition";
       }
       if (content) content.classList.add('hidden');
     }
   });
 
-  if (tab === 'timetable') {
-    loadStudentTimetable();
-  } else if (tab === 'announcements') {
-    loadStudentAnnouncements();
+  // Dispatch loader based on active tab
+  if (tab === 'home') {
+    loadStudentHomeDashboard();
+  } else if (tab === 'classes') {
+    loadStudentClasses(subTab || currentClassesSubTab);
   } else if (tab === 'attendance') {
-    loadStudentAttendance();
+    loadStudentAttendancePortal();
+  } else if (tab === 'updates') {
+    loadStudentUpdates();
+  } else if (tab === 'profile') {
+    loadStudentProfile();
   }
+
+  // Smooth scroll to top of portal container
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// -------------------------------------------------------------------------
+// 1. HOME DASHBOARD CONTROLLER
+// -------------------------------------------------------------------------
+async function loadStudentHomeDashboard() {
+  try {
+    const res = await API.getStudentDashboard();
+    if (!res || !res.success) return;
+
+    const stats = res.stats || { percentage: null, present: 0, absent: 0, leave: 0, totalSessions: 0 };
+    
+    // Quick statistics
+    const attPctEl = document.getElementById('sp-home-att-pct');
+    if (attPctEl) {
+      attPctEl.textContent = stats.percentage !== null ? `${stats.percentage}%` : 'N/A';
+    }
+
+    const attSubEl = document.getElementById('sp-home-att-sub');
+    if (attSubEl) {
+      attSubEl.textContent = `${stats.present || 0} of ${stats.totalSessions || 0} sessions`;
+    }
+
+    const presentEl = document.getElementById('sp-home-present-count');
+    if (presentEl) presentEl.textContent = String(stats.present || 0);
+
+    const subjectsEl = document.getElementById('sp-home-subjects-count');
+    if (subjectsEl) subjectsEl.textContent = String(res.totalSubjects || 0);
+
+    const noticesEl = document.getElementById('sp-home-notices-count');
+    const totalNotices = (res.recentAnnouncements || []).length + (res.upcomingEvents || []).length;
+    if (noticesEl) noticesEl.textContent = String(totalNotices);
+
+    // Today's Day Name
+    const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const dayNameEl = document.getElementById('sp-home-today-dayname');
+    if (dayNameEl) dayNameEl.textContent = `${dayName} Schedule`;
+
+    // Today's schedule slots
+    const todaySlotsContainer = document.getElementById('sp-home-today-slots');
+    if (todaySlotsContainer) {
+      const slots = res.todaySchedule || [];
+      if (slots.length === 0) {
+        todaySlotsContainer.innerHTML = `
+          <div class="p-6 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5">
+            <svg class="w-8 h-8 text-[var(--text-sub)] opacity-50 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">No Classes Scheduled Today</h4>
+            <p class="text-[11px] text-[var(--text-sub)]">Enjoy your day or check the full weekly timetable for upcoming classes.</p>
+          </div>
+        `;
+      } else {
+        todaySlotsContainer.innerHTML = slots.map((s, idx) => {
+          return `
+            <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-3 shadow-2xs hover:border-[#245b70]/40 transition">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-700 dark:text-teal-300 flex items-center justify-center font-black text-xs flex-shrink-0">
+                  ${(s.subject || 'SUB').substring(0, 3).toUpperCase()}
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h4 class="text-xs font-black text-[var(--text-main)] truncate">${s.subject || 'Subject'}</h4>
+                    ${s.room ? `<span class="px-1.5 py-0.2 rounded-md bg-slate-500/10 text-[var(--text-sub)] font-bold text-[9px]">Room: ${s.room}</span>` : ''}
+                  </div>
+                  <p class="text-[10px] text-[var(--text-sub)] font-medium truncate">Teacher: <b>${s.teacherName || 'Faculty'}</b></p>
+                </div>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <span class="px-2.5 py-1 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[#245b70] dark:text-cyan-400 font-extrabold text-[11px] shadow-2xs">
+                  ${s.timeSlot || '--:--'}
+                </span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // Recent announcements on home
+    const homeAnnounceContainer = document.getElementById('sp-home-announcements-list');
+    if (homeAnnounceContainer) {
+      const announcements = res.recentAnnouncements || [];
+      if (announcements.length === 0) {
+        homeAnnounceContainer.innerHTML = `
+          <div class="p-5 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] text-xs text-[var(--text-sub)]">
+            No active campus circulars right now.
+          </div>
+        `;
+      } else {
+        homeAnnounceContainer.innerHTML = announcements.map(n => {
+          const isImp = n.priority === 'important';
+          const dateStr = n.publishedAt ? new Date(n.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+          return `
+            <div onclick="openStudentNoticeModal('${n._id}', 'announcement')" class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] hover:border-[#245b70]/40 transition active:scale-98 cursor-pointer space-y-1 shadow-2xs">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  ${isImp ? '<span class="px-1.5 py-0.2 rounded bg-amber-500 text-white font-black text-[9px] uppercase">Alert</span>' : '<span class="px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)] font-bold text-[9px]">Circular</span>'}
+                  <h4 class="text-xs font-black text-[var(--text-main)] truncate">${n.title}</h4>
+                </div>
+                <span class="text-[10px] text-[var(--text-sub)] font-medium flex-shrink-0">${dateStr}</span>
+              </div>
+              <p class="text-[11px] text-[var(--text-sub)] line-clamp-2 leading-relaxed">${n.description || ''}</p>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // Institution branding update
+    if (res.institution && res.institution.schoolName) {
+      const instNameEl = document.getElementById('sp-card-inst-name');
+      if (instNameEl) instNameEl.textContent = res.institution.schoolName;
+    }
+  } catch (err) {
+    console.error('[Student Home Dashboard Error]', err);
+  }
+}
+
+// -------------------------------------------------------------------------
+// 2. CLASSES & ACADEMICS CONTROLLER
+// -------------------------------------------------------------------------
+function switchClassesSubTab(subTab) {
+  currentClassesSubTab = subTab;
+  const subTabs = ['timetable', 'subjects', 'materials'];
+
+  subTabs.forEach(st => {
+    const btn = document.getElementById(`sp-csubtab-${st}`);
+    const view = document.getElementById(`sp-classes-view-${st}`);
+    if (st === subTab) {
+      if (btn) btn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-black custom-gradient-btn text-white transition shadow-2xs flex items-center justify-center gap-1.5";
+      if (view) view.classList.remove('hidden');
+    } else {
+      if (btn) btn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition flex items-center justify-center gap-1.5";
+      if (view) view.classList.add('hidden');
+    }
+  });
+
+  if (subTab === 'timetable') {
+    loadStudentTimetable(currentStudentTimetableDay);
+  } else if (subTab === 'subjects') {
+    loadStudentSubjects();
+  }
+}
+
+async function loadStudentClasses(subTab = 'timetable') {
+  switchClassesSubTab(subTab);
 }
 
 async function loadStudentTimetable(day = 'all') {
@@ -12958,7 +13366,7 @@ function renderStudentTimetableSlots(slots) {
   if (!slots || slots.length === 0) {
     container.innerHTML = `
       <div class="p-8 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
-        <span class="text-3xl">🗓️</span>
+        <svg class="w-10 h-10 text-[var(--text-sub)] opacity-50 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">No Classes Scheduled</h4>
         <p class="text-[11px] text-[var(--text-sub)]">There are no timetable slots recorded for this selection yet.</p>
       </div>
@@ -12993,95 +13401,124 @@ function renderStudentTimetableSlots(slots) {
   }).join('');
 }
 
-async function loadStudentAnnouncements() {
-  const container = document.getElementById('sp-announcements-list');
+async function loadStudentSubjects() {
+  const container = document.getElementById('sp-subjects-grid');
   if (!container) return;
-  container.innerHTML = '<div class="p-6 text-center text-xs text-[var(--text-sub)] font-bold">Loading notices...</div>';
+  container.innerHTML = '<div class="p-6 text-center text-xs text-[var(--text-sub)] font-bold col-span-2">Loading subjects...</div>';
 
   try {
-    const res = await API.getStudentAnnouncements();
-    const notices = res.announcements || [];
-    const events = res.events || [];
+    const res = await API.getStudentSubjects();
+    const subjects = res.subjects || [];
+    currentStudentSubjectsList = subjects;
 
-    if (notices.length === 0 && events.length === 0) {
+    if (subjects.length === 0) {
       container.innerHTML = `
-        <div class="p-8 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
-          <span class="text-3xl">📢</span>
-          <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">Notice Board is Clean</h4>
-          <p class="text-[11px] text-[var(--text-sub)]">No announcements or events have been published right now.</p>
+        <div class="p-8 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2 col-span-2">
+          <svg class="w-10 h-10 text-[var(--text-sub)] opacity-50 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">No Subjects Enrolled</h4>
+          <p class="text-[11px] text-[var(--text-sub)]">No subjects are assigned to your class yet.</p>
         </div>
       `;
       return;
     }
 
-    let html = '';
-
-    // Events if any
-    if (events.length > 0) {
-      html += `
-        <div class="space-y-2 mb-4">
-          <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">Upcoming Events</h4>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            ${events.map(ev => `
-              <div class="p-3 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 space-y-1">
-                <div class="flex items-center justify-between">
-                  <span class="px-2 py-0.5 rounded-md bg-cyan-500 text-white font-black text-[9px] uppercase">${ev.status || 'Upcoming'}</span>
-                  <span class="text-[10px] font-bold text-[var(--text-sub)]">${ev.date || ''} ${ev.time || ''}</span>
-                </div>
-                <h5 class="text-xs font-extrabold text-[var(--text-main)]">${ev.name}</h5>
-                ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)]">${ev.description}</p>` : ''}
-                ${ev.location ? `<p class="text-[10px] text-cyan-700 dark:text-cyan-300 font-bold">📍 ${ev.location}</p>` : ''}
+    container.innerHTML = subjects.map(s => {
+      const att = s.attendance || {};
+      const pctStr = att.percentage !== null ? `${att.percentage}%` : 'N/A';
+      return `
+        <div class="p-4 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] hover:border-[#245b70]/40 transition space-y-3 shadow-2xs">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-teal-500/15 text-teal-700 dark:text-teal-300 flex items-center justify-center font-black text-xs flex-shrink-0">
+                ${(s.name || 'SUB').substring(0, 3).toUpperCase()}
               </div>
-            `).join('')}
+              <div class="min-w-0">
+                <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)] truncate">${s.name}</h4>
+                <p class="text-[10px] text-[var(--text-sub)] font-medium truncate">Faculty: <b>${s.teacher || 'Assigned'}</b></p>
+              </div>
+            </div>
+            ${s.subjectCode ? `<span class="px-2 py-0.5 rounded-md bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-mono text-[9px] font-bold flex-shrink-0">${s.subjectCode}</span>` : ''}
+          </div>
+
+          <!-- Subject Attendance Bar -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[10px]">
+              <span class="text-[var(--text-sub)] font-semibold">Subject Attendance</span>
+              <span class="font-extrabold text-[#245b70] dark:text-cyan-400">${pctStr}</span>
+            </div>
+            <div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              <div class="h-full bg-teal-600 rounded-full" style="width: ${att.percentage || 0}%"></div>
+            </div>
+          </div>
+
+          <div class="pt-1 flex items-center justify-between border-t border-[var(--border-color)]">
+            <span class="text-[10px] text-[var(--text-sub)]">${att.present || 0} / ${att.totalSessions || 0} Sessions</span>
+            <button type="button" onclick="openStudentSubjectModal('${s._id}')" class="text-xs font-bold text-[#245b70] dark:text-cyan-400 hover:underline flex items-center gap-1">
+              <span>Details</span>
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
           </div>
         </div>
       `;
-    }
-
-    // Announcements
-    if (notices.length > 0) {
-      html += `
-        <div class="space-y-2.5">
-          <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">School Circulars & Notices</h4>
-          ${notices.map(n => {
-            const isImp = n.priority === 'important';
-            const dateStr = n.publishedAt ? new Date(n.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-            return `
-              <div class="p-4 rounded-2xl ${isImp ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[var(--bg-page)] border-[var(--border-color)]'} border space-y-2 shadow-2xs">
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2">
-                    ${isImp ? '<span class="px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] uppercase tracking-wider">Important</span>' : '<span class="px-2 py-0.5 rounded-md bg-slate-500/20 text-[var(--text-sub)] font-bold text-[9px]">Notice</span>'}
-                    <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${n.title}</h5>
-                  </div>
-                  <span class="text-[10px] text-[var(--text-sub)] font-medium flex-shrink-0">${dateStr}</span>
-                </div>
-                <p class="text-xs text-[var(--text-main)] opacity-90 leading-relaxed whitespace-pre-line">${n.description}</p>
-                <div class="text-[10px] text-[var(--text-sub)] font-semibold pt-1 border-t border-[var(--border-color)]/50">
-                  Posted by: <b>${n.createdByName || 'Administration'}</b>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      `;
-    }
-
-    container.innerHTML = html;
+    }).join('');
   } catch (err) {
-    container.innerHTML = '<div class="p-6 text-center text-xs text-rose-500 font-bold">Failed to load notices</div>';
+    container.innerHTML = '<div class="p-6 text-center text-xs text-rose-500 font-bold col-span-2">Failed to load subjects</div>';
   }
 }
 
-async function loadStudentAttendance() {
-  try {
-    const res = await API.getStudentAttendance();
-    const stats = res.stats || { percentage: null, present: 0, absent: 0, leave: 0, totalSessions: 0 };
-    const sessions = res.sessions || [];
+function openStudentSubjectModal(subjectId) {
+  const subj = currentStudentSubjectsList.find(s => String(s._id) === String(subjectId));
+  if (!subj) return;
 
+  const modal = document.getElementById('modal-student-subject-detail');
+  if (!modal) return;
+
+  const avatar = document.getElementById('ssd-avatar');
+  if (avatar) avatar.textContent = (subj.name || 'SUB').substring(0, 3).toUpperCase();
+
+  const nameEl = document.getElementById('ssd-name');
+  if (nameEl) nameEl.textContent = subj.name;
+
+  const codeEl = document.getElementById('ssd-code');
+  if (codeEl) codeEl.textContent = subj.subjectCode ? `Code: ${subj.subjectCode}` : 'Code: General';
+
+  const teacherEl = document.getElementById('ssd-teacher');
+  if (teacherEl) teacherEl.textContent = subj.teacher || 'Not Assigned';
+
+  const teacherEmailEl = document.getElementById('ssd-teacher-email');
+  if (teacherEmailEl) teacherEmailEl.textContent = subj.teacherEmail ? `Email: ${subj.teacherEmail}` : '';
+
+  const att = subj.attendance || {};
+  const attPctEl = document.getElementById('ssd-att-pct');
+  if (attPctEl) attPctEl.textContent = att.percentage !== null ? `${att.percentage}%` : 'N/A';
+
+  const attDetailsEl = document.getElementById('ssd-att-details');
+  if (attDetailsEl) attDetailsEl.textContent = `${att.present || 0} of ${att.totalSessions || 0} recorded sessions attended`;
+
+  modal.classList.remove('hidden');
+}
+
+function closeStudentSubjectModal() {
+  const modal = document.getElementById('modal-student-subject-detail');
+  if (modal) modal.classList.add('hidden');
+}
+
+// -------------------------------------------------------------------------
+// 3. ADVANCED ATTENDANCE PORTAL & CALENDAR CONTROLLER
+// -------------------------------------------------------------------------
+async function loadStudentAttendancePortal() {
+  try {
+    const [attRes, calRes] = await Promise.all([
+      API.getStudentAttendance(),
+      API.getStudentAttendanceCalendar(currentCalendarYear, currentCalendarMonth)
+    ]);
+
+    const stats = attRes.stats || { percentage: null, present: 0, absent: 0, leave: 0, totalSessions: 0 };
+    currentStudentAllSessions = attRes.sessions || [];
+
+    // KPI overview
     const pctEl = document.getElementById('sp-attendance-pct');
-    if (pctEl) {
-      pctEl.textContent = stats.percentage !== null ? `${stats.percentage}%` : 'N/A';
-    }
+    if (pctEl) pctEl.textContent = stats.percentage !== null ? `${stats.percentage}%` : 'N/A';
 
     const presentEl = document.getElementById('sp-att-present');
     if (presentEl) presentEl.textContent = String(stats.present || 0);
@@ -13095,45 +13532,582 @@ async function loadStudentAttendance() {
     const totalEl = document.getElementById('sp-att-total');
     if (totalEl) totalEl.textContent = String(stats.totalSessions || 0);
 
-    const sessionsContainer = document.getElementById('sp-attendance-sessions');
-    if (sessionsContainer) {
-      if (sessions.length === 0) {
-        sessionsContainer.innerHTML = `
-          <div class="p-6 text-center text-xs text-[var(--text-sub)] font-medium">
-            No attendance records logged yet for your profile.
-          </div>
-        `;
-      } else {
-        sessionsContainer.innerHTML = sessions.map(s => {
-          let badgeColor = 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30';
-          let statusLabel = 'Present';
-          if (s.status === 'A') {
-            badgeColor = 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
-            statusLabel = 'Absent';
-          } else if (s.status === 'L') {
-            badgeColor = 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30';
-            statusLabel = 'Leave';
-          }
-          return `
-            <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2 shadow-2xs">
-              <div class="flex items-center gap-2.5">
-                <span class="w-2.5 h-2.5 rounded-full ${s.status === 'P' ? 'bg-teal-500' : (s.status === 'A' ? 'bg-rose-500' : 'bg-amber-500')}"></span>
-                <div>
-                  <h5 class="text-xs font-black text-[var(--text-main)]">${s.date || 'Date'}</h5>
-                  <p class="text-[10px] text-[var(--text-sub)] font-medium">${s.subject ? `Subject: ${s.subject}` : `Class: ${s.class || ''}`} ${s.period ? `• Period ${s.period}` : ''}</p>
-                </div>
-              </div>
-              <span class="px-2.5 py-1 rounded-xl text-xs font-black border ${badgeColor}">
-                ${statusLabel}
-              </span>
-            </div>
-          `;
-        }).join('');
+    // Monthly Calendar
+    if (calRes && calRes.success) {
+      currentCalendarDaysMap = calRes.days || {};
+      renderStudentCalendar(currentCalendarYear, currentCalendarMonth);
+    }
+
+    // Subject breakdown
+    loadSubjectAttendanceBreakdown();
+
+    // Chronological sessions list
+    renderStudentAttendanceSessions(currentStudentAllSessions, currentStudentSessionsFilter);
+
+  } catch (err) {
+    console.error('[Student Attendance Portal Error]', err);
+  }
+}
+
+function navigateStudentCalendar(delta) {
+  currentCalendarMonth += delta;
+  if (currentCalendarMonth > 12) {
+    currentCalendarMonth = 1;
+    currentCalendarYear++;
+  } else if (currentCalendarMonth < 1) {
+    currentCalendarMonth = 12;
+    currentCalendarYear--;
+  }
+
+  loadStudentAttendancePortal();
+}
+
+function renderStudentCalendar(year, month) {
+  const labelEl = document.getElementById('sp-calendar-month-label');
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  if (labelEl) labelEl.textContent = `${monthNames[month - 1]} ${year}`;
+
+  const grid = document.getElementById('sp-calendar-days-grid');
+  if (!grid) return;
+
+  // Days in month
+  const totalDays = new Date(year, month, 0).getDate();
+  // Day of week of 1st day (0 is Sun, 1 is Mon, ...)
+  let startDay = new Date(year, month - 1, 1).getDay();
+  // Adjust so Monday is 0, Sunday is 6
+  startDay = (startDay + 6) % 7;
+
+  let html = '';
+
+  // Blank padding cells
+  for (let i = 0; i < startDay; i++) {
+    html += '<div class="h-10 rounded-xl bg-transparent"></div>';
+  }
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
+  const todayDate = today.getDate();
+
+  for (let d = 1; d <= totalDays; d++) {
+    const dayData = currentCalendarDaysMap[d];
+    let dotClass = 'bg-slate-300 dark:bg-slate-700';
+    let bgClass = 'bg-[var(--bg-page)]';
+    let textClass = 'text-[var(--text-main)]';
+
+    if (dayData) {
+      if (dayData.status === 'P') {
+        dotClass = 'bg-emerald-500';
+        bgClass = 'bg-emerald-500/10 border-emerald-500/30';
+      } else if (dayData.status === 'A') {
+        dotClass = 'bg-rose-500';
+        bgClass = 'bg-rose-500/10 border-rose-500/30';
+      } else if (dayData.status === 'L') {
+        dotClass = 'bg-amber-500';
+        bgClass = 'bg-amber-500/10 border-amber-500/30';
       }
     }
-  } catch (err) {
-    console.error('[Student Attendance Load Error]', err);
+
+    const isToday = isCurrentMonth && d === todayDate;
+    const ringClass = isToday ? 'ring-2 ring-[#245b70]' : '';
+
+    html += `
+      <button type="button" onclick="selectStudentCalendarDate(${d})" class="touch-btn h-10 rounded-xl ${bgClass} border border-[var(--border-color)] ${ringClass} flex flex-col items-center justify-center p-0.5 transition active:scale-95 group hover:border-[#245b70]/60">
+        <span class="text-xs font-black ${textClass} leading-tight">${d}</span>
+        <span class="w-1.5 h-1.5 rounded-full ${dotClass} mt-0.5"></span>
+      </button>
+    `;
   }
+
+  grid.innerHTML = html;
+
+  // Auto-select today or last available date in inspector
+  if (isCurrentMonth) {
+    selectStudentCalendarDate(todayDate);
+  } else if (totalDays > 0) {
+    selectStudentCalendarDate(1);
+  }
+}
+
+function selectStudentCalendarDate(dayNum) {
+  const dayData = currentCalendarDaysMap[dayNum];
+  const dateStr = `${currentCalendarYear}-${String(currentCalendarMonth).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+  
+  const dateLabel = document.getElementById('sp-inspector-date');
+  if (dateLabel) {
+    const dObj = new Date(currentCalendarYear, currentCalendarMonth - 1, dayNum);
+    const dayName = dObj.toLocaleDateString('en-US', { weekday: 'long' });
+    dateLabel.textContent = `${dayName}, ${dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  }
+
+  const badgeEl = document.getElementById('sp-inspector-status-badge');
+  const sessionsEl = document.getElementById('sp-inspector-sessions');
+
+  if (!dayData || !dayData.sessions || dayData.sessions.length === 0) {
+    if (badgeEl) {
+      badgeEl.className = "px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)]";
+      badgeEl.textContent = 'No Sessions Recorded';
+    }
+    if (sessionsEl) {
+      sessionsEl.innerHTML = '<p class="text-xs text-[var(--text-sub)]">No attendance sessions were recorded for your class on this date.</p>';
+    }
+    return;
+  }
+
+  let badgeColor = 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300';
+  let statusText = 'Present';
+  if (dayData.status === 'A') {
+    badgeColor = 'bg-rose-500/20 text-rose-800 dark:text-rose-300';
+    statusText = 'Absent';
+  } else if (dayData.status === 'L') {
+    badgeColor = 'bg-amber-500/20 text-amber-800 dark:text-amber-300';
+    statusText = 'Leave';
+  }
+
+  if (badgeEl) {
+    badgeEl.className = `px-2 py-0.5 rounded-lg text-[10px] font-black ${badgeColor}`;
+    badgeEl.textContent = statusText;
+  }
+
+  if (sessionsEl) {
+    sessionsEl.innerHTML = dayData.sessions.map(s => {
+      let sColor = 'text-emerald-600 dark:text-emerald-400';
+      let sText = 'Present';
+      if (s.status === 'A') { sColor = 'text-rose-600 dark:text-rose-400'; sText = 'Absent'; }
+      else if (s.status === 'L') { sColor = 'text-amber-600 dark:text-amber-400'; sText = 'Leave'; }
+
+      return `
+        <div class="p-2.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] flex items-center justify-between gap-2 shadow-2xs">
+          <div>
+            <h5 class="text-xs font-black text-[var(--text-main)]">${s.subject || 'General Attendance'}</h5>
+            <p class="text-[10px] text-[var(--text-sub)] font-medium">${s.period ? `Period: ${s.period} • ` : ''}Marked by: ${s.markedBy || 'Administration'}</p>
+            ${s.note ? `<p class="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">Note: ${s.note}</p>` : ''}
+          </div>
+          <span class="text-xs font-black ${sColor}">${sText}</span>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+async function loadSubjectAttendanceBreakdown() {
+  const container = document.getElementById('sp-subject-attendance-list');
+  if (!container) return;
+
+  try {
+    const res = await API.getStudentSubjects();
+    const subjects = res.subjects || [];
+    if (subjects.length === 0) {
+      container.innerHTML = '<div class="p-3 text-center text-xs text-[var(--text-sub)]">No subjects assigned yet.</div>';
+      return;
+    }
+
+    container.innerHTML = subjects.map(s => {
+      const att = s.attendance || {};
+      const pct = att.percentage !== null ? att.percentage : null;
+      const pctStr = pct !== null ? `${pct}%` : 'N/A';
+      return `
+        <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5 shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-[var(--text-main)]">${s.name}</span>
+            <span class="text-xs font-black text-[#245b70] dark:text-cyan-400">${pctStr}</span>
+          </div>
+          <div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+            <div class="h-full bg-teal-600 rounded-full" style="width: ${pct || 0}%"></div>
+          </div>
+          <div class="flex items-center justify-between text-[10px] text-[var(--text-sub)]">
+            <span>Faculty: ${s.teacher || 'Assigned'}</span>
+            <span>${att.present || 0} / ${att.totalSessions || 0} attended</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="p-3 text-center text-xs text-rose-500">Failed to load subject attendance</div>';
+  }
+}
+
+function filterStudentAttendanceSessions(status) {
+  currentStudentSessionsFilter = status;
+  ['all', 'P', 'A', 'L'].forEach(st => {
+    const btn = document.getElementById(`sp-afilt-${st}`);
+    if (btn) {
+      if (st === status) {
+        btn.className = "px-2 py-1 rounded-lg text-[10px] font-bold bg-[#245b70] text-white";
+      } else {
+        btn.className = "px-2 py-1 rounded-lg text-[10px] font-bold bg-[var(--bg-page)] text-[var(--text-sub)]";
+      }
+    }
+  });
+
+  renderStudentAttendanceSessions(currentStudentAllSessions, status);
+}
+
+function renderStudentAttendanceSessions(sessions, filter = 'all') {
+  const container = document.getElementById('sp-attendance-sessions');
+  if (!container) return;
+
+  const filtered = filter === 'all' ? sessions : sessions.filter(s => s.status === filter);
+
+  if (!filtered || filtered.length === 0) {
+    container.innerHTML = `
+      <div class="p-6 text-center text-xs text-[var(--text-sub)] font-medium">
+        No attendance sessions matching this selection.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(s => {
+    let badgeColor = 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30';
+    let statusLabel = 'Present';
+    if (s.status === 'A') {
+      badgeColor = 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
+      statusLabel = 'Absent';
+    } else if (s.status === 'L') {
+      badgeColor = 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30';
+      statusLabel = 'Leave';
+    }
+
+    return `
+      <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2 shadow-2xs">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full ${s.status === 'P' ? 'bg-teal-500' : (s.status === 'A' ? 'bg-rose-500' : 'bg-amber-500')}"></span>
+          <div>
+            <h5 class="text-xs font-black text-[var(--text-main)]">${s.date || 'Date'}</h5>
+            <p class="text-[10px] text-[var(--text-sub)] font-medium">${s.subject ? `Subject: ${s.subject}` : `Class: ${s.class || ''}`} ${s.period ? `• Period ${s.period}` : ''}</p>
+          </div>
+        </div>
+        <span class="px-2.5 py-1 rounded-xl text-xs font-black border ${badgeColor}">
+          ${statusLabel}
+        </span>
+      </div>
+    `;
+  }).join('');
+}
+
+// -------------------------------------------------------------------------
+// 4. CAMPUS UPDATES & CIRCULARS CONTROLLER
+// -------------------------------------------------------------------------
+async function loadStudentUpdates() {
+  const container = document.getElementById('sp-announcements-list');
+  if (!container) return;
+  container.innerHTML = '<div class="p-6 text-center text-xs text-[var(--text-sub)] font-bold">Loading notices...</div>';
+
+  try {
+    const res = await API.getStudentAnnouncements();
+    currentStudentAnnouncements = res.announcements || [];
+    currentStudentEvents = res.events || [];
+
+    renderFilteredStudentUpdates();
+  } catch (err) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-rose-500 font-bold">Failed to load notices</div>';
+  }
+}
+
+function filterStudentUpdates(category) {
+  currentStudentUpdatesFilter = category;
+  ['all', 'important', 'events'].forEach(cat => {
+    const btn = document.getElementById(`sp-ufilt-${cat}`);
+    if (btn) {
+      if (cat === category) {
+        btn.className = "px-2.5 py-1 rounded-xl text-xs font-bold bg-[#245b70] text-white transition flex-shrink-0 shadow-2xs";
+      } else {
+        btn.className = "px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex-shrink-0";
+      }
+    }
+  });
+
+  renderFilteredStudentUpdates();
+}
+
+function handleStudentUpdatesSearch(query) {
+  currentStudentUpdatesSearch = (query || '').toLowerCase().trim();
+  renderFilteredStudentUpdates();
+}
+
+function renderFilteredStudentUpdates() {
+  const container = document.getElementById('sp-announcements-list');
+  if (!container) return;
+
+  let notices = [...currentStudentAnnouncements];
+  let events = [...currentStudentEvents];
+
+  if (currentStudentUpdatesFilter === 'important') {
+    notices = notices.filter(n => n.priority === 'important');
+    events = [];
+  } else if (currentStudentUpdatesFilter === 'events') {
+    notices = [];
+  }
+
+  if (currentStudentUpdatesSearch) {
+    const q = currentStudentUpdatesSearch;
+    notices = notices.filter(n => (n.title || '').toLowerCase().includes(q) || (n.description || '').toLowerCase().includes(q));
+    events = events.filter(e => (e.name || '').toLowerCase().includes(q) || (e.description || '').toLowerCase().includes(q));
+  }
+
+  if (notices.length === 0 && events.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
+        <svg class="w-10 h-10 text-[var(--text-sub)] opacity-50 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">Notice Board is Clean</h4>
+        <p class="text-[11px] text-[var(--text-sub)]">No circulars or events match this selection right now.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+
+  if (events.length > 0) {
+    html += `
+      <div class="space-y-2 mb-3">
+        <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">Upcoming Events</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          ${events.map(ev => `
+            <div onclick="openStudentNoticeModal('${ev._id}', 'event')" class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-cyan-500/30 hover:border-cyan-500 transition active:scale-98 cursor-pointer space-y-1.5 shadow-2xs">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded-md bg-cyan-500 text-white font-black text-[9px] uppercase tracking-wider">${ev.status || 'Upcoming'}</span>
+                <span class="text-[10px] font-bold text-[var(--text-sub)]">${ev.date || ''}</span>
+              </div>
+              <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${ev.name}</h5>
+              ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)] line-clamp-2">${ev.description}</p>` : ''}
+              ${ev.location ? `<p class="text-[10px] text-cyan-700 dark:text-cyan-300 font-bold">Location: ${ev.location}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  if (notices.length > 0) {
+    html += `
+      <div class="space-y-2.5">
+        <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">School Circulars & Notices</h4>
+        ${notices.map(n => {
+          const isImp = n.priority === 'important';
+          const dateStr = n.publishedAt ? new Date(n.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+          return `
+            <div onclick="openStudentNoticeModal('${n._id}', 'announcement')" class="p-4 rounded-2xl ${isImp ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[var(--bg-page)] border-[var(--border-color)]'} border hover:border-[#245b70]/40 transition active:scale-98 cursor-pointer space-y-2 shadow-2xs">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  ${isImp ? '<span class="px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] uppercase tracking-wider">Important</span>' : '<span class="px-2 py-0.5 rounded-md bg-slate-500/20 text-[var(--text-sub)] font-bold text-[9px]">Notice</span>'}
+                  <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)] truncate">${n.title}</h5>
+                </div>
+                <span class="text-[10px] text-[var(--text-sub)] font-medium flex-shrink-0">${dateStr}</span>
+              </div>
+              <p class="text-xs text-[var(--text-main)] opacity-90 leading-relaxed whitespace-pre-line line-clamp-3">${n.description}</p>
+              <div class="text-[10px] text-[var(--text-sub)] font-semibold pt-1 border-t border-[var(--border-color)]/50 flex items-center justify-between">
+                <span>Posted by: <b>${n.createdByName || 'Administration'}</b></span>
+                <span class="text-[#245b70] dark:text-cyan-400 font-bold">Read Full -></span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+function openStudentNoticeModal(id, type) {
+  const modal = document.getElementById('modal-student-notice-detail');
+  if (!modal) return;
+
+  let item = null;
+  if (type === 'event') {
+    item = currentStudentEvents.find(e => String(e._id) === String(id));
+  } else {
+    item = currentStudentAnnouncements.find(n => String(n._id) === String(id));
+  }
+  if (!item) return;
+
+  const titleEl = document.getElementById('snd-title');
+  const dateEl = document.getElementById('snd-date');
+  const badgeEl = document.getElementById('snd-priority-badge');
+  const contentEl = document.getElementById('snd-content');
+  const authorEl = document.getElementById('snd-author');
+
+  if (type === 'event') {
+    if (titleEl) titleEl.textContent = item.name;
+    if (dateEl) dateEl.textContent = `${item.date || ''} ${item.time || ''}`;
+    if (badgeEl) {
+      badgeEl.className = "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-cyan-500 text-white";
+      badgeEl.textContent = item.status || 'Event';
+    }
+    if (contentEl) {
+      contentEl.innerHTML = `
+        <p>${item.description || 'No description provided'}</p>
+        ${item.location ? `<p class="mt-2 font-bold text-cyan-700 dark:text-cyan-300">Venue: ${item.location}</p>` : ''}
+      `;
+    }
+    if (authorEl) authorEl.textContent = 'School Calendar Event';
+  } else {
+    if (titleEl) titleEl.textContent = item.title;
+    if (dateEl) dateEl.textContent = item.publishedAt ? new Date(item.publishedAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+    if (badgeEl) {
+      const isImp = item.priority === 'important';
+      badgeEl.className = `px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${isImp ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'}`;
+      badgeEl.textContent = isImp ? 'Important Circular' : 'General Notice';
+    }
+    if (contentEl) contentEl.textContent = item.description || '';
+    if (authorEl) authorEl.textContent = `Posted by: ${item.createdByName || 'Administration'}`;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeStudentNoticeModal() {
+  const modal = document.getElementById('modal-student-notice-detail');
+  if (modal) modal.classList.add('hidden');
+}
+
+// -------------------------------------------------------------------------
+// 5. PROFILE & LEAVE APPLICATION CONTROLLER
+// -------------------------------------------------------------------------
+async function loadStudentProfile() {
+  loadStudentLeaveRequests();
+}
+
+function openStudentLeaveModal() {
+  const modal = document.getElementById('modal-student-leave-request');
+  if (!modal) return;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const fromEl = document.getElementById('slr-from-date');
+  const toEl = document.getElementById('slr-to-date');
+  const reasonEl = document.getElementById('slr-reason');
+
+  if (fromEl) fromEl.value = todayStr;
+  if (toEl) toEl.value = todayStr;
+  if (reasonEl) reasonEl.value = '';
+
+  modal.classList.remove('hidden');
+}
+
+function closeStudentLeaveModal() {
+  const modal = document.getElementById('modal-student-leave-request');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleStudentLeaveSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('slr-submit-btn');
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+  }
+
+  try {
+    const fromDate = document.getElementById('slr-from-date')?.value?.trim();
+    const toDate = document.getElementById('slr-to-date')?.value?.trim();
+    const reason = document.getElementById('slr-reason')?.value?.trim();
+
+    if (!fromDate || !toDate || !reason) {
+      showToast('Please provide from date, to date, and reason');
+      return;
+    }
+
+    const res = await API.submitStudentLeaveRequest({ fromDate, toDate, reason });
+    if (res.success) {
+      showToast(res.message || 'Leave request submitted successfully');
+      closeStudentLeaveModal();
+      loadStudentLeaveRequests();
+    } else {
+      showToast(res.message || 'Failed to submit leave request');
+    }
+  } catch (err) {
+    showToast(err.message || 'Error submitting leave request');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  }
+}
+
+async function loadStudentLeaveRequests() {
+  const container = document.getElementById('sp-my-leave-requests');
+  if (!container) return;
+
+  try {
+    const res = await API.getStudentLeaveRequests();
+    const requests = res.requests || [];
+    currentStudentLeaveRequests = requests;
+
+    if (requests.length === 0) {
+      container.innerHTML = '<div class="p-3 text-center text-xs text-[var(--text-sub)]">No leave applications submitted yet.</div>';
+      return;
+    }
+
+    container.innerHTML = requests.map(r => {
+      let statusColor = 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30';
+      let statusLabel = 'Pending Review';
+      if (r.status === 'approved') {
+        statusColor = 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30';
+        statusLabel = 'Approved';
+      } else if (r.status === 'rejected') {
+        statusColor = 'bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/30';
+        statusLabel = 'Rejected';
+      }
+
+      return `
+        <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5 shadow-2xs">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-black text-[var(--text-main)]">${r.fromDate} to ${r.toDate}</span>
+            <span class="px-2 py-0.5 rounded-lg text-[10px] font-black border ${statusColor}">${statusLabel}</span>
+          </div>
+          <p class="text-xs text-[var(--text-sub)]">${r.reason || ''}</p>
+          ${r.teacherRemarks ? `<p class="text-[10px] text-teal-700 dark:text-teal-300 font-semibold">Teacher Remark: ${r.teacherRemarks}</p>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="p-3 text-center text-xs text-rose-500">Failed to load leave requests</div>';
+  }
+}
+
+async function handleStudentPasswordChange(e) {
+  e.preventDefault();
+  const currentPassword = document.getElementById('sp-pw-current')?.value?.trim();
+  const newPassword = document.getElementById('sp-pw-new')?.value?.trim();
+  const btn = document.getElementById('sp-pw-btn');
+
+  if (!newPassword || newPassword.length < 6) {
+    showToast('New password must be at least 6 characters long');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+  }
+
+  try {
+    const res = await API.changeStudentPassword({ currentPassword, newPassword });
+    if (res.success) {
+      showToast(res.message || 'Password updated successfully');
+      document.getElementById('sp-pw-current').value = '';
+      document.getElementById('sp-pw-new').value = '';
+    } else {
+      showToast(res.message || 'Failed to update password');
+    }
+  } catch (err) {
+    showToast(err.message || 'Error updating password');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Update Password';
+    }
+  }
+}
+
+function showStudentExamResultsNotice() {
+  showToast('Semester examination marks and grading cards are being compiled by the examination board.');
+}
+
+function printStudentIdCard() {
+  window.print();
 }
 
 function handleStudentLogout() {
@@ -13270,7 +14244,9 @@ function renderOutcomers(list) {
   if (!list || list.length === 0) {
     container.innerHTML = `
       <div class="p-10 text-center rounded-3xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm space-y-2.5">
-        <span class="text-4xl">🎉</span>
+        <div class="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center mx-auto">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
         <h4 class="text-sm sm:text-base font-black text-[var(--text-main)]">No Outcomers Found</h4>
         <p class="text-xs text-[var(--text-sub)] max-w-md mx-auto">
           ${currentOutcomersFilter === 'pending'
@@ -13338,14 +14314,14 @@ function renderOutcomers(list) {
             <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Father's Contact</span>
             <p class="font-extrabold text-[var(--text-main)] mt-0.5">
               ${f.fatherName || 'Not specified'} 
-              ${f.fatherMobile ? `<a href="tel:${f.fatherMobile}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1">📞 ${f.fatherMobile}</a>` : ''}
+              ${f.fatherMobile ? `<a href="tel:${f.fatherMobile}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${f.fatherMobile}</a>` : ''}
             </p>
           </div>
           <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
             <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Mother's Contact</span>
             <p class="font-extrabold text-[var(--text-main)] mt-0.5">
               ${f.motherName || 'Not specified'}
-              ${f.motherNumber ? `<a href="tel:${f.motherNumber}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1">📞 ${f.motherNumber}</a>` : ''}
+              ${f.motherNumber ? `<a href="tel:${f.motherNumber}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${f.motherNumber}</a>` : ''}
             </p>
           </div>
           <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] sm:col-span-2 lg:col-span-3">

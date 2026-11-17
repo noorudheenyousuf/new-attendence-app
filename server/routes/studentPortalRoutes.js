@@ -8,6 +8,10 @@ const Timetable = require('../models/Timetable');
 const Announcement = require('../models/Announcement');
 const Event = require('../models/Event');
 const ActivityLog = require('../models/ActivityLog');
+const Subject = require('../models/Subject');
+const LeaveRequest = require('../models/LeaveRequest');
+const AppSettings = require('../models/AppSettings');
+const bcrypt = require('bcryptjs');
 const authMiddleware = require('../middleware/auth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
@@ -494,6 +498,383 @@ router.get('/attendance', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('[StudentPortal Attendance Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/student-portal/dashboard
+// @desc    Get complete student home dashboard overview
+router.get('/dashboard', authMiddleware, async (req, res) => {
+  try {
+    const student = await findLinkedStudent(req.user);
+    const settings = await AppSettings.findOne().lean();
+
+    if (!student) {
+      return res.json({
+        success: true,
+        registered: false,
+        user: {
+          id: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+          role: req.user.role,
+          avatarUrl: req.user.avatarUrl
+        },
+        institution: {
+          appName: settings?.appName || 'REGISTERLY',
+          schoolName: settings?.schoolName || '',
+          appLogo: settings?.appLogo || ''
+        }
+      });
+    }
+
+    const { stats } = await getStudentAttendanceData(student);
+    const studentObj = student.toObject();
+    studentObj.attendanceStats = stats;
+
+    // Subjects count
+    const totalSubjects = await Subject.countDocuments({
+      isPrivate: { $ne: true },
+      assignedClasses: caseInsensitiveRegex(student.class)
+    });
+
+    // Today's schedule slots
+    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const slots = await Timetable.find({
+      class: caseInsensitiveRegex(student.class),
+      $or: [
+        { day: todayName },
+        { day: 'All Days' },
+        { day: { $regex: new RegExp('\\b' + todayName + '\\b', 'i') } },
+        { days: todayName },
+        { days: 'All Days' }
+      ]
+    }).sort({ order: 1, createdAt: 1 }).lean();
+
+    // Teacher names for slots
+    const teacherEmails = [...new Set(slots.map(s => (s.teacherEmail || '').toLowerCase()).filter(Boolean))];
+    const teachers = await User.find({ email: { $in: teacherEmails } }).select('email name avatarUrl').lean();
+    const teacherMap = {};
+    teachers.forEach(t => { teacherMap[t.email.toLowerCase()] = t; });
+
+    const enrichedSlots = slots.map(s => {
+      const teacher = teacherMap[(s.teacherEmail || '').toLowerCase()];
+      return {
+        ...s,
+        teacherName: teacher ? teacher.name : (s.teacherEmail || 'Teacher'),
+        teacherAvatar: teacher ? teacher.avatarUrl : ''
+      };
+    });
+
+    // Recent announcements
+    const recentAnnouncements = await Announcement.find({ isPublished: true })
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .limit(4)
+      .lean();
+
+    const upcomingEvents = await Event.find({ status: { $ne: 'cancelled' } })
+      .sort({ date: 1 })
+      .limit(3)
+      .lean();
+
+    res.json({
+      success: true,
+      registered: true,
+      student: studentObj,
+      stats,
+      totalSubjects,
+      pendingAssignments: 0,
+      upcomingExams: upcomingEvents.length,
+      todaySchedule: enrichedSlots,
+      recentAnnouncements,
+      upcomingEvents,
+      institution: {
+        appName: settings?.appName || 'REGISTERLY',
+        schoolName: settings?.schoolName || '',
+        appLogo: settings?.appLogo || ''
+      }
+    });
+  } catch (error) {
+    console.error('[StudentPortal Dashboard Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/student-portal/subjects
+// @desc    Get subjects for current student's class with teacher info and attendance %
+router.get('/subjects', authMiddleware, async (req, res) => {
+  try {
+    const student = await findLinkedStudent(req.user);
+    if (!student || !student.class) {
+      return res.json({ success: true, subjects: [] });
+    }
+
+    const subjects = await Subject.find({
+      isPrivate: { $ne: true },
+      assignedClasses: caseInsensitiveRegex(student.class)
+    }).sort({ order: 1, name: 1 }).lean();
+
+    const stIdStr = String(student.studentId);
+
+    // Enrich with teacher and subject-specific attendance
+    const enriched = await Promise.all(subjects.map(async (subj) => {
+      let teacherInfo = null;
+      if (subj.teacherEmail) {
+        teacherInfo = await User.findOne({ email: subj.teacherEmail.toLowerCase() }).select('name email avatarUrl').lean();
+      }
+
+      // Query attendance for this class and subject
+      const subjectAttendances = await Attendance.find({
+        isPrivate: { $ne: true },
+        class: caseInsensitiveRegex(student.class),
+        subject: caseInsensitiveRegex(subj.name),
+        'records.studentId': { $in: [student.studentId, stIdStr, Number(stIdStr)].filter(v => v !== undefined && !isNaN(v) ? true : typeof v === 'string') }
+      }).lean();
+
+      let total = 0;
+      let present = 0;
+      let absent = 0;
+      let leave = 0;
+
+      for (const att of subjectAttendances) {
+        if (!Array.isArray(att.records)) continue;
+        const rec = att.records.find(r => String(r.studentId) === stIdStr);
+        if (rec) {
+          total++;
+          if (rec.status === 'P') present++;
+          else if (rec.status === 'A') absent++;
+          else if (rec.status === 'L') leave++;
+        }
+      }
+
+      const percentage = total > 0 ? Number(((present / total) * 100).toFixed(1)) : null;
+
+      return {
+        _id: subj._id,
+        name: subj.name,
+        subjectCode: subj.subjectCode || '',
+        teacher: teacherInfo ? teacherInfo.name : (subj.teacher || 'Not Assigned'),
+        teacherEmail: subj.teacherEmail || '',
+        teacherAvatar: teacherInfo ? teacherInfo.avatarUrl : '',
+        attendance: {
+          totalSessions: total,
+          present,
+          absent,
+          leave,
+          percentage
+        }
+      };
+    }));
+
+    res.json({
+      success: true,
+      class: student.class,
+      subjects: enriched
+    });
+  } catch (error) {
+    console.error('[StudentPortal Subjects Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/student-portal/attendance-calendar
+// @desc    Get day-wise attendance calendar for a month
+router.get('/attendance-calendar', authMiddleware, async (req, res) => {
+  try {
+    const student = await findLinkedStudent(req.user);
+    if (!student) {
+      return res.json({ success: true, days: {}, monthlyStats: null });
+    }
+
+    const now = new Date();
+    const year = parseInt(req.query.year, 10) || now.getFullYear();
+    const month = parseInt(req.query.month, 10) || (now.getMonth() + 1); // 1-12
+    const monthStr = String(month).padStart(2, '0');
+    const prefix = `${year}-${monthStr}`;
+
+    const stIdStr = String(student.studentId);
+    const attendances = await Attendance.find({
+      isPrivate: { $ne: true },
+      date: { $regex: `^${prefix}` },
+      'records.studentId': { $in: [student.studentId, stIdStr, Number(stIdStr)].filter(v => v !== undefined && !isNaN(v) ? true : typeof v === 'string') }
+    }).sort({ date: 1 }).lean();
+
+    const daysMap = {};
+    let mTotal = 0;
+    let mPresent = 0;
+    let mAbsent = 0;
+    let mLeave = 0;
+
+    for (const att of attendances) {
+      if (!Array.isArray(att.records)) continue;
+      const rec = att.records.find(r => String(r.studentId) === stIdStr);
+      if (rec) {
+        mTotal++;
+        if (rec.status === 'P') mPresent++;
+        else if (rec.status === 'A') mAbsent++;
+        else if (rec.status === 'L') mLeave++;
+
+        const dayNum = parseInt(att.date.split('-')[2], 10);
+        if (!daysMap[dayNum]) {
+          daysMap[dayNum] = {
+            date: att.date,
+            status: rec.status,
+            sessions: []
+          };
+        } else {
+          if (rec.status === 'A') daysMap[dayNum].status = 'A';
+          else if (rec.status === 'L' && daysMap[dayNum].status !== 'A') daysMap[dayNum].status = 'L';
+        }
+
+        daysMap[dayNum].sessions.push({
+          subject: att.subject || 'General Attendance',
+          period: att.period || '',
+          class: att.class,
+          status: rec.status,
+          note: rec.note || '',
+          markedBy: att.markedBy || ''
+        });
+      }
+    }
+
+    const mPercentage = mTotal > 0 ? Number(((mPresent / mTotal) * 100).toFixed(1)) : null;
+
+    res.json({
+      success: true,
+      year,
+      month,
+      days: daysMap,
+      monthlyStats: {
+        totalSessions: mTotal,
+        present: mPresent,
+        absent: mAbsent,
+        leave: mLeave,
+        percentage: mPercentage
+      }
+    });
+  } catch (error) {
+    console.error('[StudentPortal Calendar Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/student-portal/leave-requests
+// @desc    Get student's leave requests
+router.get('/leave-requests', authMiddleware, async (req, res) => {
+  try {
+    const student = await findLinkedStudent(req.user);
+    if (!student) {
+      return res.json({ success: true, requests: [] });
+    }
+
+    const requests = await LeaveRequest.find({
+      studentId: student.studentId
+    }).sort({ createdAt: -1 }).limit(50).lean();
+
+    res.json({
+      success: true,
+      requests
+    });
+  } catch (error) {
+    console.error('[StudentPortal LeaveRequests Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/student-portal/leave-requests
+// @desc    Submit a leave request
+router.post('/leave-requests', authMiddleware, async (req, res) => {
+  try {
+    const student = await findLinkedStudent(req.user);
+    if (!student) {
+      return res.status(400).json({ success: false, message: 'Student profile not found. Please register first.' });
+    }
+
+    const { fromDate, toDate, reason } = req.body;
+    if (!fromDate || !toDate || !reason || !String(reason).trim()) {
+      return res.status(400).json({ success: false, message: 'From Date, To Date, and Reason are required' });
+    }
+
+    const leave = await LeaveRequest.create({
+      studentId: student.studentId,
+      studentRef: student._id,
+      userId: req.user._id,
+      studentName: student.name,
+      class: student.class,
+      roll: student.roll || 1,
+      fromDate: String(fromDate).trim(),
+      toDate: String(toDate).trim(),
+      reason: String(reason).trim(),
+      status: 'pending'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Leave request submitted successfully. It will be reviewed by your teacher.',
+      data: leave
+    });
+  } catch (error) {
+    console.error('[StudentPortal Submit Leave Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/student-portal/materials
+// @desc    Get study materials (with clean empty state)
+router.get('/materials', authMiddleware, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      materials: [],
+      message: 'No study materials published yet for your class.'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/student-portal/exam-results
+// @desc    Get examination results (with clean empty state)
+router.get('/exam-results', authMiddleware, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      exams: [],
+      message: 'No examination results published yet for your class.'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/student-portal/change-password
+// @desc    Change password for student user account
+router.put('/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.password && currentPassword) {
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      }
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('[StudentPortal Change Password Error]', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

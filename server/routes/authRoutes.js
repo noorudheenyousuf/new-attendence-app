@@ -114,7 +114,7 @@ router.post('/register', async (req, res) => {
 // @desc    Login with Email / Username & Password
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, portal } = req.body;
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Please enter your username/email and password' });
     }
@@ -145,6 +145,7 @@ router.post('/login', async (req, res) => {
       success: true,
       message: `Welcome back, ${user.name}!`,
       token,
+      portal: portal || (user.role === 'student' ? 'student' : 'teacher'),
       user: {
         id: user._id,
         name: user.name,
