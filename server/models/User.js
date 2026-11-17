@@ -22,8 +22,13 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'teacher'],
+    enum: ['admin', 'teacher', 'student'],
     default: 'teacher'
+  },
+  studentRef: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Student',
+    default: null
   },
   avatarUrl: {
     type: String,

@@ -40,10 +40,10 @@ const API = {
   },
 
   // Auth Endpoints
-  async register(name, email, password) {
+  async register(name, email, password, extra = {}) {
     const res = await this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify({ name, email, password, ...extra })
     });
     if (res.token) this.setToken(res.token);
     return res;
@@ -543,5 +543,38 @@ const API = {
       method: 'POST',
       body: JSON.stringify({ ...data, isPrivate: true })
     });
+  },
+
+  // ===================== STUDENT PORTAL API =====================
+  async getStudentPortalMe() {
+    return this.request('/student-portal/me');
+  },
+
+  async submitStudentDetails(data) {
+    return this.request('/student-portal/submit-details', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateStudentDetails(data) {
+    return this.request('/student-portal/update-details', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getStudentTimetable(day = 'all') {
+    const params = new URLSearchParams();
+    if (day && day !== 'all') params.append('day', day);
+    return this.request(`/student-portal/timetable?${params.toString()}`);
+  },
+
+  async getStudentAnnouncements() {
+    return this.request('/student-portal/announcements');
+  },
+
+  async getStudentAttendance() {
+    return this.request('/student-portal/attendance');
   }
 };

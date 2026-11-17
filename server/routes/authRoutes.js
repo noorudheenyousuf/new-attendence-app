@@ -9,6 +9,7 @@ const Subject = require('../models/Subject');
 const Class = require('../models/Class');
 const Timetable = require('../models/Timetable');
 const ActivityLog = require('../models/ActivityLog');
+const Student = require('../models/Student');
 const authMiddleware = require('../middleware/auth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
@@ -37,10 +38,10 @@ router.get('/google-client-id', (req, res) => {
 });
 
 // @route   POST /api/auth/register
-// @desc    Register a new user (First registered user is automatically Admin)
+// @desc    Register a new user (Supports admin, teacher, and student registration)
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role: requestedRole, portal } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide full name, email, and password' });
     }
@@ -55,10 +56,21 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, message: 'An account with this email already exists' });
     }
 
-    // First account is Admin, subsequent accounts are Teachers
-    const userCount = await User.countDocuments();
-    const isFirstAccount = userCount === 0;
-    const role = isFirstAccount ? 'admin' : 'teacher';
+    // Check if student portal request or existing student profile matches this email
+    const isStudentPortal = portal === 'student' || requestedRole === 'student';
+    const existingStudent = await Student.findOne({
+      'personalDetails.studentEmail': normalizedEmail,
+      isPrivate: { $ne: true }
+    });
+
+    let role;
+    if (isStudentPortal || existingStudent) {
+      role = 'student';
+    } else {
+      const userCount = await User.countDocuments();
+      const isFirstAccount = userCount === 0;
+      role = isFirstAccount ? 'admin' : 'teacher';
+    }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -68,14 +80,20 @@ router.post('/register', async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       role,
-      isFirstAccount
+      isFirstAccount: role === 'admin',
+      studentRef: existingStudent ? existingStudent._id : null
     });
+
+    if (existingStudent) {
+      existingStudent.userId = user._id;
+      await existingStudent.save();
+    }
 
     const token = generateToken(user);
 
     res.status(201).json({
       success: true,
-      message: isFirstAccount ? 'Admin account created successfully!' : 'Account registered successfully!',
+      message: role === 'admin' ? 'Admin account created successfully!' : (role === 'student' ? 'Student account registered successfully!' : 'Teacher account registered successfully!'),
       token,
       user: {
         id: user._id,
@@ -83,7 +101,8 @@ router.post('/register', async (req, res) => {
         email: user.email,
         role: user.role,
         avatarUrl: user.avatarUrl,
-        isFirstAccount: user.isFirstAccount
+        isFirstAccount: user.isFirstAccount,
+        studentRef: user.studentRef
       }
     });
   } catch (error) {
@@ -144,7 +163,7 @@ router.post('/login', async (req, res) => {
 // @desc    Cryptographically verify Google ID Token or Access Token & Authenticate User
 router.post('/google', async (req, res) => {
   try {
-    const { credential, access_token } = req.body;
+    const { credential, access_token, portal, role: requestedRole } = req.body;
 
     if (!credential && !access_token) {
       return res.status(400).json({
@@ -228,10 +247,20 @@ router.post('/google', async (req, res) => {
     });
 
     if (!user) {
-      // First account is Admin, subsequent accounts are Teachers
-      const userCount = await User.countDocuments();
-      const isFirstAccount = userCount === 0;
-      const role = isFirstAccount ? 'admin' : 'teacher';
+      const isStudentPortal = portal === 'student' || requestedRole === 'student';
+      const existingStudent = await Student.findOne({
+        'personalDetails.studentEmail': normalizedEmail,
+        isPrivate: { $ne: true }
+      });
+
+      let role;
+      if (isStudentPortal || existingStudent) {
+        role = 'student';
+      } else {
+        const userCount = await User.countDocuments();
+        const isFirstAccount = userCount === 0;
+        role = isFirstAccount ? 'admin' : 'teacher';
+      }
 
       const salt = await bcrypt.genSalt(10);
       const randomPassword = await bcrypt.hash(Math.random().toString(36), salt);
@@ -241,12 +270,18 @@ router.post('/google', async (req, res) => {
         email: normalizedEmail,
         password: randomPassword,
         role,
-        isFirstAccount,
+        isFirstAccount: role === 'admin',
         googleId: sub,
-        avatarUrl: picture || ''
+        avatarUrl: picture || '',
+        studentRef: existingStudent ? existingStudent._id : null
       });
+
+      if (existingStudent) {
+        existingStudent.userId = user._id;
+        await existingStudent.save();
+      }
     } else {
-      // Connect existing teacher profile with Google authentication
+      // Connect existing profile with Google authentication
       let modified = false;
       if (sub && user.googleId !== sub) {
         user.googleId = sub;
@@ -259,6 +294,18 @@ router.post('/google', async (req, res) => {
       if (name && (!user.name || user.name.toLowerCase() === 'teacher' || user.name === user.email.split('@')[0])) {
         user.name = name;
         modified = true;
+      }
+      if (!user.studentRef && user.role === 'student') {
+        const existingStudent = await Student.findOne({
+          'personalDetails.studentEmail': normalizedEmail,
+          isPrivate: { $ne: true }
+        });
+        if (existingStudent) {
+          user.studentRef = existingStudent._id;
+          existingStudent.userId = user._id;
+          await existingStudent.save();
+          modified = true;
+        }
       }
       if (modified) await user.save();
     }
@@ -279,7 +326,8 @@ router.post('/google', async (req, res) => {
         assignedClasses: user.assignedClasses || [],
         assignedSubjects: user.assignedSubjects || [],
         googleConnected: Boolean(user.googleId),
-        isFirstAccount: user.isFirstAccount
+        isFirstAccount: user.isFirstAccount,
+        studentRef: user.studentRef
       }
     });
   } catch (error) {
@@ -324,7 +372,8 @@ router.get('/me', authMiddleware, async (req, res) => {
         assignedSubjects,
         createdAt: user.createdAt,
         googleConnected: Boolean(user.googleId),
-        isFirstAccount: user.isFirstAccount
+        isFirstAccount: user.isFirstAccount,
+        studentRef: user.studentRef
       }
     });
   } catch (error) {
@@ -440,7 +489,8 @@ router.put('/profile', authMiddleware, async (req, res) => {
         assignedSubjects: user.assignedSubjects || [],
         createdAt: user.createdAt,
         googleConnected: Boolean(user.googleId),
-        isFirstAccount: user.isFirstAccount
+        isFirstAccount: user.isFirstAccount,
+        studentRef: user.studentRef
       }
     });
   } catch (error) {

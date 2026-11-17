@@ -446,6 +446,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initGoogleAuth();
     await loadCurrentUser();
     if (currentUser) {
+      if (currentUser.role === 'student') {
+        selectTab('student-portal');
+        initStudentPortal();
+        hideSplashLoader();
+        return;
+      }
       await loadAppSettings();
       await loadClasses();
       await loadSubjects();
@@ -474,6 +480,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Flow sequence: Language -> Guide -> Morning Modal -> Dashboard
       proceedAppWorkflowSequence();
     } else {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('portal') === 'student' || window.location.pathname.endsWith('/student')) {
+        setAuthPortalRole('student');
+        openAuthModal();
+      }
       await loadHomeDashboard();
       hideSplashLoader();
     }
@@ -6544,11 +6555,24 @@ async function selectTab(tab) {
     }
   }
 
+  if (currentUser && currentUser.role === 'student') {
+    tab = 'student-portal';
+  }
+
+  const bottomNav = document.getElementById('app-bottom-nav');
+  if (bottomNav) {
+    if (currentUser && currentUser.role === 'student') {
+      bottomNav.classList.add('hidden');
+    } else {
+      bottomNav.classList.remove('hidden');
+    }
+  }
+
   if (currentActiveTab !== tab) {
     previousAppTab = currentActiveTab;
     currentActiveTab = tab;
   }
-  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace'];
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace', 'student-portal'];
   allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -6626,6 +6650,10 @@ async function selectTab(tab) {
     const mainViewport = document.querySelector('main');
     if (mainViewport) mainViewport.scrollTop = 0;
   } else if (tab === 'teacher-log' || tab === 'edit-profile') {
+    const mainViewport = document.querySelector('main');
+    if (mainViewport) mainViewport.scrollTop = 0;
+  } else if (tab === 'student-portal') {
+    if (typeof initStudentPortal === 'function') initStudentPortal();
     const mainViewport = document.querySelector('main');
     if (mainViewport) mainViewport.scrollTop = 0;
   }
@@ -7362,13 +7390,21 @@ async function handleGoogleTokenResponse(tokenResponse) {
   showToast('Authenticating with Google...');
 
   try {
-    const res = await API.googleLogin({ access_token: tokenResponse.access_token });
+    const res = await API.googleLogin({ access_token: tokenResponse.access_token, portal: authPortalRole, role: authPortalRole });
     if (res.success && res.user) {
       currentUser = res.user;
       currentRole = res.user.role;
       updateUserUI();
       closeAuthModal(true);
       showToast(res.message || `Welcome, ${res.user.name}!`);
+
+      if (res.user.role === 'student') {
+        selectTab('student-portal');
+        initStudentPortal();
+        hideSplashLoader();
+        return;
+      }
+
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -7406,13 +7442,21 @@ async function handleGoogleCredentialResponse(response) {
   showToast('Verifying Google credentials...');
 
   try {
-    const res = await API.googleLogin({ credential: response.credential });
+    const res = await API.googleLogin({ credential: response.credential, portal: authPortalRole, role: authPortalRole });
     if (res.success && res.user) {
       currentUser = res.user;
       currentRole = res.user.role;
       updateUserUI();
       closeAuthModal(true);
       showToast(res.message || `Welcome, ${res.user.name}!`);
+
+      if (res.user.role === 'student') {
+        selectTab('student-portal');
+        initStudentPortal();
+        hideSplashLoader();
+        return;
+      }
+
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -7469,6 +7513,14 @@ async function handleEmailLogin(e) {
       updateUserUI();
       closeAuthModal(true);
       showToast(res.message || `Welcome back, ${res.user.name}!`);
+
+      if (res.user.role === 'student') {
+        selectTab('student-portal');
+        initStudentPortal();
+        hideSplashLoader();
+        return;
+      }
+
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -7538,13 +7590,21 @@ async function handleEmailRegister(e) {
   }
 
   try {
-    const res = await API.register(name, email, password);
+    const res = await API.register(name, email, password, { portal: authPortalRole, role: authPortalRole });
     if (res.success && res.user) {
       currentUser = res.user;
       currentRole = res.user.role;
       updateUserUI();
       closeAuthModal(true);
       showToast(res.message || 'Account created successfully!');
+
+      if (res.user.role === 'student') {
+        selectTab('student-portal');
+        initStudentPortal();
+        hideSplashLoader();
+        return;
+      }
+
       selectTab('home');
 
       // Show animation during loading (no dashboard preview)
@@ -12445,3 +12505,620 @@ async function jumpToAttendanceSession(className, subjectName, dateStr) {
   if (!ok) return;
   loadAttendanceRoster();
 }
+
+// =========================================================================
+// ================= STUDENT PORTAL & SELF-REGISTRATION SYSTEM =============
+// =========================================================================
+let authPortalRole = 'staff';
+let currentStudentData = null;
+let currentStudentPortalTab = 'profile';
+let currentStudentTimetableDay = 'all';
+let currentStudentTimetableSlots = [];
+
+function setAuthPortalRole(role) {
+  authPortalRole = role === 'student' ? 'student' : 'staff';
+  const staffBtn = document.getElementById('auth-role-staff');
+  const studentBtn = document.getElementById('auth-role-student');
+  if (staffBtn && studentBtn) {
+    if (authPortalRole === 'student') {
+      studentBtn.className = "flex-1 py-1.5 rounded-lg bg-[#245b70] text-white shadow-2xs font-black transition";
+      staffBtn.className = "flex-1 py-1.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-bold transition";
+    } else {
+      staffBtn.className = "flex-1 py-1.5 rounded-lg bg-[#245b70] text-white shadow-2xs font-black transition";
+      studentBtn.className = "flex-1 py-1.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-bold transition";
+    }
+  }
+}
+
+// Teacher Share Modal
+function openShareStudentPortalModal() {
+  const modal = document.getElementById('modal-share-student-portal');
+  if (!modal) return;
+  const input = document.getElementById('share-student-portal-url');
+  if (input) {
+    input.value = `${window.location.origin}/?portal=student`;
+  }
+  modal.classList.remove('hidden');
+}
+
+function closeShareStudentPortalModal() {
+  const modal = document.getElementById('modal-share-student-portal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function copyStudentPortalLink() {
+  const input = document.getElementById('share-student-portal-url');
+  if (!input) return;
+  input.select();
+  input.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(input.value).then(() => {
+    showToast('Student Portal link copied to clipboard!');
+    const btnLabel = document.getElementById('copy-portal-btn-label');
+    if (btnLabel) {
+      btnLabel.innerText = 'Copied!';
+      setTimeout(() => { btnLabel.innerText = 'Copy'; }, 2000);
+    }
+  }).catch(() => {
+    showToast('Link copied!');
+  });
+}
+
+function shareStudentPortalWhatsApp() {
+  const url = `${window.location.origin}/?portal=student`;
+  const text = encodeURIComponent(`Hello students! Please open this link to enter your details, access your class timetable, and view school announcements:\n${url}`);
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+function triggerNativeShareStudentLink() {
+  const url = `${window.location.origin}/?portal=student`;
+  if (navigator.share) {
+    navigator.share({
+      title: 'REGISTERLY Student Portal',
+      text: 'Open this link to submit your details and view your class timetable & announcements:',
+      url: url
+    }).catch(() => {});
+  } else {
+    copyStudentPortalLink();
+  }
+}
+
+// Initialize Student Portal View
+async function initStudentPortal() {
+  try {
+    // Populate class options in the registration form
+    const classSelect = document.getElementById('spf-class');
+    if (classSelect) {
+      classSelect.innerHTML = '<option value="">Select your class</option>';
+      let classes = [];
+      try {
+        const clsRes = await API.getClasses();
+        classes = clsRes.data || [];
+      } catch (_) {}
+      classes.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.name;
+        opt.textContent = c.name;
+        classSelect.appendChild(opt);
+      });
+    }
+
+    const res = await API.getStudentPortalMe();
+    if (!res.success) {
+      showToast('Error loading student profile');
+      return;
+    }
+
+    const user = res.user || currentUser;
+    const student = res.data;
+    currentStudentData = student;
+
+    // Header updates
+    const nameEl = document.getElementById('sp-name');
+    const avatarEl = document.getElementById('sp-avatar');
+    const classBadgeEl = document.getElementById('sp-class-badge');
+    const subtitleEl = document.getElementById('sp-subtitle');
+
+    if (nameEl) nameEl.textContent = student ? student.name : (user.name || 'Student');
+    if (avatarEl) avatarEl.src = (student && student.photoUrl) || (user && user.avatarUrl) || DEFAULT_AVATAR;
+
+    if (student) {
+      if (classBadgeEl) {
+        classBadgeEl.textContent = `Class ${student.class || '-'}`;
+        classBadgeEl.classList.remove('hidden');
+      }
+      if (subtitleEl) {
+        subtitleEl.textContent = `Roll: #${student.roll ?? '-'} • Student ID: ${student.studentId || '-'}`;
+      }
+
+      // Populate Digital ID Card
+      renderStudentIdCard(student);
+
+      // Populate Form inputs for editing
+      populateStudentFormFields(student);
+
+      // Hide unregistered banner, show ID card, hide form by default
+      const unregBanner = document.getElementById('sp-unregistered-banner');
+      if (unregBanner) unregBanner.classList.add('hidden');
+      const idCard = document.getElementById('sp-id-card');
+      if (idCard) idCard.classList.remove('hidden');
+      const formCard = document.getElementById('sp-form-card');
+      if (formCard) formCard.classList.add('hidden');
+      const toggleBtnText = document.getElementById('sp-toggle-edit-btn-text');
+      if (toggleBtnText) toggleBtnText.textContent = 'Edit My Details';
+      const formTitle = document.getElementById('sp-form-title');
+      if (formTitle) formTitle.textContent = 'Edit My Details';
+      const submitBtnText = document.getElementById('spf-submit-btn-text');
+      if (submitBtnText) submitBtnText.textContent = 'Update Profile';
+    } else {
+      // First time self-registration
+      if (classBadgeEl) classBadgeEl.classList.add('hidden');
+      if (subtitleEl) subtitleEl.textContent = 'Profile registration pending';
+
+      const unregBanner = document.getElementById('sp-unregistered-banner');
+      if (unregBanner) unregBanner.classList.remove('hidden');
+      const idCard = document.getElementById('sp-id-card');
+      if (idCard) idCard.classList.add('hidden');
+      const formCard = document.getElementById('sp-form-card');
+      if (formCard) formCard.classList.remove('hidden');
+
+      const nameInput = document.getElementById('spf-name');
+      if (nameInput && user && user.name) nameInput.value = user.name;
+      const previewEl = document.getElementById('spf-photo-preview');
+      if (previewEl && user && user.avatarUrl) previewEl.src = user.avatarUrl;
+      const photoUrlInput = document.getElementById('spf-photo-url');
+      if (photoUrlInput && user && user.avatarUrl) photoUrlInput.value = user.avatarUrl;
+    }
+
+    switchStudentPortalTab('profile');
+  } catch (err) {
+    console.error('[StudentPortal Init Error]', err);
+    showToast('Failed to load student portal');
+  }
+}
+
+function renderStudentIdCard(student) {
+  const p = student.personalDetails || {};
+  const a = student.address || {};
+  const f = student.familyDetails || {};
+
+  const classRollEl = document.getElementById('sp-display-class-roll');
+  if (classRollEl) classRollEl.textContent = `${student.class || '-'} • Roll #${student.roll ?? '-'}`;
+
+  const idEl = document.getElementById('sp-display-id');
+  if (idEl) idEl.textContent = String(student.studentId || '-');
+
+  const bgGenderEl = document.getElementById('sp-display-bg-gender');
+  if (bgGenderEl) bgGenderEl.textContent = `${p.bloodGroup || 'Blood: -'} • ${p.gender || 'Gender: -'}`;
+
+  const dobEl = document.getElementById('sp-display-dob');
+  if (dobEl) dobEl.textContent = p.dob || 'Not specified';
+
+  const emailEl = document.getElementById('sp-display-email');
+  if (emailEl) emailEl.textContent = p.studentEmail || (currentUser && currentUser.email) || '-';
+
+  const fatherEl = document.getElementById('sp-display-father');
+  if (fatherEl) fatherEl.textContent = f.fatherName ? `${f.fatherName} (${f.fatherMobile || 'No phone'})` : '-';
+
+  const motherEl = document.getElementById('sp-display-mother');
+  if (motherEl) motherEl.textContent = f.motherName ? `${f.motherName} (${f.motherNumber || 'No phone'})` : '-';
+
+  const addrEl = document.getElementById('sp-display-address');
+  if (addrEl) {
+    const parts = [a.fullAddress, a.place, a.district, a.state, a.pinCode ? `PIN: ${a.pinCode}` : ''].filter(Boolean);
+    addrEl.textContent = parts.length > 0 ? parts.join(', ') : 'Not specified';
+  }
+}
+
+function populateStudentFormFields(student) {
+  const p = student.personalDetails || {};
+  const a = student.address || {};
+  const f = student.familyDetails || {};
+
+  const nameInput = document.getElementById('spf-name');
+  if (nameInput) nameInput.value = student.name || '';
+
+  const classSelect = document.getElementById('spf-class');
+  if (classSelect) classSelect.value = student.class || '';
+
+  const rollInput = document.getElementById('spf-roll');
+  if (rollInput) rollInput.value = student.roll ?? '';
+
+  const photoUrlInput = document.getElementById('spf-photo-url');
+  if (photoUrlInput) photoUrlInput.value = student.photoUrl || '';
+  const photoPreview = document.getElementById('spf-photo-preview');
+  if (photoPreview) photoPreview.src = student.photoUrl || DEFAULT_AVATAR;
+
+  const dobInput = document.getElementById('spf-dob');
+  if (dobInput) dobInput.value = p.dob || '';
+
+  const genderSelect = document.getElementById('spf-gender');
+  if (genderSelect) genderSelect.value = p.gender || '';
+
+  const bgSelect = document.getElementById('spf-blood-group');
+  if (bgSelect) bgSelect.value = p.bloodGroup || '';
+
+  const fullAddr = document.getElementById('spf-full-address');
+  if (fullAddr) fullAddr.value = a.fullAddress || '';
+  const place = document.getElementById('spf-place');
+  if (place) place.value = a.place || '';
+  const dist = document.getElementById('spf-district');
+  if (dist) dist.value = a.district || '';
+  const st = document.getElementById('spf-state');
+  if (st) st.value = a.state || '';
+  const pin = document.getElementById('spf-pincode');
+  if (pin) pin.value = a.pinCode || '';
+
+  const fName = document.getElementById('spf-father-name');
+  if (fName) fName.value = f.fatherName || '';
+  const fMob = document.getElementById('spf-father-mobile');
+  if (fMob) fMob.value = f.fatherMobile || '';
+  const mName = document.getElementById('spf-mother-name');
+  if (mName) mName.value = f.motherName || '';
+  const mMob = document.getElementById('spf-mother-mobile');
+  if (mMob) mMob.value = f.motherNumber || '';
+}
+
+function toggleStudentEditForm() {
+  const formCard = document.getElementById('sp-form-card');
+  const toggleBtnText = document.getElementById('sp-toggle-edit-btn-text');
+  if (!formCard) return;
+  const isHidden = formCard.classList.contains('hidden');
+  if (isHidden) {
+    formCard.classList.remove('hidden');
+    if (toggleBtnText) toggleBtnText.textContent = 'Hide Form';
+    formCard.scrollIntoView({ behavior: 'smooth' });
+  } else {
+    formCard.classList.add('hidden');
+    if (toggleBtnText) toggleBtnText.textContent = 'Edit My Details';
+  }
+}
+
+async function handleStudentPhotoSelect(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try {
+    showToast('Uploading photo...');
+    const res = await API.uploadPhoto(file, 'students');
+    const photoUrl = res.url || res.secure_url || res.photoUrl || (res.data && res.data.url);
+    if (photoUrl) {
+      const preview = document.getElementById('spf-photo-preview');
+      if (preview) preview.src = photoUrl;
+      const hidden = document.getElementById('spf-photo-url');
+      if (hidden) hidden.value = photoUrl;
+      showToast('Photo uploaded successfully');
+    }
+  } catch (err) {
+    console.error('[Student Photo Upload Error]', err);
+    showToast('Photo upload failed: ' + err.message);
+  }
+}
+
+async function handleStudentDetailsSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('spf-submit-btn');
+  const originalBtn = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Saving Details...</span>';
+  }
+
+  try {
+    const name = document.getElementById('spf-name')?.value?.trim();
+    const studentClass = document.getElementById('spf-class')?.value?.trim();
+    const roll = document.getElementById('spf-roll')?.value?.trim();
+    const photoUrl = document.getElementById('spf-photo-url')?.value?.trim();
+
+    const payload = {
+      name,
+      class: studentClass,
+      roll: Number(roll),
+      photoUrl,
+      personalDetails: {
+        dob: document.getElementById('spf-dob')?.value?.trim(),
+        gender: document.getElementById('spf-gender')?.value?.trim(),
+        bloodGroup: document.getElementById('spf-blood-group')?.value?.trim()
+      },
+      address: {
+        fullAddress: document.getElementById('spf-full-address')?.value?.trim(),
+        place: document.getElementById('spf-place')?.value?.trim(),
+        district: document.getElementById('spf-district')?.value?.trim(),
+        state: document.getElementById('spf-state')?.value?.trim(),
+        pinCode: document.getElementById('spf-pincode')?.value?.trim()
+      },
+      familyDetails: {
+        fatherName: document.getElementById('spf-father-name')?.value?.trim(),
+        fatherMobile: document.getElementById('spf-father-mobile')?.value?.trim(),
+        motherName: document.getElementById('spf-mother-name')?.value?.trim(),
+        motherNumber: document.getElementById('spf-mother-mobile')?.value?.trim()
+      }
+    };
+
+    const isEdit = Boolean(currentStudentData);
+    let res;
+    if (isEdit) {
+      res = await API.updateStudentDetails(payload);
+    } else {
+      res = await API.submitStudentDetails(payload);
+    }
+
+    if (res.success && res.data) {
+      currentStudentData = res.data;
+      showToast(res.message || 'Details saved successfully!');
+      await initStudentPortal();
+    } else {
+      showToast(res.message || 'Failed to save details');
+    }
+  } catch (err) {
+    console.error('[Student Details Save Error]', err);
+    showToast(err.message || 'Error saving student details');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtn;
+    }
+  }
+}
+
+function switchStudentPortalTab(tab) {
+  currentStudentPortalTab = tab;
+  const tabs = ['profile', 'timetable', 'announcements', 'attendance'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`sp-tab-${t}`);
+    const content = document.getElementById(`sp-content-${t}`);
+    if (t === tab) {
+      if (btn) {
+        btn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap custom-gradient-btn shadow-sm";
+      }
+      if (content) content.classList.remove('hidden');
+    } else {
+      if (btn) {
+        btn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition flex items-center justify-center gap-1.5 whitespace-nowrap";
+      }
+      if (content) content.classList.add('hidden');
+    }
+  });
+
+  if (tab === 'timetable') {
+    loadStudentTimetable();
+  } else if (tab === 'announcements') {
+    loadStudentAnnouncements();
+  } else if (tab === 'attendance') {
+    loadStudentAttendance();
+  }
+}
+
+async function loadStudentTimetable(day = 'all') {
+  const container = document.getElementById('sp-timetable-slots');
+  if (!container) return;
+  container.innerHTML = '<div class="p-6 text-center text-xs text-[var(--text-sub)] font-bold">Loading timetable...</div>';
+
+  try {
+    const res = await API.getStudentTimetable(day);
+    if (!res.success) {
+      container.innerHTML = `<div class="p-6 text-center text-xs text-[var(--text-sub)]">${res.message || 'Unable to load timetable'}</div>`;
+      return;
+    }
+
+    const slots = res.data || [];
+    currentStudentTimetableSlots = slots;
+    renderStudentTimetableSlots(slots);
+  } catch (err) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-rose-500 font-bold">Failed to load timetable</div>';
+  }
+}
+
+function filterStudentTimetable(day) {
+  currentStudentTimetableDay = day;
+  const days = ['all', 'today', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  days.forEach(d => {
+    const btn = document.getElementById(`spt-day-${d}`);
+    if (btn) {
+      if (d === day) {
+        btn.className = "px-2.5 py-1 rounded-xl text-xs font-bold bg-[#245b70] text-white transition flex-shrink-0 shadow-2xs";
+      } else {
+        btn.className = "px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex-shrink-0";
+      }
+    }
+  });
+
+  if (day === 'today') {
+    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    loadStudentTimetable(todayName);
+  } else {
+    loadStudentTimetable(day);
+  }
+}
+
+function renderStudentTimetableSlots(slots) {
+  const container = document.getElementById('sp-timetable-slots');
+  if (!container) return;
+
+  if (!slots || slots.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
+        <span class="text-3xl">🗓️</span>
+        <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">No Classes Scheduled</h4>
+        <p class="text-[11px] text-[var(--text-sub)]">There are no timetable slots recorded for this selection yet.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = slots.map(s => {
+    const daysLabel = Array.isArray(s.days) && s.days.length > 0 ? s.days.join(', ') : (s.day || 'All Days');
+    return `
+      <div class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] hover:border-[#245b70]/40 transition flex items-center justify-between gap-3 shadow-2xs">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-teal-500/15 text-teal-700 dark:text-teal-300 flex items-center justify-center font-black text-xs flex-shrink-0">
+            ${(s.subject || 'SUB').substring(0, 3).toUpperCase()}
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${s.subject || 'Subject'}</h4>
+              <span class="px-2 py-0.2 rounded-md bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-bold text-[10px]">${daysLabel}</span>
+              ${s.room ? `<span class="px-1.5 py-0.2 rounded-md bg-slate-500/10 text-[var(--text-sub)] font-bold text-[10px]">Room: ${s.room}</span>` : ''}
+            </div>
+            <p class="text-[11px] text-[var(--text-sub)] font-medium mt-0.5">Teacher: <b>${s.teacherName || s.teacherEmail || 'Teacher'}</b></p>
+          </div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <span class="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border border-[var(--border-color)] text-[#245b70] dark:text-cyan-400 font-extrabold text-[11px] shadow-2xs">
+            ${s.timeSlot || '--:--'}
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadStudentAnnouncements() {
+  const container = document.getElementById('sp-announcements-list');
+  if (!container) return;
+  container.innerHTML = '<div class="p-6 text-center text-xs text-[var(--text-sub)] font-bold">Loading notices...</div>';
+
+  try {
+    const res = await API.getStudentAnnouncements();
+    const notices = res.announcements || [];
+    const events = res.events || [];
+
+    if (notices.length === 0 && events.length === 0) {
+      container.innerHTML = `
+        <div class="p-8 text-center rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
+          <span class="text-3xl">📢</span>
+          <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">Notice Board is Clean</h4>
+          <p class="text-[11px] text-[var(--text-sub)]">No announcements or events have been published right now.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+
+    // Events if any
+    if (events.length > 0) {
+      html += `
+        <div class="space-y-2 mb-4">
+          <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">Upcoming Events</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${events.map(ev => `
+              <div class="p-3 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="px-2 py-0.5 rounded-md bg-cyan-500 text-white font-black text-[9px] uppercase">${ev.status || 'Upcoming'}</span>
+                  <span class="text-[10px] font-bold text-[var(--text-sub)]">${ev.date || ''} ${ev.time || ''}</span>
+                </div>
+                <h5 class="text-xs font-extrabold text-[var(--text-main)]">${ev.name}</h5>
+                ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)]">${ev.description}</p>` : ''}
+                ${ev.location ? `<p class="text-[10px] text-cyan-700 dark:text-cyan-300 font-bold">📍 ${ev.location}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // Announcements
+    if (notices.length > 0) {
+      html += `
+        <div class="space-y-2.5">
+          <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">School Circulars & Notices</h4>
+          ${notices.map(n => {
+            const isImp = n.priority === 'important';
+            const dateStr = n.publishedAt ? new Date(n.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+            return `
+              <div class="p-4 rounded-2xl ${isImp ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[var(--bg-page)] border-[var(--border-color)]'} border space-y-2 shadow-2xs">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    ${isImp ? '<span class="px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] uppercase tracking-wider">Important</span>' : '<span class="px-2 py-0.5 rounded-md bg-slate-500/20 text-[var(--text-sub)] font-bold text-[9px]">Notice</span>'}
+                    <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${n.title}</h5>
+                  </div>
+                  <span class="text-[10px] text-[var(--text-sub)] font-medium flex-shrink-0">${dateStr}</span>
+                </div>
+                <p class="text-xs text-[var(--text-main)] opacity-90 leading-relaxed whitespace-pre-line">${n.description}</p>
+                <div class="text-[10px] text-[var(--text-sub)] font-semibold pt-1 border-t border-[var(--border-color)]/50">
+                  Posted by: <b>${n.createdByName || 'Administration'}</b>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<div class="p-6 text-center text-xs text-rose-500 font-bold">Failed to load notices</div>';
+  }
+}
+
+async function loadStudentAttendance() {
+  try {
+    const res = await API.getStudentAttendance();
+    const stats = res.stats || { percentage: null, present: 0, absent: 0, leave: 0, totalSessions: 0 };
+    const sessions = res.sessions || [];
+
+    const pctEl = document.getElementById('sp-attendance-pct');
+    if (pctEl) {
+      pctEl.textContent = stats.percentage !== null ? `${stats.percentage}%` : 'N/A';
+    }
+
+    const presentEl = document.getElementById('sp-att-present');
+    if (presentEl) presentEl.textContent = String(stats.present || 0);
+
+    const absentEl = document.getElementById('sp-att-absent');
+    if (absentEl) absentEl.textContent = String(stats.absent || 0);
+
+    const leaveEl = document.getElementById('sp-att-leave');
+    if (leaveEl) leaveEl.textContent = String(stats.leave || 0);
+
+    const totalEl = document.getElementById('sp-att-total');
+    if (totalEl) totalEl.textContent = String(stats.totalSessions || 0);
+
+    const sessionsContainer = document.getElementById('sp-attendance-sessions');
+    if (sessionsContainer) {
+      if (sessions.length === 0) {
+        sessionsContainer.innerHTML = `
+          <div class="p-6 text-center text-xs text-[var(--text-sub)] font-medium">
+            No attendance records logged yet for your profile.
+          </div>
+        `;
+      } else {
+        sessionsContainer.innerHTML = sessions.map(s => {
+          let badgeColor = 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30';
+          let statusLabel = 'Present';
+          if (s.status === 'A') {
+            badgeColor = 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
+            statusLabel = 'Absent';
+          } else if (s.status === 'L') {
+            badgeColor = 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30';
+            statusLabel = 'Leave';
+          }
+          return `
+            <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2 shadow-2xs">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full ${s.status === 'P' ? 'bg-teal-500' : (s.status === 'A' ? 'bg-rose-500' : 'bg-amber-500')}"></span>
+                <div>
+                  <h5 class="text-xs font-black text-[var(--text-main)]">${s.date || 'Date'}</h5>
+                  <p class="text-[10px] text-[var(--text-sub)] font-medium">${s.subject ? `Subject: ${s.subject}` : `Class: ${s.class || ''}`} ${s.period ? `• Period ${s.period}` : ''}</p>
+                </div>
+              </div>
+              <span class="px-2.5 py-1 rounded-xl text-xs font-black border ${badgeColor}">
+                ${statusLabel}
+              </span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  } catch (err) {
+    console.error('[Student Attendance Load Error]', err);
+  }
+}
+
+function handleStudentLogout() {
+  API.setToken(null);
+  currentUser = null;
+  currentStudentData = null;
+  showToast('Logged out of student portal');
+  window.location.href = '/?portal=student';
+}
+

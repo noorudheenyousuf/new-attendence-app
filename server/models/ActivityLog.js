@@ -15,7 +15,7 @@ const activityLogSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'teacher'],
+    enum: ['admin', 'teacher', 'student'],
     default: 'teacher'
   },
   counts: {
