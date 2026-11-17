@@ -1080,6 +1080,9 @@ function updateUserUI() {
   // Reload activity logs & profile dashboard stats
   loadActivityLogs();
   updateProfileDashboardKPIs();
+  if (currentUser.role !== 'student') {
+    updateOutcomersBadges();
+  }
 }
 
 // Dark Mode Toggle with Sun SVG & persistent storage
@@ -6572,7 +6575,7 @@ async function selectTab(tab) {
     previousAppTab = currentActiveTab;
     currentActiveTab = tab;
   }
-  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace', 'student-portal'];
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace', 'student-portal', 'outcomers'];
   allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -6654,6 +6657,10 @@ async function selectTab(tab) {
     if (mainViewport) mainViewport.scrollTop = 0;
   } else if (tab === 'student-portal') {
     if (typeof initStudentPortal === 'function') initStudentPortal();
+    const mainViewport = document.querySelector('main');
+    if (mainViewport) mainViewport.scrollTop = 0;
+  } else if (tab === 'outcomers') {
+    if (typeof loadOutcomers === 'function') loadOutcomers();
     const mainViewport = document.querySelector('main');
     if (mainViewport) mainViewport.scrollTop = 0;
   }
@@ -12636,9 +12643,24 @@ async function initStudentPortal() {
       // Populate Form inputs for editing
       populateStudentFormFields(student);
 
-      // Hide unregistered banner, show ID card, hide form by default
+      // Unregistered / Pending banner logic
       const unregBanner = document.getElementById('sp-unregistered-banner');
-      if (unregBanner) unregBanner.classList.add('hidden');
+      if (student.registrationStatus === 'pending') {
+        if (unregBanner) {
+          unregBanner.className = "p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1";
+          unregBanner.innerHTML = `
+            <div class="font-black text-sm flex items-center gap-2">
+              <span>⏳</span>
+              <span>Registration Submitted - Pending Teacher Verification</span>
+            </div>
+            <p class="text-xs leading-relaxed opacity-90">Your student details have been saved and sent to your teacher's Outcomers queue. Once verified by your teacher, your official class roster and attendance records will be activated.</p>
+          `;
+          unregBanner.classList.remove('hidden');
+        }
+      } else {
+        if (unregBanner) unregBanner.classList.add('hidden');
+      }
+
       const idCard = document.getElementById('sp-id-card');
       if (idCard) idCard.classList.remove('hidden');
       const formCard = document.getElementById('sp-form-card');
@@ -13121,4 +13143,328 @@ function handleStudentLogout() {
   showToast('Logged out of student portal');
   window.location.href = '/?portal=student';
 }
+
+// =========================================================================
+// ================= OUTCOMERS & DUAL-LINK ROUTING CONTROLLER ==============
+// =========================================================================
+let currentOutcomersList = [];
+let currentOutcomersFilter = 'pending';
+let currentApproveOutcomerId = null;
+
+function copyTeacherPortalLink() {
+  const url = `${window.location.origin}/?portal=teacher`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('Teacher joining link copied to clipboard!');
+  }).catch(() => {
+    showToast('Link copied!');
+  });
+}
+
+function shareTeacherPortalWhatsApp() {
+  const url = `${window.location.origin}/?portal=teacher`;
+  const text = encodeURIComponent(`Welcome teachers! Here is the direct link to access the REGISTERLY Teacher Portal:\n${url}`);
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+function openOutcomersPage() {
+  selectTab('outcomers');
+}
+
+function goBackFromOutcomers() {
+  if (previousAppTab && previousAppTab !== 'outcomers') {
+    selectTab(previousAppTab);
+  } else {
+    selectTab('settings');
+  }
+}
+
+async function updateOutcomersBadges() {
+  try {
+    const res = await API.getOutcomers('pending');
+    const count = (res.data || []).length;
+
+    const settingsBadge = document.getElementById('settings-outcomers-badge');
+    if (settingsBadge) {
+      if (count > 0) {
+        settingsBadge.textContent = `${count} Pending`;
+        settingsBadge.classList.remove('hidden');
+      } else {
+        settingsBadge.classList.add('hidden');
+      }
+    }
+
+    const studentsBadge = document.getElementById('students-outcomers-count');
+    if (studentsBadge) {
+      studentsBadge.textContent = String(count);
+    }
+
+    const headerBadge = document.getElementById('outcomers-header-badge');
+    if (headerBadge) {
+      headerBadge.textContent = `${count} Pending`;
+    }
+
+    const filterPendingCount = document.getElementById('outcomers-filter-pending-count');
+    if (filterPendingCount) {
+      filterPendingCount.textContent = String(count);
+    }
+  } catch (err) {
+    console.warn('[Outcomers Badges Error]', err);
+  }
+}
+
+async function loadOutcomers(status) {
+  if (status) currentOutcomersFilter = status;
+  const container = document.getElementById('outcomers-list-container');
+  if (container) {
+    container.innerHTML = '<div class="p-8 text-center text-xs text-[var(--text-sub)] font-bold">Loading outcomer submissions...</div>';
+  }
+
+  try {
+    const res = await API.getOutcomers(currentOutcomersFilter);
+    currentOutcomersList = res.data || [];
+    renderOutcomers(currentOutcomersList);
+    updateOutcomersBadges();
+  } catch (err) {
+    console.error('[Load Outcomers Error]', err);
+    if (container) {
+      container.innerHTML = `<div class="p-8 text-center text-xs text-rose-500 font-bold">Failed to load outcomers: ${err.message}</div>`;
+    }
+  }
+}
+
+function filterOutcomers(filter) {
+  currentOutcomersFilter = filter;
+  ['pending', 'approved', 'all'].forEach(f => {
+    const btn = document.getElementById(`outcomers-tab-${f}`);
+    if (btn) {
+      if (f === filter) {
+        btn.className = "px-3 py-1.5 rounded-xl text-xs font-black bg-amber-500 text-white shadow-2xs transition flex items-center gap-1.5";
+      } else {
+        btn.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--card-bg)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex items-center gap-1.5";
+      }
+    }
+  });
+  loadOutcomers(filter);
+}
+
+function handleOutcomersSearch(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderOutcomers(currentOutcomersList);
+    return;
+  }
+  const filtered = currentOutcomersList.filter(s => {
+    const name = (s.name || '').toLowerCase();
+    const cls = (s.class || '').toLowerCase();
+    const email = (s.personalDetails?.studentEmail || '').toLowerCase();
+    const phone = (s.familyDetails?.fatherMobile || '').toLowerCase();
+    return name.includes(q) || cls.includes(q) || email.includes(q) || phone.includes(q);
+  });
+  renderOutcomers(filtered);
+}
+
+function renderOutcomers(list) {
+  const container = document.getElementById('outcomers-list-container');
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div class="p-10 text-center rounded-3xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm space-y-2.5">
+        <span class="text-4xl">🎉</span>
+        <h4 class="text-sm sm:text-base font-black text-[var(--text-main)]">No Outcomers Found</h4>
+        <p class="text-xs text-[var(--text-sub)] max-w-md mx-auto">
+          ${currentOutcomersFilter === 'pending'
+            ? 'There are no pending student submissions waiting for verification. Share the Student Link above to let students submit their details.'
+            : 'No student registrations match this filter.'}
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(s => {
+    const isPending = s.registrationStatus === 'pending';
+    const p = s.personalDetails || {};
+    const a = s.address || {};
+    const f = s.familyDetails || {};
+    const createdDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    const fullAddr = [a.fullAddress, a.place, a.district, a.state, a.pinCode ? `PIN: ${a.pinCode}` : ''].filter(Boolean).join(', ') || 'No address provided';
+
+    return `
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border ${isPending ? 'border-amber-500/40' : 'border-[var(--border-color)]'} shadow-sm space-y-3.5 transition-all">
+        <!-- Top Row: Student Avatar, Name, Requested Class & Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-color)] pb-3">
+          <div class="flex items-center gap-3">
+            <img src="${s.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(s.name)}" class="w-13 h-13 rounded-2xl object-cover border-2 border-[var(--border-color)] bg-slate-200 flex-shrink-0">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h4 class="font-black text-sm sm:text-base text-[var(--text-main)]">${escapeHtml(s.name)}</h4>
+                <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 font-extrabold text-xs">Class: ${escapeHtml(s.class || 'Unassigned')}</span>
+                <span class="px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] font-bold text-xs">Roll: #${s.roll ?? '-'}</span>
+                ${isPending
+                  ? '<span class="px-2 py-0.5 rounded-lg bg-amber-500 text-white font-black text-[10px] uppercase shadow-2xs">Pending Verification</span>'
+                  : '<span class="px-2 py-0.5 rounded-lg bg-teal-500 text-white font-black text-[10px] uppercase shadow-2xs">Enrolled</span>'}
+              </div>
+              <p class="text-[11px] text-[var(--text-sub)] font-medium mt-0.5">Submitted: ${createdDate} • Email: ${escapeHtml(p.studentEmail || 'No email')}</p>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-2 self-end sm:self-center">
+            ${isPending ? `
+              <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="touch-btn px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Verify & Add to Class</span>
+              </button>
+              <button type="button" onclick="triggerRejectOutcomer('${s._id}')" class="touch-btn px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1 transition active:scale-95">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <span>Cancel</span>
+              </button>
+            ` : `
+              <span class="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
+                <span>✓ Active in Roster (ID: ${s.studentId || '-'})</span>
+              </span>
+            `}
+          </div>
+        </div>
+
+        <!-- Details Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">DOB & Blood Group</span>
+            <p class="font-extrabold text-[var(--text-main)] mt-0.5">${p.dob || 'Not specified'} • ${p.bloodGroup || 'Blood: -'} (${p.gender || '-'})</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Father's Contact</span>
+            <p class="font-extrabold text-[var(--text-main)] mt-0.5">
+              ${f.fatherName || 'Not specified'} 
+              ${f.fatherMobile ? `<a href="tel:${f.fatherMobile}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1">📞 ${f.fatherMobile}</a>` : ''}
+            </p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Mother's Contact</span>
+            <p class="font-extrabold text-[var(--text-main)] mt-0.5">
+              ${f.motherName || 'Not specified'}
+              ${f.motherNumber ? `<a href="tel:${f.motherNumber}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1">📞 ${f.motherNumber}</a>` : ''}
+            </p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] sm:col-span-2 lg:col-span-3">
+            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Residential Address</span>
+            <p class="font-extrabold text-[var(--text-main)] mt-0.5">${escapeHtml(fullAddr)}</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openApproveOutcomerModal(id) {
+  currentApproveOutcomerId = id;
+  const student = currentOutcomersList.find(s => String(s._id) === String(id));
+  if (!student) return;
+
+  const modal = document.getElementById('modal-approve-outcomer');
+  if (!modal) return;
+
+  const avatar = document.getElementById('aom-avatar');
+  if (avatar) avatar.src = student.photoUrl || DEFAULT_AVATAR;
+
+  const nameEl = document.getElementById('aom-name');
+  if (nameEl) nameEl.textContent = student.name;
+
+  const emailEl = document.getElementById('aom-email');
+  if (emailEl) emailEl.textContent = student.personalDetails?.studentEmail || `Requested: ${student.class || '-'}`;
+
+  const studentIdInput = document.getElementById('aom-student-id');
+  if (studentIdInput) studentIdInput.value = student._id;
+
+  const classSelect = document.getElementById('aom-class-select');
+  if (classSelect) {
+    classSelect.innerHTML = '';
+    classesList.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = c.name;
+      if (student.class && isClassEqual(c.name, student.class)) {
+        opt.selected = true;
+      }
+      classSelect.appendChild(opt);
+    });
+  }
+
+  const rollInput = document.getElementById('aom-roll');
+  if (rollInput) {
+    rollInput.value = student.roll ?? 1;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeApproveOutcomerModal() {
+  const modal = document.getElementById('modal-approve-outcomer');
+  if (modal) modal.classList.add('hidden');
+  currentApproveOutcomerId = null;
+}
+
+async function submitApproveOutcomer(e) {
+  e.preventDefault();
+  if (!currentApproveOutcomerId) return;
+
+  const btn = document.getElementById('aom-submit-btn');
+  const origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Enrolling...</span>';
+  }
+
+  const assignedClass = document.getElementById('aom-class-select')?.value?.trim();
+  const roll = document.getElementById('aom-roll')?.value?.trim();
+
+  try {
+    const res = await API.approveOutcomer(currentApproveOutcomerId, {
+      class: assignedClass,
+      roll: Number(roll)
+    });
+
+    if (res.success) {
+      showToast(res.message || 'Student enrolled successfully!');
+      closeApproveOutcomerModal();
+      await loadOutcomers();
+      await loadAttendanceRoster();
+      renderStudentsDirectory();
+    } else {
+      showToast(res.message || 'Approval failed');
+    }
+  } catch (err) {
+    console.error('[Approve Outcomer Error]', err);
+    showToast(err.message || 'Error approving student');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  }
+}
+
+async function triggerRejectOutcomer(id) {
+  const student = currentOutcomersList.find(s => String(s._id) === String(id));
+  const sName = student ? student.name : 'this student';
+  if (!confirm(`Are you sure you want to cancel the registration for ${sName}? This student will not be included in the roster.`)) {
+    return;
+  }
+
+  try {
+    const res = await API.rejectOutcomer(id);
+    if (res.success) {
+      showToast(res.message || 'Registration submission cancelled');
+      await loadOutcomers();
+    } else {
+      showToast(res.message || 'Failed to cancel submission');
+    }
+  } catch (err) {
+    console.error('[Reject Outcomer Error]', err);
+    showToast(err.message || 'Error cancelling outcomer');
+  }
+}
+
 

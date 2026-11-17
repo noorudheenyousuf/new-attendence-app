@@ -4,6 +4,7 @@ const Student = require('../models/Student');
 const Attendance = require('../models/Attendance');
 const Subject = require('../models/Subject');
 const ActivityLog = require('../models/ActivityLog');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const optionalAuth = require('../middleware/optionalAuth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
@@ -83,9 +84,15 @@ async function attachAttendanceStatsToStudents(studentsList) {
 // @desc    Get all students (with class filter, search, and scope: 'all' | 'private' | 'public')
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { class: classFilter, search, scope } = req.query;
+    const { class: classFilter, search, scope, status } = req.query;
     const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
     let query = {};
+
+    if (status === 'pending') {
+      query.registrationStatus = 'pending';
+    } else if (status !== 'all') {
+      query.registrationStatus = { $ne: 'pending' };
+    }
 
     if (scope === 'private') {
       if (!userEmail) return res.json({ success: true, data: [] });
@@ -141,6 +148,115 @@ router.get('/', optionalAuth, async (req, res) => {
     const students = await Student.find(query).sort({ class: 1, roll: 1 });
     const enrichedStudents = await attachAttendanceStatsToStudents(students);
     res.json({ success: true, data: enrichedStudents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/students/outcomers
+// @desc    Get all students who self-registered via link and are pending verification
+router.get('/outcomers', authMiddleware, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = { isPrivate: { $ne: true } };
+    if (status && status !== 'all') {
+      filter.registrationStatus = status;
+    } else if (!status) {
+      filter.registrationStatus = 'pending';
+    }
+    const outcomers = await Student.find(filter).sort({ createdAt: -1 }).lean();
+    const pendingCount = await Student.countDocuments({ isPrivate: { $ne: true }, registrationStatus: 'pending' });
+    res.json({
+      success: true,
+      data: outcomers,
+      pendingCount
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/students/outcomers/:id/approve
+// @desc    Teacher verifies & approves outcomer, assigning/confirming class & roll
+router.put('/outcomers/:id/approve', authMiddleware, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Outcomer student not found' });
+    }
+
+    const { class: assignedClass, roll, studentId } = req.body;
+    if (assignedClass) student.class = String(assignedClass).trim();
+    if (roll !== undefined && roll !== null && String(roll).trim() !== '') {
+      student.roll = Number(roll);
+    }
+    if (studentId) {
+      student.studentId = studentId;
+    } else if (!student.studentId || isNaN(Number(student.studentId))) {
+      student.studentId = await Student.getNextStudentId();
+    }
+
+    student.registrationStatus = 'approved';
+    student.academicStatus = {
+      ...(student.academicStatus || {}),
+      admissionStatus: 'Confirmed'
+    };
+    await student.save();
+
+    // Log teacher verification
+    await ActivityLog.create({
+      action: `Outcomer Verified & Enrolled: ${student.name} (ID: ${student.studentId})`,
+      details: `Class: ${student.class} • Roll: #${student.roll}`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'student',
+      entityId: student._id.toString()
+    });
+
+    res.json({
+      success: true,
+      data: student,
+      message: `Student ${student.name} approved and enrolled in ${student.class} successfully!`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   DELETE /api/students/outcomers/:id/reject
+// @desc    Teacher rejects/cancels an outcomer submission
+router.delete('/outcomers/:id/reject', authMiddleware, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Outcomer student not found' });
+    }
+
+    const studentName = student.name;
+    const studentEmail = student.personalDetails?.studentEmail || '';
+
+    // If user account is linked to this student, reset studentRef
+    if (student.userId) {
+      await User.findByIdAndUpdate(student.userId, { studentRef: null });
+    }
+
+    await Student.findByIdAndDelete(req.params.id);
+
+    await ActivityLog.create({
+      action: `Outcomer Submission Cancelled: ${studentName}`,
+      details: `Email: ${studentEmail}`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'student',
+      entityId: req.params.id
+    });
+
+    res.json({
+      success: true,
+      message: `Outcomer submission for ${studentName} has been cancelled.`
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

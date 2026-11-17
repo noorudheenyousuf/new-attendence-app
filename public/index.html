@@ -775,6 +775,78 @@
               </div>
               <svg class="w-3.5 h-3.5 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
+
+            <!-- 5. Outcomers Card (Review & Verify Inbound Student Registrations) -->
+            <button type="button" onclick="openOutcomersPage()" class="touch-btn bg-[var(--card-bg)] hover:bg-amber-500/5 p-3 rounded-2xl border border-[var(--border-color)] shadow-sm flex items-center justify-between gap-2 transition active:scale-98 group text-left col-span-2" title="Review incoming students who self-registered via link">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition text-lg">
+                  📥
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-black text-[var(--text-main)] truncate">Outcomers</span>
+                    <span id="settings-outcomers-badge" class="px-2 py-0.2 rounded-full bg-amber-500 text-white font-black text-[10px] hidden">0 Pending</span>
+                  </div>
+                  <div class="text-[10px] text-[var(--text-sub)] truncate">Verify self-registered students & enroll in classes</div>
+                </div>
+              </div>
+              <svg class="w-3.5 h-3.5 text-[var(--text-sub)] group-hover:translate-x-0.5 transition flex-shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. DIRECT PORTAL LINKS (Teacher Link & Student Link for Easy Sharing) -->
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🔗</span>
+              <h4 class="text-xs sm:text-sm font-black text-[var(--text-main)]">Portal Sharing Links</h4>
+            </div>
+            <span class="text-[10px] text-[var(--text-sub)] font-semibold">Separate Links</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Student Portal Link -->
+            <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-teal-700 dark:text-teal-300 flex items-center gap-1.5">
+                  <span>👨‍🎓</span>
+                  <span>Student Link</span>
+                </span>
+                <span class="text-[9px] px-1.5 py-0.2 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 font-extrabold uppercase">Self-Register</span>
+              </div>
+              <p class="text-[10px] text-[var(--text-sub)] leading-tight">Send to students: they can only add details and see announcements & timetable</p>
+              <div class="flex items-center gap-1.5 pt-0.5">
+                <button type="button" onclick="copyStudentPortalLink()" class="touch-btn flex-1 py-1.5 px-2 rounded-xl custom-gradient-btn text-white font-bold text-[11px] flex items-center justify-center gap-1 active:scale-95 transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span>Copy Link</span>
+                </button>
+                <button type="button" onclick="shareStudentPortalWhatsApp()" class="touch-btn py-1.5 px-2.5 rounded-xl bg-[#25D366] text-white font-bold text-[11px] flex items-center justify-center gap-1 active:scale-95 transition" title="Share via WhatsApp">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2z"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Teacher Portal Link -->
+            <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-[#245b70] dark:text-cyan-300 flex items-center gap-1.5">
+                  <span>👩‍🏫</span>
+                  <span>Teacher Link</span>
+                </span>
+                <span class="text-[9px] px-1.5 py-0.2 rounded bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-extrabold uppercase">Full Access</span>
+              </div>
+              <p class="text-[10px] text-[var(--text-sub)] leading-tight">Send to teachers: standard access to mark attendance & manage records</p>
+              <div class="flex items-center gap-1.5 pt-0.5">
+                <button type="button" onclick="copyTeacherPortalLink()" class="touch-btn flex-1 py-1.5 px-2 rounded-xl bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-[11px] flex items-center justify-center gap-1 active:scale-95 transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span>Copy Link</span>
+                </button>
+                <button type="button" onclick="shareTeacherPortalWhatsApp()" class="touch-btn py-1.5 px-2.5 rounded-xl bg-[#25D366] text-white font-bold text-[11px] flex items-center justify-center gap-1 active:scale-95 transition" title="Share via WhatsApp">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2z"/></svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -990,6 +1062,12 @@
                   <span class="opacity-90 font-black">:</span>
                   <span id="students-count-class" class="font-black text-white">0</span>
                 </div>
+
+                <!-- Outcomers Pill Button -->
+                <button type="button" onclick="openOutcomersPage()" id="students-outcomers-btn" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-black transition active:scale-95" title="Review incoming student registrations">
+                  <span>Outcomers</span>
+                  <span id="students-outcomers-count" class="px-1.5 py-0.2 rounded-md bg-amber-500 text-white text-[10px] font-black">0</span>
+                </button>
               </div>
             </div>
 
@@ -1604,6 +1682,116 @@
       <!-- PERSONAL WORKSPACE VIEW -->
       <section id="view-workspace" class="hidden space-y-0 pb-4">
         <!-- Pink Theme Overlay handled via JS: applyPinkTheme() / revertPinkTheme() -->
+      </section>
+
+      <!-- ================= OUTCOMERS VIEW (Teacher Inbound Review & Link Sharing) ================= -->
+      <section id="view-outcomers" class="hidden space-y-4 max-w-5xl mx-auto pb-16">
+        
+        <!-- Header Banner with Back Button -->
+        <div class="bg-gradient-to-br from-amber-500/20 via-[#245b70]/15 to-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-amber-500/30 shadow-md flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <button type="button" onclick="goBackFromOutcomers()" class="touch-btn w-9 h-9 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] flex items-center justify-center font-bold text-sm shadow-xs active:scale-95 transition" title="Go Back">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xl">📥</span>
+                <h2 class="text-base sm:text-xl font-black text-[var(--text-main)] tracking-tight">Outcomers</h2>
+                <span id="outcomers-header-badge" class="px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-black text-xs shadow-2xs">0 Pending</span>
+              </div>
+              <p class="text-xs text-[var(--text-sub)] font-medium mt-0.5">Students who self-registered via app link. Review, verify and enroll into official classes.</p>
+            </div>
+          </div>
+
+          <button type="button" onclick="loadOutcomers()" class="touch-btn px-3 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[#245b70]/10 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 flex-shrink-0">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            <span class="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
+
+        <!-- SHARING LINKS BOX (Both Student and Teacher Links for Sharing) -->
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🔗</span>
+              <h3 class="text-xs sm:text-sm font-black text-[var(--text-main)]">Portal Sharing Links</h3>
+            </div>
+            <span class="text-[11px] text-[var(--text-sub)]">Share these links to invite students or staff</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Student Portal Link -->
+            <div class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-teal-700 dark:text-teal-300 flex items-center gap-1.5">
+                  <span>👨‍🎓</span>
+                  <span>Student Self-Registration Link</span>
+                </span>
+                <span class="text-[9px] px-2 py-0.5 rounded-md bg-teal-500/15 text-teal-700 dark:text-teal-300 font-extrabold uppercase">For Students</span>
+              </div>
+              <p class="text-[11px] text-[var(--text-sub)] leading-tight">Students use this link to self-enter their personal & family details. Their submission will appear right here in Outcomers for your verification.</p>
+              <div class="flex items-center gap-2 pt-1">
+                <button type="button" onclick="copyStudentPortalLink()" class="touch-btn flex-1 py-2 px-3 rounded-xl custom-gradient-btn text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow active:scale-95 transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span>Copy Student Link</span>
+                </button>
+                <button type="button" onclick="shareStudentPortalWhatsApp()" class="touch-btn py-2 px-3 rounded-xl bg-[#25D366] text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition" title="Share via WhatsApp">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2z"/></svg>
+                  <span>WhatsApp</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Teacher Portal Link -->
+            <div class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-[#245b70] dark:text-cyan-300 flex items-center gap-1.5">
+                  <span>👩‍🏫</span>
+                  <span>Teacher / Staff Joining Link</span>
+                </span>
+                <span class="text-[9px] px-2 py-0.5 rounded-md bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 font-extrabold uppercase">For Teachers</span>
+              </div>
+              <p class="text-[11px] text-[var(--text-sub)] leading-tight">Teachers use this link to join Registerly with standard faculty privileges to mark attendance and manage school records.</p>
+              <div class="flex items-center gap-2 pt-1">
+                <button type="button" onclick="copyTeacherPortalLink()" class="touch-btn flex-1 py-2 px-3 rounded-xl bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow active:scale-95 transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  <span>Copy Teacher Link</span>
+                </button>
+                <button type="button" onclick="shareTeacherPortalWhatsApp()" class="touch-btn py-2 px-3 rounded-xl bg-[#25D366] text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition" title="Share via WhatsApp">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2z"/></svg>
+                  <span>WhatsApp</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Pills & Search Container -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <button type="button" onclick="filterOutcomers('pending')" id="outcomers-tab-pending" class="px-3 py-1.5 rounded-xl text-xs font-black bg-amber-500 text-white shadow-2xs transition flex items-center gap-1.5">
+              <span>Pending Verification</span>
+              <span id="outcomers-filter-pending-count" class="px-1.5 py-0.2 rounded-md bg-white/25 text-white text-[10px]">0</span>
+            </button>
+            <button type="button" onclick="filterOutcomers('approved')" id="outcomers-tab-approved" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--card-bg)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition">
+              Enrolled & Verified
+            </button>
+            <button type="button" onclick="filterOutcomers('all')" id="outcomers-tab-all" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--card-bg)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition">
+              All Submissions
+            </button>
+          </div>
+
+          <div class="relative min-w-[200px]">
+            <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-sub)] opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="outcomers-search-input" oninput="handleOutcomersSearch(this.value)" placeholder="Search outcomers..." class="w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl pl-8 pr-3 text-xs font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] h-9">
+          </div>
+        </div>
+
+        <!-- Outcomers Cards Grid Container -->
+        <div id="outcomers-list-container" class="space-y-3">
+          <!-- Dynamically populated Outcomer student cards -->
+        </div>
+
       </section>
 
       <!-- ================= STUDENT PORTAL VIEW ================= -->
@@ -2991,16 +3179,6 @@
           </div>
         </div>
         <button id="auth-close-btn" onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] flex items-center justify-center font-bold text-sm transition">✕</button>
-      </div>
-
-      <!-- Portal Role Selector (Teacher / Staff vs Student) -->
-      <div class="flex items-center justify-between p-1 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] text-xs font-bold">
-        <button type="button" onclick="setAuthPortalRole('staff')" id="auth-role-staff" class="flex-1 py-1.5 rounded-lg bg-[#245b70] text-white shadow-2xs transition">
-          👩‍🏫 Teacher / Staff
-        </button>
-        <button type="button" onclick="setAuthPortalRole('student')" id="auth-role-student" class="flex-1 py-1.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] transition">
-          👨‍🎓 Student Portal
-        </button>
       </div>
 
       <!-- Auth Mode Tabs (Sign In vs Register) -->
@@ -5187,6 +5365,62 @@
         </button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ================= APPROVE & ENROLL OUTCOMER MODAL ================= -->
+  <div id="modal-approve-outcomer" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden no-print">
+    <div class="bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border border-[var(--border-color)] relative space-y-4">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-700 dark:text-teal-300 flex items-center justify-center text-xl font-black">
+            ✅
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-black text-[var(--text-main)]">Verify & Add Student</h3>
+            <p class="text-xs text-[var(--text-sub)]">Assign class and confirm enrollment</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeApproveOutcomerModal()" class="w-8 h-8 rounded-full bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] flex items-center justify-center font-bold text-sm transition">✕</button>
+      </div>
+
+      <!-- Student Summary Card -->
+      <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center gap-3">
+        <img id="aom-avatar" src="default_avatar.jpg" class="w-12 h-12 rounded-xl object-cover border border-slate-300 dark:border-slate-700 bg-slate-200">
+        <div class="min-w-0 flex-1">
+          <h4 id="aom-name" class="font-extrabold text-sm text-[var(--text-main)] truncate">Student Name</h4>
+          <p id="aom-email" class="text-xs text-[var(--text-sub)] truncate">student@email.com</p>
+        </div>
+      </div>
+
+      <form id="form-approve-outcomer" onsubmit="submitApproveOutcomer(event)" class="space-y-3">
+        <input type="hidden" id="aom-student-id">
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Assign to Class *</label>
+          <select id="aom-class-select" required class="touch-input w-full rounded-xl px-3 text-xs sm:text-sm font-bold bg-[var(--bg-page)] border border-[var(--border-color)] text-[var(--text-main)] focus:ring-2 focus:ring-[#245b70] focus:outline-none">
+            <!-- Populated dynamically with classesList -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[var(--text-main)] mb-1">Roll Number *</label>
+          <input type="number" id="aom-roll" required min="1" placeholder="e.g. 15" class="touch-input w-full rounded-xl px-3 text-xs sm:text-sm font-bold bg-[var(--bg-page)] border border-[var(--border-color)] text-[var(--text-main)] focus:ring-2 focus:ring-[#245b70] focus:outline-none">
+        </div>
+
+        <div class="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-[11px] text-teal-800 dark:text-teal-200 font-medium">
+          Once approved, this student will be officially enrolled into the assigned class and will appear in daily attendance rosters.
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <button type="button" onclick="closeApproveOutcomerModal()" class="touch-btn flex-1 py-2.5 rounded-xl bg-[var(--bg-page)] hover:bg-[var(--border-color)] text-[var(--text-main)] font-bold text-xs transition">
+            Cancel
+          </button>
+          <button type="submit" id="aom-submit-btn" class="touch-btn flex-1 py-2.5 rounded-xl custom-gradient-btn text-white font-black text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>Approve & Enroll</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 

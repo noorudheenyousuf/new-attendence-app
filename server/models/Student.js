@@ -98,6 +98,11 @@ const studentSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  registrationStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved'
+  },
   createdAt: {
     type: Date,
     default: Date.now

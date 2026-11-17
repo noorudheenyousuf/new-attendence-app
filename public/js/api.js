@@ -576,5 +576,25 @@ const API = {
 
   async getStudentAttendance() {
     return this.request('/student-portal/attendance');
+  },
+
+  // ===================== OUTCOMERS API (Teacher Review & Enrollment) =====================
+  async getOutcomers(status = 'pending') {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    return this.request(`/students/outcomers?${params.toString()}`);
+  },
+
+  async approveOutcomer(id, data = {}) {
+    return this.request(`/students/outcomers/${id}/approve`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async rejectOutcomer(id) {
+    return this.request(`/students/outcomers/${id}/reject`, {
+      method: 'DELETE'
+    });
   }
 };

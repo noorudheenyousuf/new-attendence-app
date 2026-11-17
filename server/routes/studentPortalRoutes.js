@@ -262,6 +262,7 @@ router.post('/submit-details', authMiddleware, async (req, res) => {
         familyDetails: mergedFamily,
         academicStatus: mergedAcademic,
         userId: req.user._id,
+        registrationStatus: 'pending',
         isPrivate: false
       });
     }
