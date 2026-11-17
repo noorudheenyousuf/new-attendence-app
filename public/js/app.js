@@ -4859,24 +4859,59 @@ async function handleSaveNewStudent(e) {
 let activeEditStudentObjId = null;
 let activeEditStudentRecord = null;
 
+function handleEditProfileFromDetailsModal() {
+  if (!currentDetailsStudent) return;
+  const st = currentDetailsStudent;
+  closeStudentDetailsModal();
+  if (st.isPrivate && typeof pwEditStudent === 'function') {
+    pwEditStudent(st._id);
+  } else {
+    openEditStudentModal(st._id || st.studentId);
+  }
+}
+
 async function openEditStudentModal(id) {
   activeEditStudentObjId = id;
   clearAllStudentModalErrors('edit');
   try {
     let student = null;
-    try {
-      const singleRes = await API.getStudentById(id);
-      if (singleRes && singleRes.success && singleRes.data) {
-        student = singleRes.data;
-      }
-    } catch (_) {}
+    const targetStr = String(id);
 
-    if (!student) {
-      const res = await API.getStudents();
-      student = (res.data || []).find(s => s._id === id || String(s.studentId) === String(id));
+    // 1. Check currently active student in details modal
+    if (typeof currentDetailsStudent !== 'undefined' && currentDetailsStudent && (String(currentDetailsStudent._id) === targetStr || String(currentDetailsStudent.studentId) === targetStr)) {
+      student = currentDetailsStudent;
     }
-    if (!student) return;
+    // 2. Check in-memory arrays for fast instant load
+    if (!student && Array.isArray(studentsList)) {
+      student = studentsList.find(s => String(s._id) === targetStr || String(s.studentId) === targetStr);
+    }
+    if (!student && Array.isArray(cachedAllStudents)) {
+      student = cachedAllStudents.find(s => String(s._id) === targetStr || String(s.studentId) === targetStr);
+    }
+    if (!student && typeof pwStudentsList !== 'undefined' && Array.isArray(pwStudentsList)) {
+      student = pwStudentsList.find(s => String(s._id) === targetStr || String(s.studentId) === targetStr);
+    }
+    // 3. API lookup
+    if (!student) {
+      try {
+        const singleRes = await API.getStudentById(id);
+        if (singleRes && singleRes.success && singleRes.data) {
+          student = singleRes.data;
+        }
+      } catch (_) {}
+    }
+    if (!student) {
+      try {
+        const res = await API.getStudents('all');
+        student = (res.data || []).find(s => String(s._id) === targetStr || String(s.studentId) === targetStr);
+      } catch (_) {}
+    }
+    if (!student) {
+      showToast('Student information not found', true);
+      return;
+    }
 
+    activeEditStudentObjId = student._id || id;
     activeEditStudentRecord = student;
     editStudentPhotoUrl = student.photoUrl || '';
     editStudentBase64Photo = student.photoUrl || '';
@@ -8518,103 +8553,153 @@ function closeMessagesModal() {
   goBackFromSubPage('home');
 }
 
+function insertMsgInputTag(tag) {
+  const input = document.getElementById('message-input-text');
+  if (!input) return;
+  const cleaned = input.value.replace(/^📢\s*\[.*?\]\s*|^⏰\s*\[.*?\]\s*|^⚠️\s*\[.*?\]\s*|^📋\s*\[.*?\]\s*/, '');
+  input.value = tag + cleaned;
+  input.focus();
+}
+
+let messagesSearchQuery = '';
+function handleMessagesSearch(query) {
+  messagesSearchQuery = (query || '').toLowerCase().trim();
+  renderMessagesStream();
+}
+
+function renderMessagesStream() {
+  const container = document.getElementById('messages-list-container');
+  if (!container) return;
+
+  let messages = cachedMessages || [];
+  if (messagesSearchQuery) {
+    messages = messages.filter(m => {
+      const txt = (m.text || '').toLowerCase();
+      const sName = (m.senderName || '').toLowerCase();
+      const sEmail = resolveSenderEmail(m).toLowerCase();
+      return txt.includes(messagesSearchQuery) || sName.includes(messagesSearchQuery) || sEmail.includes(messagesSearchQuery);
+    });
+  }
+
+  const countPill = document.getElementById('messages-count-pill');
+  if (countPill) {
+    if (messagesSearchQuery) {
+      countPill.textContent = `${messages.length} Found`;
+    } else {
+      countPill.textContent = (cachedMessages || []).length > 0 ? `${(cachedMessages || []).length} Notices` : 'Notice Board';
+    }
+  }
+
+  if (messages.length === 0) {
+    container.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3">
+        <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-[#1e4d5f]/20 via-[#245b70]/20 to-teal-400/20 text-[#245b70] dark:text-cyan-300 flex items-center justify-center shadow-inner border border-[#245b70]/20">
+          <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <div>
+          <h3 class="text-sm sm:text-base font-black text-[var(--text-main)]">${messagesSearchQuery ? 'No matching announcements found' : 'Teacher Notice Board is Clean'}</h3>
+          <p class="text-xs text-[var(--text-sub)] max-w-sm mt-1">${messagesSearchQuery ? 'Try a different search query' : 'No announcements or messages have been posted yet. Type below to broadcast the first notice to all teachers!'}</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const myId = currentUser && (currentUser._id || currentUser.id);
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  container.innerHTML = messages.map(m => {
+    const isMine = String(m.senderId) === String(myId);
+    const canManage = isMine || isAdmin;
+    const avatar = m.senderAvatar || DEFAULT_AVATAR;
+    const senderEmail = resolveSenderEmail(m);
+    const senderName = m.senderName || 'Anonymous Teacher';
+    const rolePill = m.senderRole === 'admin'
+      ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/35 shadow-2xs"><svg class="w-2.5 h-2.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Admin</span>`
+      : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/25 shadow-2xs">Teacher</span>`;
+
+    return `
+      <div class="message-announcement-card flex items-start gap-3 ${isMine ? 'flex-row-reverse' : ''} group transition-all duration-200">
+        <!-- Avatar with live status indicator -->
+        <div class="relative flex-shrink-0">
+          <img src="${avatar}" alt="${escapeHtml(senderName)}" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover ring-2 ${isMine ? 'ring-[#245b70]/50' : 'ring-[#43888a]/40'} shadow-sm">
+          <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[var(--card-bg)] flex items-center justify-center shadow-2xs">
+            <span class="w-1 h-1 rounded-full bg-white"></span>
+          </div>
+        </div>
+
+        <!-- Content Block: Profile Name, Email, and Message Box Below -->
+        <div class="max-w-[85%] sm:max-w-[80%] space-y-1.5 ${isMine ? 'items-end flex flex-col' : ''}">
+          <!-- Profile Name + Role + Time -->
+          <div class="flex items-center gap-2 ${isMine ? 'flex-row-reverse' : ''} flex-wrap">
+            <span class="font-black text-xs sm:text-sm text-[var(--text-main)] truncate">${escapeHtml(senderName)}</span>
+            ${rolePill}
+            ${isMine ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)]">You</span>' : ''}
+            <span class="text-[10px] font-medium text-[var(--text-sub)] flex items-center gap-1">
+              <svg class="w-2.5 h-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              ${_timeAgo(m.createdAt)}
+            </span>
+          </div>
+
+          <!-- Email Profile Display: below name, clearly highlighted with icon -->
+          <div class="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold ${isMine ? 'text-teal-700 dark:text-teal-300 flex-row-reverse' : 'text-[#245b70] dark:text-cyan-400'} truncate">
+            <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span class="font-mono truncate">${escapeHtml(senderEmail || 'No email registered')}</span>
+          </div>
+
+          <!-- BELOW THAT: THE MESSAGE CARD -->
+          <div class="${isMine
+            ? 'bg-gradient-to-br from-[#1e4d5f] via-[#245b70] to-[#123644] text-white border border-white/15 shadow-md rounded-2xl rounded-tr-xs'
+            : 'bg-gradient-to-br from-[var(--bg-page)] via-[var(--card-bg)] to-[#245b70]/10 dark:to-[#245b70]/20 text-[var(--text-main)] border border-[var(--border-color)] border-l-4 border-l-[#245b70] dark:border-l-cyan-400 shadow-sm rounded-2xl rounded-tl-xs'
+          } px-3.5 py-2.5 sm:px-4 sm:py-3 relative select-none cursor-pointer active:scale-98 transition group-hover:shadow-md"
+            onmousedown="handleMsgStartHold(event, '${m._id}')"
+            onmouseup="handleMsgEndHold(event)"
+            onmouseleave="handleMsgEndHold(event)"
+            ontouchstart="handleMsgStartHold(event, '${m._id}')"
+            ontouchend="handleMsgEndHold(event)"
+            ontouchcancel="handleMsgEndHold(event)"
+            oncontextmenu="handleMsgContextMenu(event, '${m._id}')"
+            title="Click & hold to edit or delete"
+            style="white-space:pre-wrap;word-break:break-word;">
+
+            <!-- Chat Text Only with Dynamic Font Scaling -->
+            <p class="${getMessageFontSizeClass(m.text)} ${isMine ? 'text-white' : 'text-[var(--text-main)]'}">
+              ${escapeHtml(m.text)}
+            </p>
+
+            ${m.isEdited ? `<span class="text-[9px] ${isMine ? 'text-teal-200/80' : 'text-[var(--text-sub)]'} italic block mt-1">(edited)</span>` : ''}
+
+            <!-- Direct Quick Action Buttons for Owner or Admin -->
+            ${canManage ? `
+              <div class="flex items-center gap-1.5 pt-2 mt-1 border-t ${isMine ? 'border-white/15 justify-end' : 'border-[var(--border-color)] justify-start'} opacity-75 group-hover:opacity-100 transition">
+                <button type="button" onclick="event.stopPropagation(); openEditMessageModal('${m._id}')" class="touch-btn px-2.5 py-1 rounded-lg ${isMine ? 'bg-white/15 hover:bg-white/25 text-white' : 'bg-[#245b70]/10 hover:bg-[#245b70]/20 text-[#245b70] dark:text-cyan-300'} font-bold text-[10px] flex items-center gap-1 active:scale-95 transition" title="Edit Announcement">
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  <span>Edit</span>
+                </button>
+                <button type="button" onclick="event.stopPropagation(); triggerDeleteMessage('${m._id}')" class="touch-btn px-2.5 py-1 rounded-lg ${isMine ? 'bg-rose-500/25 hover:bg-rose-500/40 text-rose-200' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400'} font-bold text-[10px] flex items-center gap-1 active:scale-95 transition" title="Delete Announcement">
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  <span>Delete</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.scrollTop = container.scrollHeight;
+}
+
 async function loadMessages() {
   const container = document.getElementById('messages-list-container');
   if (!container) return;
   container.innerHTML = `<div class="flex items-center justify-center py-12"><div class="w-7 h-7 rounded-full border-3 border-[#245b70] border-t-transparent animate-spin"></div></div>`;
   try {
     const res = await API.getMessages();
-    // Backend returns { success: true, data: [...], unreadCount }
     const messages = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
     cachedMessages = messages;
-
-    const countPill = document.getElementById('messages-count-pill');
-    if (countPill) {
-      countPill.textContent = messages.length > 0 ? `${messages.length} Notices` : 'Notice Board';
-    }
-
-    if (messages.length === 0) {
-      container.innerHTML = `
-        <div class="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3">
-          <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-[#245b70]/20 to-[#43888a]/30 text-[#245b70] dark:text-cyan-300 flex items-center justify-center shadow-inner border border-[#245b70]/20">
-            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          </div>
-          <div>
-            <h3 class="text-sm sm:text-base font-black text-[var(--text-main)]">Teacher Notice Board is Clean</h3>
-            <p class="text-xs text-[var(--text-sub)] max-w-sm mt-1">No announcements or messages have been posted yet. Type below to broadcast the first notice to all teachers!</p>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    const myId = currentUser && (currentUser._id || currentUser.id);
-    container.innerHTML = messages.map(m => {
-      const isMine = String(m.senderId) === String(myId);
-      const avatar = m.senderAvatar || DEFAULT_AVATAR;
-      const senderEmail = resolveSenderEmail(m);
-      const senderName = m.senderName || 'Anonymous Teacher';
-      const rolePill = m.senderRole === 'admin'
-        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/35 shadow-2xs"><svg class="w-2.5 h-2.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Admin</span>`
-        : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 border border-[#245b70]/25 shadow-2xs">Teacher</span>`;
-
-      return `
-        <div class="message-announcement-card flex items-start gap-3 ${isMine ? 'flex-row-reverse' : ''} group">
-          <!-- Avatar with live status indicator -->
-          <div class="relative flex-shrink-0">
-            <img src="${avatar}" alt="${escapeHtml(senderName)}" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover ring-2 ${isMine ? 'ring-[#245b70]/50' : 'ring-[#43888a]/40'} shadow-sm">
-            <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[var(--card-bg)] flex items-center justify-center shadow-2xs">
-              <span class="w-1 h-1 rounded-full bg-white"></span>
-            </div>
-          </div>
-
-          <!-- Content Block: Profile Name, Email, and Message Box Below -->
-          <div class="max-w-[85%] sm:max-w-[80%] space-y-1.5 ${isMine ? 'items-end flex flex-col' : ''}">
-            <!-- Profile Name + Role + Time -->
-            <div class="flex items-center gap-2 ${isMine ? 'flex-row-reverse' : ''} flex-wrap">
-              <span class="font-black text-xs sm:text-sm text-[var(--text-main)] truncate">${escapeHtml(senderName)}</span>
-              ${rolePill}
-              ${isMine ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)]">You</span>' : ''}
-              <span class="text-[10px] font-medium text-[var(--text-sub)] flex items-center gap-1">
-                <svg class="w-2.5 h-2.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                ${_timeAgo(m.createdAt)}
-              </span>
-            </div>
-
-            <!-- Email Profile Display: below name, clearly highlighted with icon -->
-            <div class="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold ${isMine ? 'text-teal-700 dark:text-teal-300 flex-row-reverse' : 'text-[#245b70] dark:text-cyan-400'} truncate">
-              <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              <span class="font-mono truncate">${escapeHtml(senderEmail || 'No email registered')}</span>
-            </div>
-
-            <!-- BELOW THAT: THE MESSAGE (Only chat text, dynamic font sizing) -->
-            <div class="${isMine
-              ? 'bg-gradient-to-br from-[#245b70] via-[#1b4859] to-[#14323d] text-white border border-[#245b70]/60 shadow-md rounded-2xl rounded-tr-xs'
-              : 'bg-gradient-to-br from-[var(--bg-page)] via-[var(--card-bg)] to-[#245b70]/10 dark:to-[#245b70]/20 text-[var(--text-main)] border border-[var(--border-color)] border-l-4 border-l-[#245b70] dark:border-l-cyan-400 shadow-sm rounded-2xl rounded-tl-xs'
-            } px-3.5 py-2.5 sm:px-4 sm:py-3 relative select-none cursor-pointer active:scale-98 transition group-hover:shadow-md"
-              onmousedown="handleMsgStartHold(event, '${m._id}')"
-              onmouseup="handleMsgEndHold(event)"
-              onmouseleave="handleMsgEndHold(event)"
-              ontouchstart="handleMsgStartHold(event, '${m._id}')"
-              ontouchend="handleMsgEndHold(event)"
-              ontouchcancel="handleMsgEndHold(event)"
-              oncontextmenu="handleMsgContextMenu(event, '${m._id}')"
-              title="Click & hold to edit or delete"
-              style="white-space:pre-wrap;word-break:break-word;">
-
-              <!-- Chat Text Only with Dynamic Font Scaling -->
-              <p class="${getMessageFontSizeClass(m.text)} ${isMine ? 'text-white' : 'text-[var(--text-main)]'}">
-                ${escapeHtml(m.text)}
-              </p>
-
-              ${m.isEdited ? `<span class="text-[9px] ${isMine ? 'text-teal-200/80' : 'text-[var(--text-sub)]'} italic block mt-1">(edited)</span>` : ''}
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-    // scroll to bottom (messages are chronological from backend)
-    container.scrollTop = container.scrollHeight;
+    renderMessagesStream();
   } catch (err) {
     container.innerHTML = `<div class="text-center text-xs text-rose-500 py-6">Failed to load messages: ${escapeHtml(err.message)}</div>`;
   }
@@ -9604,41 +9689,76 @@ function closeMessageActionsModal() {
   activeSelectedMessage = null;
 }
 
-async function promptEditSelectedMessage() {
+let activeEditingMessageObj = null;
+
+function openEditMessageModal(msgId) {
+  const msg = (cachedMessages || []).find(m => String(m._id) === String(msgId));
+  if (!msg) return;
+  activeEditingMessageObj = msg;
+  const modal = document.getElementById('modal-edit-message');
+  const input = document.getElementById('edit-message-text-input');
+  if (input) {
+    input.value = msg.text || '';
+    setTimeout(() => { input.focus(); }, 150);
+  }
+  if (modal) modal.classList.remove('hidden');
+}
+
+function openEditMessageModalFromAction() {
   if (!activeSelectedMessage) return;
-  const currentText = activeSelectedMessage.text;
-  const newText = typeof showCustomPrompt === 'function'
-    ? await showCustomPrompt({
-        title: 'Edit Message',
-        badge: 'Messages',
-        message: 'Edit your message below:',
-        defaultValue: currentText
-      })
-    : prompt('Edit your message:', currentText);
-  if (newText === null || !newText.trim() || newText.trim() === currentText) {
-    closeMessageActionsModal();
+  const msg = activeSelectedMessage;
+  closeMessageActionsModal();
+  openEditMessageModal(msg._id);
+}
+
+function closeEditMessageModal() {
+  const modal = document.getElementById('modal-edit-message');
+  if (modal) modal.classList.add('hidden');
+  activeEditingMessageObj = null;
+}
+
+function insertMsgEditTag(tag) {
+  const input = document.getElementById('edit-message-text-input');
+  if (!input) return;
+  const cleaned = input.value.replace(/^📢\s*\[.*?\]\s*|^⏰\s*\[.*?\]\s*|^⚠️\s*\[.*?\]\s*|^📋\s*\[.*?\]\s*/, '');
+  input.value = tag + cleaned;
+  input.focus();
+}
+
+async function handleSaveEditedMessage() {
+  if (!activeEditingMessageObj) return;
+  const input = document.getElementById('edit-message-text-input');
+  const newText = input ? input.value.trim() : '';
+  if (!newText) {
+    showToast('Message text cannot be empty', true);
     return;
   }
+  const btn = document.getElementById('btn-save-edited-msg');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
   try {
-    const res = await API.editMessage(activeSelectedMessage._id, newText.trim());
-    if (res.success) {
-      showToast('Message updated');
-      closeMessageActionsModal();
+    const res = await API.editMessage(activeEditingMessageObj._id, newText);
+    if (res && res.success) {
+      showToast('Announcement updated');
+      closeEditMessageModal();
       await loadMessages();
     }
   } catch (err) {
     showToast(err.message || 'Failed to edit message', true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Save Changes</span>';
+    }
   }
 }
 
-async function confirmDeleteSelectedMessage() {
-  if (!activeSelectedMessage) return;
+async function triggerDeleteMessage(msgId) {
   const confirmed = typeof showCustomConfirm === 'function'
     ? await showCustomConfirm({
-        title: 'Delete Message',
-        badge: 'Messages',
-        message: 'Are you sure you want to delete this message?',
+        title: 'Delete Announcement?',
+        badge: 'Notice Board',
+        message: 'Are you sure you want to delete this broadcast notice?',
         isDanger: true
       })
     : confirm('Are you sure you want to delete this message?');
@@ -9646,15 +9766,25 @@ async function confirmDeleteSelectedMessage() {
   triggerNavHaptic('delete');
 
   try {
-    const res = await API.deleteMessage(activeSelectedMessage._id);
-    if (res.success) {
-      showToast('Message deleted');
-      closeMessageActionsModal();
+    const res = await API.deleteMessage(msgId);
+    if (res && res.success) {
+      showToast('Announcement deleted');
       await loadMessages();
     }
   } catch (err) {
     showToast(err.message || 'Failed to delete message', true);
   }
+}
+
+async function promptEditSelectedMessage() {
+  openEditMessageModalFromAction();
+}
+
+async function confirmDeleteSelectedMessage() {
+  if (!activeSelectedMessage) return;
+  const msgId = activeSelectedMessage._id;
+  closeMessageActionsModal();
+  await triggerDeleteMessage(msgId);
 }
 
 async function handleClearAllChat() {
@@ -9747,7 +9877,7 @@ async function openIndividualAttendanceReportModal() {
   }
 
   // Populate Class Select (combines public classes and personal workspace classes)
-  const classSelect = document.getElementById('att-indiv-class');
+  const classSelect = document.getElementById('att-indiv-class-select') || document.getElementById('att-indiv-class');
   if (classSelect) {
     const combinedClasses = [...(classesList || []), ...((typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList)) ? pwClassesList : [])];
     const seenClasses = new Set();
@@ -9766,7 +9896,7 @@ async function openIndividualAttendanceReportModal() {
   }
 
   // Populate Year Select
-  const yearSelect = document.getElementById('att-indiv-year');
+  const yearSelect = document.getElementById('att-indiv-year-select') || document.getElementById('att-indiv-year');
   if (yearSelect) {
     const currentYear = new Date().getFullYear();
     yearSelect.innerHTML = `
@@ -9784,11 +9914,15 @@ function closeIndividualAttendanceModal() {
   const modal = document.getElementById('modal-individual-attendance');
   if (modal) modal.classList.add('hidden');
 }
+function closeIndividualAttendanceReportModal() {
+  closeIndividualAttendanceModal();
+}
 
 function handleIndivAttendanceClassChanged() {
-  const classVal = document.getElementById('att-indiv-class')?.value || '';
-  const stuSelect = document.getElementById('att-indiv-student');
-  const subSelect = document.getElementById('att-indiv-subject');
+  const classSelect = document.getElementById('att-indiv-class-select') || document.getElementById('att-indiv-class');
+  const classVal = classSelect?.value || '';
+  const stuSelect = document.getElementById('att-indiv-student-select') || document.getElementById('att-indiv-student');
+  const subSelect = document.getElementById('att-indiv-subject-select') || document.getElementById('att-indiv-subject');
 
   // Populate Subjects for this class (including workspace subjects)
   if (subSelect) {
@@ -9816,35 +9950,48 @@ function handleIndivAttendanceClassChanged() {
     });
     filteredStudents.sort((a, b) => (parseInt(a.roll, 10) || 0) - (parseInt(b.roll, 10) || 0));
     stuSelect.innerHTML = filteredStudents.map(s => {
-      return `<option value="${s._id || s.studentId}" data-id="${s.studentId}" data-roll="${s.roll || ''}">${escapeHtml(s.name)}</option>`;
+      return `<option value="${s._id || s.studentId}" data-id="${s.studentId}" data-roll="${s.roll || ''}" data-name="${escapeQuotes(s.name || '')}">${escapeHtml(s.name)}</option>`;
     }).join('') || '<option value="">No students in this class</option>';
   }
 
   handleIndivAttendanceStudentChanged();
 }
+function handleAttIndivClassChanged() {
+  handleIndivAttendanceClassChanged();
+}
 
 function handleIndivAttendanceStudentChanged() {
-  const stuSelect = document.getElementById('att-indiv-student');
+  const stuSelect = document.getElementById('att-indiv-student-select') || document.getElementById('att-indiv-student');
   const subEl = document.getElementById('att-indiv-student-sub');
-  if (!stuSelect || !subEl) return;
+  const nameEl = document.getElementById('att-indiv-student-fullname');
+  if (!stuSelect) return;
   const selOpt = stuSelect.options[stuSelect.selectedIndex];
   if (selOpt && selOpt.value) {
     const sId = selOpt.getAttribute('data-id') || '';
     const roll = selOpt.getAttribute('data-roll') || '';
-    subEl.innerText = `ID: ${sId} • Roll: #${roll}`;
-    subEl.classList.remove('hidden');
+    const sName = selOpt.getAttribute('data-name') || selOpt.text || '';
+    if (nameEl) nameEl.textContent = sName;
+    if (subEl) {
+      subEl.innerText = `ID: ${sId} • Roll: #${roll}`;
+      subEl.classList.remove('hidden');
+    }
   } else {
-    subEl.innerText = '';
-    subEl.classList.add('hidden');
+    if (nameEl) nameEl.textContent = 'Select a student';
+    if (subEl) {
+      subEl.innerText = 'ID: — • Roll: —';
+    }
   }
+}
+function handleAttIndivStudentChanged() {
+  handleIndivAttendanceStudentChanged();
 }
 
 async function executeIndividualAttendancePrint() {
-  const stuSelect = document.getElementById('att-indiv-student');
-  const classVal = document.getElementById('att-indiv-class')?.value || '';
-  const subjectVal = document.getElementById('att-indiv-subject')?.value || 'all';
-  const yearVal = document.getElementById('att-indiv-year')?.value || new Date().getFullYear();
-  const monthVal = document.getElementById('att-indiv-month')?.value || 'all-year';
+  const stuSelect = document.getElementById('att-indiv-student-select') || document.getElementById('att-indiv-student');
+  const classVal = (document.getElementById('att-indiv-class-select') || document.getElementById('att-indiv-class'))?.value || '';
+  const subjectVal = (document.getElementById('att-indiv-subject-select') || document.getElementById('att-indiv-subject'))?.value || 'all';
+  const yearVal = (document.getElementById('att-indiv-year-select') || document.getElementById('att-indiv-year'))?.value || new Date().getFullYear();
+  const monthVal = (document.getElementById('att-indiv-month-select') || document.getElementById('att-indiv-month'))?.value || 'all';
 
   if (!stuSelect || !stuSelect.value) {
     showToast('Please select a student', true);
@@ -10071,7 +10218,7 @@ async function openIndividualStudentDataModal() {
     } catch (_) {}
   }
 
-  const classSelect = document.getElementById('stu-indiv-class');
+  const classSelect = document.getElementById('stu-indiv-class-select') || document.getElementById('stu-indiv-class');
   if (classSelect) {
     const combinedClasses = [...(classesList || []), ...((typeof pwClassesList !== 'undefined' && Array.isArray(pwClassesList)) ? pwClassesList : [])];
     const seenClasses = new Set();
@@ -10099,8 +10246,9 @@ function closeIndividualStudentDataModal() {
 }
 
 function handleIndivStudentDataClassChanged() {
-  const classVal = document.getElementById('stu-indiv-class')?.value || '';
-  const stuSelect = document.getElementById('stu-indiv-student');
+  const classSelect = document.getElementById('stu-indiv-class-select') || document.getElementById('stu-indiv-class');
+  const classVal = classSelect?.value || '';
+  const stuSelect = document.getElementById('stu-indiv-student-select') || document.getElementById('stu-indiv-student');
   if (stuSelect) {
     const combinedStudents = [...(cachedAllStudents || []), ...((typeof pwStudentsList !== 'undefined' && Array.isArray(pwStudentsList)) ? pwStudentsList : [])];
     const seenStu = new Set();
@@ -10114,30 +10262,43 @@ function handleIndivStudentDataClassChanged() {
     });
     filteredStudents.sort((a, b) => (parseInt(a.roll, 10) || 0) - (parseInt(b.roll, 10) || 0));
     stuSelect.innerHTML = filteredStudents.map(s => {
-      return `<option value="${s._id || s.studentId}" data-id="${s.studentId}" data-roll="${s.roll || ''}">${escapeHtml(s.name)}</option>`;
+      return `<option value="${s._id || s.studentId}" data-id="${s.studentId}" data-roll="${s.roll || ''}" data-name="${escapeQuotes(s.name || '')}">${escapeHtml(s.name)}</option>`;
     }).join('') || '<option value="">No students in this class</option>';
   }
   handleIndivStudentDataStudentChanged();
 }
+function handleStuIndivClassChanged() {
+  handleIndivStudentDataClassChanged();
+}
 
 function handleIndivStudentDataStudentChanged() {
-  const stuSelect = document.getElementById('stu-indiv-student');
+  const stuSelect = document.getElementById('stu-indiv-student-select') || document.getElementById('stu-indiv-student');
   const subEl = document.getElementById('stu-indiv-student-sub');
-  if (!stuSelect || !subEl) return;
+  const nameEl = document.getElementById('stu-indiv-student-fullname');
+  if (!stuSelect) return;
   const selOpt = stuSelect.options[stuSelect.selectedIndex];
   if (selOpt && selOpt.value) {
     const sId = selOpt.getAttribute('data-id') || '';
     const roll = selOpt.getAttribute('data-roll') || '';
-    subEl.innerText = `ID: ${sId} • Roll: #${roll}`;
-    subEl.classList.remove('hidden');
+    const sName = selOpt.getAttribute('data-name') || selOpt.text || '';
+    if (nameEl) nameEl.textContent = sName;
+    if (subEl) {
+      subEl.innerText = `ID: ${sId} • Roll: #${roll}`;
+      subEl.classList.remove('hidden');
+    }
   } else {
-    subEl.innerText = '';
-    subEl.classList.add('hidden');
+    if (nameEl) nameEl.textContent = 'Select a student';
+    if (subEl) {
+      subEl.innerText = 'ID: — • Roll: —';
+    }
   }
+}
+function handleStuIndivStudentChanged() {
+  handleIndivStudentDataStudentChanged();
 }
 
 async function executeIndividualStudentDataPrint() {
-  const stuSelect = document.getElementById('stu-indiv-student');
+  const stuSelect = document.getElementById('stu-indiv-student-select') || document.getElementById('stu-indiv-student');
   if (!stuSelect || !stuSelect.value) {
     showToast('Please select a student', true);
     return;
