@@ -593,6 +593,55 @@ const API = {
     return this.request('/student-portal/announcements');
   },
 
+  // --- Announcements & Events (Admin CRUD + Public/Teacher Read) ---
+  async getAnnouncements() {
+    return this.request('/announcements');
+  },
+
+  async createAnnouncement(data) {
+    return this.request('/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateAnnouncement(id, data) {
+    return this.request(`/announcements/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async deleteAnnouncement(id) {
+    return this.request(`/announcements/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async getEvents(upcoming = false) {
+    return this.request(`/events${upcoming ? '?upcoming=true' : ''}`);
+  },
+
+  async createEvent(data) {
+    return this.request('/events', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateEvent(id, data) {
+    return this.request(`/events/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async deleteEvent(id) {
+    return this.request(`/events/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
   async getStudentAttendance() {
     return this.request('/student-portal/attendance');
   },

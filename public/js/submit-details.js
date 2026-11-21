@@ -6,6 +6,22 @@
   let nextRollByClass = {};
   let uploadedPhotoUrl = '';
 
+  function getFirstLetterAvatar(name = '') {
+    const clean = String(name || '').trim();
+    const letter = clean ? clean[0].toUpperCase() : 'S';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#245b70"/><text x="50" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="800" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${letter}</text></svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+  }
+
+  function handlePublicNameChange() {
+    if (uploadedPhotoUrl) return;
+    const name = document.getElementById('pub-name')?.value || '';
+    const previewEl = document.getElementById('pub-photo-preview');
+    if (previewEl) {
+      previewEl.src = getFirstLetterAvatar(name);
+    }
+  }
+
   function showFormError(msg) {
     const box = document.getElementById('pub-form-error');
     const txt = document.getElementById('pub-form-error-text');
@@ -293,6 +309,7 @@
     await refreshPublicSubmissionStatus();
   }
 
+  window.handlePublicNameChange = handlePublicNameChange;
   window.handlePublicClassChange = handlePublicClassChange;
   window.handlePublicDobChange = handlePublicDobChange;
   window.handlePublicGuardianChange = handlePublicGuardianChange;
@@ -301,5 +318,8 @@
   window.refreshPublicSubmissionStatus = refreshPublicSubmissionStatus;
   window.startNewPublicSubmission = startNewPublicSubmission;
 
-  document.addEventListener('DOMContentLoaded', initPublicSubmitPage);
+  document.addEventListener('DOMContentLoaded', () => {
+    handlePublicNameChange();
+    initPublicSubmitPage();
+  });
 })();

@@ -280,7 +280,7 @@ router.post('/public-submit', async (req, res) => {
       name: String(name).trim(),
       class: cleanClass,
       roll: autoRoll,
-      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face',
+      photoUrl: photoUrl || '',
       personalDetails: {
         dob: personalDetails?.dob ? String(personalDetails.dob).trim() : '',
         gender: personalDetails?.gender ? String(personalDetails.gender).trim() : '',
@@ -699,7 +699,7 @@ router.post('/', authMiddleware, async (req, res) => {
       name: String(name).trim(),
       class: String(studentClass).trim(),
       roll: finalRoll,
-      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face',
+      photoUrl: photoUrl || '',
       personalDetails: whitelistedPersonal,
       address: whitelistedAddress,
       familyDetails: whitelistedFamily,

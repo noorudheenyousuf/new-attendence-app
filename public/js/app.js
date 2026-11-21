@@ -6130,11 +6130,13 @@ async function updateProfileDashboardKPIs() {
   const myEmail = (currentUser.email || '').trim().toLowerCase();
   const isAdmin = currentUser.role === 'admin';
 
-  // 1. Calculate today's classes, live subject, and next subject from timetable
+  // 1. Calculate active date's classes, live subject, and next subject from timetable
+  let selectedDateSlotsCount = 0;
   try {
-    const now = new Date();
+    const activeDt = getActiveAppDateObj();
+    const isToday = isActiveAppDateToday();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const todayName = dayNames[now.getDay()].toLowerCase();
+    const activeDayName = dayNames[activeDt.getDay()].toLowerCase();
 
     const ttRes = await API.getTimetable('', '', myEmail);
     const allSlots = (ttRes && ttRes.data) ? ttRes.data : (Array.isArray(ttRes) ? ttRes : []);
@@ -6147,74 +6149,81 @@ async function updateProfileDashboardKPIs() {
       const d = (s.day || '').trim().toLowerCase();
       const days = Array.isArray(s.days) ? s.days.map(x => x.trim().toLowerCase()) : [];
       const splitDays = d.split(',').map(x => x.trim().toLowerCase());
-      return d === todayName || d === 'all days' || splitDays.includes(todayName) || days.includes(todayName) || days.includes('all days');
+      return d === activeDayName || d === 'all days' || splitDays.includes(activeDayName) || days.includes(activeDayName) || days.includes('all days');
     });
 
+    selectedDateSlotsCount = todaySlots.length;
     todayClassesEls.forEach(el => el.textContent = String(todaySlots.length));
-
-    // Calculate Live and Next Subject
-    const currentMin = now.getHours() * 60 + now.getMinutes();
-
-    const slotsWithRange = todaySlots.map(s => {
-      const range = _parseSlotTimeRange(s.timeSlot || s.time);
-      return {
-        slot: s,
-        startMin: range ? range.startMin : null,
-        endMin: range ? range.endMin : null,
-        range
-      };
-    }).sort((a, b) => {
-      if (a.startMin !== null && b.startMin !== null) return a.startMin - b.startMin;
-      return 0;
-    });
-
-    // Find Live slot: currently active
-    const liveMatch = slotsWithRange.find(item => {
-      if (item.startMin === null || item.endMin === null) return false;
-      return currentMin >= item.startMin && currentMin < item.endMin;
-    });
-
-    // Find Next slot: earliest slot starting after now
-    const nextMatch = slotsWithRange.find(item => {
-      if (item.startMin === null) return false;
-      return item.startMin > currentMin;
-    });
 
     const isMl = (typeof currentAppLanguage !== 'undefined' ? currentAppLanguage : localStorage.getItem('app_language')) === 'ml';
 
-    if (liveSubEls.length > 0) {
-      if (liveMatch) {
-        const s = liveMatch.slot;
-        const timeText = s.timeSlot || s.time || '';
-        const classText = s.class ? (isMl ? `ക്ലാസ് ${s.class}` : `Class ${s.class}`) : '';
-        const liveMeta = [classText, timeText].filter(Boolean).join(' • ') || (isMl ? 'നടന്നുകൊണ്ടിരിക്കുന്നു' : 'In session');
-        liveSubEls.forEach(el => el.textContent = s.subject || (isMl ? 'ക്ലാസ്' : 'Class'));
-        liveMetaEls.forEach(el => el.textContent = liveMeta);
-      } else {
-        const liveMeta = todaySlots.length === 0 ? (isMl ? 'ഇന്ന് ക്ലാസുകളില്ല' : 'No classes today') : (isMl ? 'ഇപ്പോൾ ക്ലാസുകളൊന്നുമില്ല' : 'No active session');
-        liveSubEls.forEach(el => el.textContent = isMl ? 'ഒന്നുമില്ല' : 'None');
-        liveMetaEls.forEach(el => el.textContent = liveMeta);
-      }
-    }
+    if (!isToday) {
+      const formattedSelected = activeDt.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+      liveSubEls.forEach(el => el.textContent = formattedSelected);
+      liveMetaEls.forEach(el => el.textContent = `${todaySlots.length} scheduled class${todaySlots.length === 1 ? '' : 'es'}`);
+      nextSubEls.forEach(el => el.textContent = todaySlots.length > 0 ? 'Tap Classes' : 'No Classes');
+      nextMetaEls.forEach(el => el.textContent = todaySlots.length > 0 ? 'Open timetable to mark fast' : 'No schedule on this date');
+    } else {
+      // Calculate Live and Next Subject for Today
+      const currentMin = activeDt.getHours() * 60 + activeDt.getMinutes();
 
-    if (nextSubEls.length > 0) {
-      if (nextMatch) {
-        const s = nextMatch.slot;
-        const diff = nextMatch.startMin - currentMin;
-        const classText = s.class ? (isMl ? `ക്ലാസ് ${s.class}` : `Class ${s.class}`) : '';
-        const diffText = diff > 0 ? (isMl ? (diff < 60 ? `${diff} മിനിറ്റിൽ` : `${Math.floor(diff / 60)} മണി ${diff % 60} മിനിറ്റിൽ`) : (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`)) : '';
-        const timeText = s.timeSlot || s.time || '';
-        const metaParts = [classText, diffText || timeText].filter(Boolean);
-        const nextMeta = metaParts.join(' • ') || (isMl ? 'അടുത്ത ക്ലാസ്' : 'Upcoming');
-        nextSubEls.forEach(el => el.textContent = s.subject || (isMl ? 'ക്ലാസ്' : 'Class'));
-        nextMetaEls.forEach(el => el.textContent = nextMeta);
-      } else {
-        if (todaySlots.length > 0) {
-          nextSubEls.forEach(el => el.textContent = isMl ? 'പൂർത്തിയായി' : 'Done');
-          nextMetaEls.forEach(el => el.textContent = isMl ? 'ഇന്നത്തെ ക്ലാസുകൾ പൂർത്തിയായി' : 'All classes completed');
+      const slotsWithRange = todaySlots.map(s => {
+        const range = _parseSlotTimeRange(s.timeSlot || s.time);
+        return {
+          slot: s,
+          startMin: range ? range.startMin : null,
+          endMin: range ? range.endMin : null,
+          range
+        };
+      }).sort((a, b) => {
+        if (a.startMin !== null && b.startMin !== null) return a.startMin - b.startMin;
+        return 0;
+      });
+
+      const liveMatch = slotsWithRange.find(item => {
+        if (item.startMin === null || item.endMin === null) return false;
+        return currentMin >= item.startMin && currentMin < item.endMin;
+      });
+
+      const nextMatch = slotsWithRange.find(item => {
+        if (item.startMin === null) return false;
+        return item.startMin > currentMin;
+      });
+
+      if (liveSubEls.length > 0) {
+        if (liveMatch) {
+          const s = liveMatch.slot;
+          const timeText = s.timeSlot || s.time || '';
+          const classText = s.class ? (isMl ? `ക്ലാസ് ${s.class}` : `Class ${s.class}`) : '';
+          const liveMeta = [classText, timeText].filter(Boolean).join(' • ') || (isMl ? 'നടന്നുകൊണ്ടിരിക്കുന്നു' : 'In session');
+          liveSubEls.forEach(el => el.textContent = s.subject || (isMl ? 'ക്ലാസ്' : 'Class'));
+          liveMetaEls.forEach(el => el.textContent = liveMeta);
         } else {
-          nextSubEls.forEach(el => el.textContent = isMl ? 'ഒന്നുമില്ല' : 'None');
-          nextMetaEls.forEach(el => el.textContent = isMl ? 'അടുത്ത ക്ലാസുകളൊന്നുമില്ല' : 'No upcoming classes');
+          const liveMeta = todaySlots.length === 0 ? (isMl ? 'ഇന്ന് ക്ലാസുകളില്ല' : 'No classes today') : (isMl ? 'ഇപ്പോൾ ക്ലാസുകളൊന്നുമില്ല' : 'No active session');
+          liveSubEls.forEach(el => el.textContent = isMl ? 'ഒന്നുമില്ല' : 'None');
+          liveMetaEls.forEach(el => el.textContent = liveMeta);
+        }
+      }
+
+      if (nextSubEls.length > 0) {
+        if (nextMatch) {
+          const s = nextMatch.slot;
+          const diff = nextMatch.startMin - currentMin;
+          const classText = s.class ? (isMl ? `ക്ലാസ് ${s.class}` : `Class ${s.class}`) : '';
+          const diffText = diff > 0 ? (isMl ? (diff < 60 ? `${diff} മിനിറ്റിൽ` : `${Math.floor(diff / 60)} മണി ${diff % 60} മിനിറ്റിൽ`) : (diff < 60 ? `in ${diff}m` : `in ${Math.floor(diff / 60)}h ${diff % 60}m`)) : '';
+          const timeText = s.timeSlot || s.time || '';
+          const metaParts = [classText, diffText || timeText].filter(Boolean);
+          const nextMeta = metaParts.join(' • ') || (isMl ? 'അടുത്ത ക്ലാസ്' : 'Upcoming');
+          nextSubEls.forEach(el => el.textContent = s.subject || (isMl ? 'ക്ലാസ്' : 'Class'));
+          nextMetaEls.forEach(el => el.textContent = nextMeta);
+        } else {
+          if (todaySlots.length > 0) {
+            nextSubEls.forEach(el => el.textContent = isMl ? 'പൂർത്തിയായി' : 'Done');
+            nextMetaEls.forEach(el => el.textContent = isMl ? 'ഇന്നത്തെ ക്ലാസുകൾ പൂർത്തിയായി' : 'All classes completed');
+          } else {
+            nextSubEls.forEach(el => el.textContent = isMl ? 'ഒന്നുമില്ല' : 'None');
+            nextMetaEls.forEach(el => el.textContent = isMl ? 'അടുത്ത ക്ലാസുകളൊന്നുമില്ല' : 'No upcoming classes');
+          }
         }
       }
     }
@@ -6222,15 +6231,18 @@ async function updateProfileDashboardKPIs() {
     console.error('[Dashboard Status Error]', err);
   }
 
-  // 2. Count attendance marked today from live Attendance documents
+  // 2. Count attendance marked for active date from live Attendance documents
   try {
-    const todayDateStr = formatLocalDate(new Date());
-    const attRes = await API.getAttendance(todayDateStr);
+    const activeDateStr = getActiveAppDateStr();
+    const attRes = await API.getAttendance(activeDateStr);
     const rawList = (attRes && attRes.data !== undefined) ? attRes.data : attRes;
     const todayAttendances = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
 
     const myAttendances = todayAttendances.filter(att => isAttendanceMarkedByCurrentUser(att, currentUser));
     markedEls.forEach(el => el.textContent = String(myAttendances.length));
+    if (!isActiveAppDateToday() && selectedDateSlotsCount > 0) {
+      nextSubEls.forEach(el => el.textContent = `${myAttendances.length} / ${selectedDateSlotsCount} Marked`);
+    }
   } catch (err) {
     console.error('[Marked Today KPI Error]', err);
   }
@@ -6854,7 +6866,7 @@ async function selectTab(tab) {
     previousAppTab = currentActiveTab;
     currentActiveTab = tab;
   }
-  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace', 'student-portal', 'outcomers', 'outcomer-details'];
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'announcements-board', 'workspace', 'student-portal', 'outcomers', 'outcomer-details'];
   allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -6921,6 +6933,11 @@ async function selectTab(tab) {
     renderTeachersList();
   } else if (tab === 'admin') {
     loadAdminTeachersList();
+    if (typeof loadAdminAnnouncementsAndEvents === 'function') loadAdminAnnouncementsAndEvents();
+    const mainViewport = document.querySelector('main');
+    if (mainViewport) mainViewport.scrollTop = 0;
+  } else if (tab === 'announcements-board') {
+    if (typeof loadTeacherAnnouncementsBoard === 'function') loadTeacherAnnouncementsBoard();
     const mainViewport = document.querySelector('main');
     if (mainViewport) mainViewport.scrollTop = 0;
   } else if (tab === 'timetable') {
@@ -6966,6 +6983,79 @@ async function loadHomeDashboard() {
   ]);
 }
 
+// Active App Date (defaults to Today; changeable via Greeting Card Day Badge)
+let activeAppDateStr = '';
+
+function getActiveAppDateStr() {
+  if (!activeAppDateStr) {
+    activeAppDateStr = formatLocalDate(new Date());
+  }
+  return activeAppDateStr;
+}
+
+function getActiveAppDateObj() {
+  const str = getActiveAppDateStr();
+  const [y, m, d] = str.split('-').map(Number);
+  if (y && m && d) {
+    const dt = new Date(y, m - 1, d);
+    const now = new Date();
+    dt.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+    return dt;
+  }
+  return new Date();
+}
+
+function isActiveAppDateToday() {
+  return getActiveAppDateStr() === formatLocalDate(new Date());
+}
+
+function openAppDatePickerModal() {
+  const modal = document.getElementById('modal-app-date-picker');
+  const input = document.getElementById('app-date-picker-input');
+  if (input) input.value = getActiveAppDateStr();
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeAppDatePickerModal() {
+  const modal = document.getElementById('modal-app-date-picker');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function setActiveAppDate(dateStr) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+  activeAppDateStr = dateStr;
+  closeAppDatePickerModal();
+
+  // Sync Attendance date input so taking attendance immediately uses this date
+  const attDateInput = document.getElementById('att-date');
+  if (attDateInput) attDateInput.value = activeAppDateStr;
+  if (typeof currentDate !== 'undefined') currentDate = activeAppDateStr;
+
+  updateWelcomeGreeting();
+  await updateProfileDashboardKPIs();
+
+  const dt = getActiveAppDateObj();
+  const label = isActiveAppDateToday()
+    ? 'Today'
+    : dt.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  showToast(`App date set to ${label}`);
+}
+
+function setActiveAppDateOffset(daysOffset) {
+  const d = new Date();
+  d.setDate(d.getDate() + Number(daysOffset || 0));
+  setActiveAppDate(formatLocalDate(d));
+}
+
+function applyAppDatePickerModal() {
+  const input = document.getElementById('app-date-picker-input');
+  if (!input || !input.value) {
+    showToast('Please select a date', true);
+    return;
+  }
+  setActiveAppDate(input.value);
+}
+
 function updateWelcomeGreeting() {
   const greetingEl = document.getElementById('welcome-greeting');
   const userEl = document.getElementById('welcome-user-name');
@@ -6975,8 +7065,9 @@ function updateWelcomeGreeting() {
   const qaDateEl = document.getElementById('quick-att-date-display');
 
   const now = new Date();
+  const activeDt = getActiveAppDateObj();
   const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-  const todayDay = dayNames[now.getDay()];
+  const activeDay = dayNames[activeDt.getDay()];
 
   if (academicYearEl) {
     const yr = (appSettings && (appSettings.currentAcademicYear || appSettings.academicYear))
@@ -6985,7 +7076,7 @@ function updateWelcomeGreeting() {
     academicYearEl.textContent = `Academic Year ${yr}`;
   }
   if (dayNameEl) {
-    dayNameEl.textContent = todayDay;
+    dayNameEl.textContent = activeDay;
   }
 
   const hour = now.getHours();
@@ -7000,8 +7091,9 @@ function updateWelcomeGreeting() {
   if (userEl) userEl.textContent = (currentUser && currentUser.name) ? currentUser.name : 'Ustadh';
 
   const dateOpts = { weekday: 'short', day: 'numeric', month: 'short' };
-  const formattedDate = now.toLocaleDateString(undefined, dateOpts);
-  if (dateBadgeEl) dateBadgeEl.textContent = `Live Sync • ${formattedDate}`;
+  const formattedDate = activeDt.toLocaleDateString(undefined, dateOpts);
+  const isToday = isActiveAppDateToday();
+  if (dateBadgeEl) dateBadgeEl.textContent = isToday ? `Live Sync • ${formattedDate}` : `Selected • ${formattedDate}`;
   if (qaDateEl) qaDateEl.textContent = formattedDate;
 }
 
@@ -7071,6 +7163,10 @@ async function handleStartQuickAttendance() {
   }
 
   attendanceReadyToLoad = true;
+  const activeDateStr = getActiveAppDateStr();
+  const attDateEl = document.getElementById('att-date');
+  if (attDateEl) attDateEl.value = activeDateStr;
+  if (typeof currentDate !== 'undefined') currentDate = activeDateStr;
   currentClass = selectedClass;
   const selClass = document.getElementById('sel-class');
   if (selClass) {
@@ -12493,10 +12589,11 @@ async function openTodayScheduleModal() {
   listEl.innerHTML = `<div class="p-8 text-center text-xs text-cyan-200 flex flex-col items-center justify-center gap-2.5"><div class="w-6 h-6 rounded-full border-2 border-cyan-300 border-t-transparent animate-spin"></div><span>Loading today's schedule & attendance...</span></div>`;
 
   try {
-    const now = new Date();
+    const activeDt = getActiveAppDateObj();
+    const isToday = isActiveAppDateToday();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const todayName = dayNames[now.getDay()].toLowerCase();
-    const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayName = dayNames[activeDt.getDay()].toLowerCase();
+    const todayDateStr = getActiveAppDateStr();
 
     const myEmail = (currentUser?.email || '').trim().toLowerCase();
     const myName = (currentUser?.name || '').trim().toLowerCase();
@@ -12522,7 +12619,7 @@ async function openTodayScheduleModal() {
       todayAttendances = (attRes && attRes.data) ? attRes.data : (Array.isArray(attRes) ? attRes : []);
     } catch (_) {}
 
-    const currentMin = now.getHours() * 60 + now.getMinutes();
+    const currentMin = isToday ? (activeDt.getHours() * 60 + activeDt.getMinutes()) : -1;
 
     // Sort slots chronologically
     const slotsWithRange = todaySlots.map(s => {
@@ -12537,13 +12634,14 @@ async function openTodayScheduleModal() {
       return 0;
     });
 
-    if (titleEl) titleEl.textContent = dayNames[now.getDay()] + "'s Schedule (" + todaySlots.length + " Classes)";
+    const dateLabel = isToday ? dayNames[activeDt.getDay()] : `${dayNames[activeDt.getDay()]} (${activeDt.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })})`;
+    if (titleEl) titleEl.textContent = dateLabel + "'s Schedule (" + todaySlots.length + " Classes)";
 
     if (todaySlots.length === 0) {
       listEl.innerHTML = `
         <div class="p-6 rounded-2xl bg-white/10 border border-white/15 text-center space-y-1.5">
-          <div class="text-sm font-bold text-amber-300">No classes scheduled for today!</div>
-          <div class="text-xs text-cyan-100/70">Enjoy your day or check other days in your Timetable.</div>
+          <div class="text-sm font-bold text-amber-300">No classes scheduled for ${escapeHtml(dateLabel)}!</div>
+          <div class="text-xs text-cyan-100/70">Select another date or check your Timetable.</div>
         </div>
       `;
       return;
@@ -12551,8 +12649,8 @@ async function openTodayScheduleModal() {
 
     listEl.innerHTML = slotsWithRange.map(({ slot: s, startMin, endMin }) => {
       const timeStr = s.timeSlot || s.time || 'Period';
-      const isLive = startMin !== null && endMin !== null && currentMin >= startMin && currentMin < endMin;
-      const isUpcoming = startMin !== null && currentMin < startMin;
+      const isLive = isToday && startMin !== null && endMin !== null && currentMin >= startMin && currentMin < endMin;
+      const isUpcoming = isToday && startMin !== null && currentMin < startMin;
       const isPassed = endMin !== null && currentMin >= endMin;
 
       // Check if attendance is marked for this class & subject today
@@ -12627,6 +12725,10 @@ async function jumpToTakeAttendance(className, subjectName) {
   closeTodayScheduleModal();
 
   attendanceReadyToLoad = true;
+  const activeDateStr = getActiveAppDateStr();
+  const attDateEl = document.getElementById('att-date');
+  if (attDateEl) attDateEl.value = activeDateStr;
+  if (typeof currentDate !== 'undefined') currentDate = activeDateStr;
   if (className) {
     currentClass = className;
     const selClass = document.getElementById('sel-class');
@@ -12684,7 +12786,9 @@ async function openTodayMarkedModal() {
   listEl.innerHTML = '<div class="p-8 text-center text-xs text-cyan-200 flex flex-col items-center justify-center gap-2.5"><div class="w-6 h-6 rounded-full border-2 border-emerald-300 border-t-transparent animate-spin"></div><span>Loading marked attendance sessions...</span></div>';
 
   try {
-    const todayDateStr = formatLocalDate(new Date());
+    const activeDt = getActiveAppDateObj();
+    const isToday = isActiveAppDateToday();
+    const todayDateStr = getActiveAppDateStr();
     const myEmail = (currentUser?.email || '').trim().toLowerCase();
     const myName = (currentUser?.name || '').trim().toLowerCase();
     const isAdmin = currentUser?.role === 'admin';
@@ -12695,8 +12799,9 @@ async function openTodayMarkedModal() {
 
     const myAttendances = todayAttendances.filter(att => isAttendanceMarkedByCurrentUser(att, currentUser));
 
+    const dateLabel = isToday ? 'Today' : activeDt.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
     if (titleEl) {
-      titleEl.textContent = 'Marked Sessions Today (' + myAttendances.length + ')';
+      titleEl.textContent = `Marked Sessions (${dateLabel}: ${myAttendances.length})`;
     }
 
     if (myAttendances.length === 0) {
@@ -12997,7 +13102,13 @@ async function initStudentPortal() {
     const displayName = student ? student.name : (user.name || 'Student');
     if (greetEl) greetEl.textContent = `${greetingText}, ${displayName}`;
     if (nameEl) nameEl.textContent = displayName;
-    if (avatarEl) avatarEl.src = (student && student.photoUrl) || (user && user.avatarUrl) || DEFAULT_AVATAR;
+    if (avatarEl) {
+      const customAvatar = (student && isCustomPhoto(student.photoUrl))
+        ? student.photoUrl
+        : ((user && isCustomPhoto(user.avatarUrl)) ? user.avatarUrl : '');
+      avatarEl.src = customAvatar || getInitialsAvatar(displayName, '245b70');
+      avatarEl.onerror = () => { avatarEl.src = getInitialsAvatar(displayName, '245b70'); };
+    }
 
     if (student) {
       if (classBadgeEl) {
@@ -13054,7 +13165,7 @@ async function initStudentPortal() {
       const phoneInput = document.getElementById('spf-father-mobile');
       if (phoneInput && user && user.phone && !phoneInput.value) phoneInput.value = user.phone;
       const previewEl = document.getElementById('spf-photo-preview');
-      if (previewEl) previewEl.src = 'default_avatar.jpg';
+      if (previewEl) previewEl.src = getInitialsAvatar(user && user.name ? user.name : 'Student', '245b70');
       const photoUrlInput = document.getElementById('spf-photo-url');
       if (photoUrlInput) photoUrlInput.value = '';
       const admDateInput = document.getElementById('spf-admission-date');
@@ -13103,15 +13214,10 @@ function renderStudentIdCard(student) {
 
   const photoEl = document.getElementById('sp-card-photo');
   if (photoEl) {
-    photoEl.src = (student.photoUrl && student.photoUrl.trim()) ? student.photoUrl : 'default_avatar.jpg';
-    photoEl.onerror = () => { photoEl.src = 'default_avatar.jpg'; };
+    const fallbackAvatar = getInitialsAvatar(student.name || 'Student', '245b70');
+    photoEl.src = isCustomPhoto(student.photoUrl) ? student.photoUrl : fallbackAvatar;
+    photoEl.onerror = () => { photoEl.src = fallbackAvatar; };
   }
-
-  const issueStr = ac.admissionDate ? formatIdCardDate(ac.admissionDate) : formatIdCardDate(new Date().toISOString().split('T')[0]);
-  setText('sp-card-issue-date', `Issue date: ${issueStr}`);
-
-  const joinYear = parseInt(ac.yearJoined, 10) || new Date().getFullYear();
-  setText('sp-card-valid-upto', `Valid upto: 31/03/${joinYear + 1}`);
 }
 
 // Populate the Dedicated Read-Only Full Student Details Page
@@ -13337,6 +13443,14 @@ async function handleStudentOnboardingClassChange() {
   }
 }
 
+function handleOnboardingNameChange() {
+  const photoUrlInput = document.getElementById('spf-photo-url');
+  if (photoUrlInput && photoUrlInput.value && isCustomPhoto(photoUrlInput.value)) return;
+  const nameVal = document.getElementById('spf-name')?.value || 'Student';
+  const previewEl = document.getElementById('spf-photo-preview');
+  if (previewEl) previewEl.src = getInitialsAvatar(nameVal, '245b70');
+}
+
 function handleOnboardingDobChange() {
   const dobEl = document.getElementById('spf-dob');
   const ageEl = document.getElementById('spf-age');
@@ -13459,6 +13573,12 @@ async function handleStudentDetailsSubmit(e) {
 function switchStudentPortalTab(tab, subTab) {
   currentStudentPortalTab = tab;
   const tabs = ['home', 'classes', 'attendance', 'updates', 'profile'];
+
+  // Show Student Portal greeting card ONLY on the Home tab
+  const greetingCard = document.getElementById('sp-home-greeting-card');
+  if (greetingCard) {
+    greetingCard.classList.toggle('hidden', tab !== 'home');
+  }
 
   const activeBottomTab = (tab === 'classes' || tab === 'attendance') ? 'home' : tab;
   tabs.forEach(t => {
@@ -14774,7 +14894,7 @@ function renderOutcomers(list) {
       <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border ${borderClass} shadow-sm transition-all">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0 flex-1">
-            <img src="${s.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(s.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[var(--border-color)] bg-slate-200 flex-shrink-0">
+            <img src="${isCustomPhoto(s.photoUrl) ? s.photoUrl : getInitialsAvatar(s.name, '245b70')}" alt="${escapeHtml(s.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[var(--border-color)] bg-slate-200 flex-shrink-0">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <h4 class="font-black text-sm sm:text-base text-[var(--text-main)] truncate max-w-full">${escapeHtml(s.name)}</h4>
@@ -14897,7 +15017,7 @@ function openOutcomerDetailsPage(id) {
     contentEl.innerHTML = `
       <!-- Profile Hero Card -->
       <div class="bg-[var(--card-bg)] rounded-3xl p-5 border border-[var(--border-color)] shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
-        <img src="${s.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(s.name)}" class="w-20 h-20 rounded-3xl object-cover border-2 border-[#245b70]/30 bg-slate-200 flex-shrink-0">
+        <img src="${isCustomPhoto(s.photoUrl) ? s.photoUrl : getInitialsAvatar(s.name, '245b70')}" alt="${escapeHtml(s.name)}" class="w-20 h-20 rounded-3xl object-cover border-2 border-[#245b70]/30 bg-slate-200 flex-shrink-0">
         <div class="min-w-0 flex-1 space-y-2">
           <div class="flex items-center gap-2 flex-wrap">
             <h3 class="text-lg sm:text-xl font-black text-[var(--text-main)]">${escapeHtml(s.name)}</h3>
@@ -15116,6 +15236,474 @@ async function triggerRejectOutcomer(id, permanent = false) {
     console.error('[Reject Outcomer Error]', err);
     showToast(err.message || 'Error updating submission');
   }
+}
+
+// =========================================================================
+// ================= ADMIN ANNOUNCEMENTS & EVENTS MANAGER ==================
+// =========================================================================
+let cachedAdminAnnouncements = [];
+let cachedAdminEvents = [];
+let teacherBoardAnnouncements = [];
+let teacherBoardEvents = [];
+let teacherBoardFilter = 'all';
+
+function switchAdminAETab(tab) {
+  const isAnn = tab === 'announcements';
+  const tabAnn = document.getElementById('admin-ae-tab-announcements');
+  const tabEvt = document.getElementById('admin-ae-tab-events');
+  const panelAnn = document.getElementById('admin-ae-panel-announcements');
+  const panelEvt = document.getElementById('admin-ae-panel-events');
+
+  if (tabAnn) {
+    tabAnn.className = isAnn
+      ? 'px-3 py-1.5 rounded-lg text-xs font-black bg-[#245b70] text-white transition'
+      : 'px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition';
+  }
+  if (tabEvt) {
+    tabEvt.className = !isAnn
+      ? 'px-3 py-1.5 rounded-lg text-xs font-black bg-[#245b70] text-white transition'
+      : 'px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition';
+  }
+  if (panelAnn) panelAnn.classList.toggle('hidden', !isAnn);
+  if (panelEvt) panelEvt.classList.toggle('hidden', isAnn);
+}
+
+async function loadAdminAnnouncementsAndEvents() {
+  const annContainer = document.getElementById('admin-announcements-list');
+  const evtContainer = document.getElementById('admin-events-list');
+  if (!annContainer && !evtContainer) return;
+
+  try {
+    const [annRes, evtRes] = await Promise.all([
+      API.getAnnouncements(),
+      API.getEvents(false)
+    ]);
+    cachedAdminAnnouncements = (annRes && annRes.data) ? annRes.data : [];
+    cachedAdminEvents = (evtRes && evtRes.data) ? evtRes.data : [];
+    renderAdminAnnouncementsList();
+    renderAdminEventsList();
+  } catch (err) {
+    console.error('[Admin Announcements/Events Load Error]', err);
+    if (annContainer) annContainer.innerHTML = '<div class="p-4 text-center text-xs text-rose-500">Failed to load announcements</div>';
+    if (evtContainer) evtContainer.innerHTML = '<div class="p-4 text-center text-xs text-rose-500">Failed to load events</div>';
+  }
+}
+
+function renderAdminAnnouncementsList() {
+  const container = document.getElementById('admin-announcements-list');
+  if (!container) return;
+
+  if (!cachedAdminAnnouncements.length) {
+    container.innerHTML = '<div class="p-5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] text-center text-xs text-[var(--text-sub)]">No announcements yet. Create one on the left.</div>';
+    return;
+  }
+
+  container.innerHTML = cachedAdminAnnouncements.map(a => {
+    const isImp = a.priority === 'important';
+    const isPub = a.isPublished !== false;
+    const dateStr = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    return `
+      <div class="p-3 rounded-2xl bg-[var(--bg-page)] border ${isImp ? 'border-amber-500/40' : 'border-[var(--border-color)]'} space-y-1.5">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${isImp ? 'bg-amber-500 text-white' : 'bg-[#245b70]/12 text-[#245b70] dark:text-cyan-300'}">${isImp ? 'Important' : 'Normal'}</span>
+              ${!isPub ? '<span class="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase bg-slate-500/15 text-[var(--text-sub)]">Draft</span>' : ''}
+              <span class="text-[10px] text-[var(--text-sub)] font-semibold">${escapeHtml(dateStr)}</span>
+            </div>
+            <h4 class="text-xs font-black text-[var(--text-main)] mt-1 leading-snug">${escapeHtml(a.title)}</h4>
+            <p class="text-[11px] text-[var(--text-sub)] mt-0.5 line-clamp-2">${escapeHtml(a.description || '')}</p>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button type="button" onclick="editAdminAnnouncement('${a._id}')" class="p-1.5 rounded-lg bg-[#245b70]/10 hover:bg-[#245b70]/20 text-[#245b70] dark:text-cyan-300 transition" title="Edit Announcement">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button type="button" onclick="deleteAdminAnnouncement('${a._id}')" class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition" title="Delete Announcement">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function editAdminAnnouncement(id) {
+  const item = cachedAdminAnnouncements.find(a => String(a._id) === String(id));
+  if (!item) return;
+  switchAdminAETab('announcements');
+  document.getElementById('admin-ann-id').value = item._id;
+  document.getElementById('admin-ann-title').value = item.title || '';
+  document.getElementById('admin-ann-desc').value = item.description || '';
+  document.getElementById('admin-ann-priority').value = item.priority === 'important' ? 'important' : 'normal';
+  document.getElementById('admin-ann-published').checked = item.isPublished !== false;
+
+  const titleEl = document.getElementById('admin-ann-form-title');
+  const btnEl = document.getElementById('admin-ann-submit-btn');
+  const cancelBtn = document.getElementById('admin-ann-cancel-btn');
+  if (titleEl) titleEl.textContent = 'Edit Announcement';
+  if (btnEl) btnEl.textContent = 'Update Announcement';
+  if (cancelBtn) cancelBtn.classList.remove('hidden');
+  document.getElementById('admin-ann-title')?.focus();
+}
+
+function resetAdminAnnouncementForm() {
+  document.getElementById('admin-ann-id').value = '';
+  document.getElementById('admin-ann-title').value = '';
+  document.getElementById('admin-ann-desc').value = '';
+  document.getElementById('admin-ann-priority').value = 'normal';
+  document.getElementById('admin-ann-published').checked = true;
+
+  const titleEl = document.getElementById('admin-ann-form-title');
+  const btnEl = document.getElementById('admin-ann-submit-btn');
+  const cancelBtn = document.getElementById('admin-ann-cancel-btn');
+  if (titleEl) titleEl.textContent = 'New Announcement';
+  if (btnEl) btnEl.textContent = 'Publish Announcement';
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+}
+
+async function handleSaveAdminAnnouncement(e) {
+  e.preventDefault();
+  const id = document.getElementById('admin-ann-id')?.value?.trim() || '';
+  const payload = {
+    title: document.getElementById('admin-ann-title')?.value?.trim() || '',
+    description: document.getElementById('admin-ann-desc')?.value?.trim() || '',
+    priority: document.getElementById('admin-ann-priority')?.value || 'normal',
+    isPublished: document.getElementById('admin-ann-published')?.checked !== false
+  };
+  if (!payload.title || !payload.description) {
+    showToast('Title and description are required', true);
+    return;
+  }
+
+  try {
+    const res = id ? await API.updateAnnouncement(id, payload) : await API.createAnnouncement(payload);
+    if (res && res.success) {
+      showToast(id ? 'Announcement updated!' : 'Announcement published!');
+      resetAdminAnnouncementForm();
+      await loadAdminAnnouncementsAndEvents();
+    } else {
+      showToast(res?.message || 'Failed to save announcement', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error saving announcement', true);
+  }
+}
+
+async function deleteAdminAnnouncement(id) {
+  if (!confirm('Delete this announcement?')) return;
+  try {
+    const res = await API.deleteAnnouncement(id);
+    if (res && res.success) {
+      showToast('Announcement deleted');
+      if (document.getElementById('admin-ann-id')?.value === String(id)) {
+        resetAdminAnnouncementForm();
+      }
+      await loadAdminAnnouncementsAndEvents();
+    } else {
+      showToast(res?.message || 'Failed to delete announcement', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error deleting announcement', true);
+  }
+}
+
+function renderAdminEventsList() {
+  const container = document.getElementById('admin-events-list');
+  if (!container) return;
+
+  if (!cachedAdminEvents.length) {
+    container.innerHTML = '<div class="p-5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] text-center text-xs text-[var(--text-sub)]">No events yet. Create one on the left.</div>';
+    return;
+  }
+
+  container.innerHTML = cachedAdminEvents.map(ev => {
+    const st = ev.status || 'upcoming';
+    const badgeCls = st === 'upcoming'
+      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+      : (st === 'cancelled' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' : 'bg-slate-500/15 text-[var(--text-sub)]');
+    return `
+      <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${badgeCls}">${escapeHtml(st)}</span>
+              <span class="text-[10px] font-bold text-[#245b70] dark:text-cyan-300">${escapeHtml(ev.date || '')}${ev.time ? ` • ${escapeHtml(ev.time)}` : ''}</span>
+            </div>
+            <h4 class="text-xs font-black text-[var(--text-main)] mt-1 leading-snug">${escapeHtml(ev.name)}</h4>
+            ${ev.location ? `<p class="text-[10px] text-[var(--text-sub)] font-semibold mt-0.5">Location: ${escapeHtml(ev.location)}</p>` : ''}
+            ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)] mt-0.5 line-clamp-2">${escapeHtml(ev.description)}</p>` : ''}
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button type="button" onclick="editAdminEvent('${ev._id}')" class="p-1.5 rounded-lg bg-[#245b70]/10 hover:bg-[#245b70]/20 text-[#245b70] dark:text-cyan-300 transition" title="Edit Event">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button type="button" onclick="deleteAdminEvent('${ev._id}')" class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition" title="Delete Event">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function editAdminEvent(id) {
+  const item = cachedAdminEvents.find(ev => String(ev._id) === String(id));
+  if (!item) return;
+  switchAdminAETab('events');
+  document.getElementById('admin-evt-id').value = item._id;
+  document.getElementById('admin-evt-name').value = item.name || '';
+  document.getElementById('admin-evt-date').value = item.date || '';
+  document.getElementById('admin-evt-time').value = item.time || '';
+  document.getElementById('admin-evt-location').value = item.location || '';
+  document.getElementById('admin-evt-status').value = item.status || 'upcoming';
+  document.getElementById('admin-evt-desc').value = item.description || '';
+
+  const titleEl = document.getElementById('admin-evt-form-title');
+  const btnEl = document.getElementById('admin-evt-submit-btn');
+  const cancelBtn = document.getElementById('admin-evt-cancel-btn');
+  if (titleEl) titleEl.textContent = 'Edit Event';
+  if (btnEl) btnEl.textContent = 'Update Event';
+  if (cancelBtn) cancelBtn.classList.remove('hidden');
+  document.getElementById('admin-evt-name')?.focus();
+}
+
+function resetAdminEventForm() {
+  document.getElementById('admin-evt-id').value = '';
+  document.getElementById('admin-evt-name').value = '';
+  document.getElementById('admin-evt-date').value = '';
+  document.getElementById('admin-evt-time').value = '';
+  document.getElementById('admin-evt-location').value = '';
+  document.getElementById('admin-evt-status').value = 'upcoming';
+  document.getElementById('admin-evt-desc').value = '';
+
+  const titleEl = document.getElementById('admin-evt-form-title');
+  const btnEl = document.getElementById('admin-evt-submit-btn');
+  const cancelBtn = document.getElementById('admin-evt-cancel-btn');
+  if (titleEl) titleEl.textContent = 'New Event';
+  if (btnEl) btnEl.textContent = 'Create Event';
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+}
+
+async function handleSaveAdminEvent(e) {
+  e.preventDefault();
+  const id = document.getElementById('admin-evt-id')?.value?.trim() || '';
+  const payload = {
+    name: document.getElementById('admin-evt-name')?.value?.trim() || '',
+    date: document.getElementById('admin-evt-date')?.value?.trim() || '',
+    time: document.getElementById('admin-evt-time')?.value?.trim() || '',
+    location: document.getElementById('admin-evt-location')?.value?.trim() || '',
+    status: document.getElementById('admin-evt-status')?.value || 'upcoming',
+    description: document.getElementById('admin-evt-desc')?.value?.trim() || ''
+  };
+  if (!payload.name || !payload.date) {
+    showToast('Event name and date are required', true);
+    return;
+  }
+
+  try {
+    const res = id ? await API.updateEvent(id, payload) : await API.createEvent(payload);
+    if (res && res.success) {
+      showToast(id ? 'Event updated!' : 'Event created!');
+      resetAdminEventForm();
+      await loadAdminAnnouncementsAndEvents();
+    } else {
+      showToast(res?.message || 'Failed to save event', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error saving event', true);
+  }
+}
+
+async function deleteAdminEvent(id) {
+  if (!confirm('Delete this event?')) return;
+  try {
+    const res = await API.deleteEvent(id);
+    if (res && res.success) {
+      showToast('Event deleted');
+      if (document.getElementById('admin-evt-id')?.value === String(id)) {
+        resetAdminEventForm();
+      }
+      await loadAdminAnnouncementsAndEvents();
+    } else {
+      showToast(res?.message || 'Failed to delete event', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error deleting event', true);
+  }
+}
+
+// =========================================================================
+// ========== TEACHER DECORATIVE ANNOUNCEMENTS & EVENTS BOARD ==============
+// =========================================================================
+function openAnnouncementsBoardModal() {
+  selectTab('announcements-board');
+}
+
+function closeAnnouncementsBoard() {
+  if (previousAppTab && previousAppTab !== 'announcements-board') {
+    selectTab(previousAppTab);
+  } else {
+    selectTab('home');
+  }
+}
+
+async function loadTeacherAnnouncementsBoard() {
+  const container = document.getElementById('teacher-announcements-board-list');
+  const adminBtn = document.getElementById('teacher-board-admin-manage-btn');
+  if (adminBtn) {
+    adminBtn.classList.toggle('hidden', !(currentUser && currentUser.role === 'admin'));
+  }
+  if (container) {
+    container.innerHTML = '<div class="p-8 text-center text-xs text-[var(--text-sub)]">Loading school announcements & events...</div>';
+  }
+
+  try {
+    const [annRes, evtRes] = await Promise.all([
+      API.getAnnouncements(),
+      API.getEvents(false)
+    ]);
+    teacherBoardAnnouncements = ((annRes && annRes.data) ? annRes.data : []).filter(a => a.isPublished !== false);
+    teacherBoardEvents = (evtRes && evtRes.data) ? evtRes.data : [];
+
+    const pill = document.getElementById('teacher-board-count-pill');
+    const total = teacherBoardAnnouncements.length + teacherBoardEvents.length;
+    if (pill) pill.textContent = `${total} Update${total === 1 ? '' : 's'}`;
+
+    renderTeacherAnnouncementsBoard();
+  } catch (err) {
+    console.error('[Teacher Announcements Board Error]', err);
+    if (container) {
+      container.innerHTML = '<div class="p-6 text-center text-xs text-rose-500">Could not load announcements and events.</div>';
+    }
+  }
+}
+
+function filterTeacherAnnouncementsBoard(filter) {
+  teacherBoardFilter = filter || 'all';
+  ['all', 'important', 'announcements', 'events'].forEach(f => {
+    const btn = document.getElementById(`tb-filt-${f}`);
+    if (!btn) return;
+    if (f === teacherBoardFilter) {
+      btn.className = 'px-3 py-1.5 rounded-xl text-xs font-black bg-white text-[#245b70] shadow-xs transition whitespace-nowrap flex-shrink-0';
+    } else {
+      btn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-white/15 text-white hover:bg-white/25 border border-white/15 transition whitespace-nowrap flex-shrink-0';
+    }
+  });
+  renderTeacherAnnouncementsBoard();
+}
+
+function renderTeacherAnnouncementsBoard() {
+  const container = document.getElementById('teacher-announcements-board-list');
+  if (!container) return;
+
+  const showAnn = teacherBoardFilter === 'all' || teacherBoardFilter === 'announcements' || teacherBoardFilter === 'important';
+  const showEvt = teacherBoardFilter === 'all' || teacherBoardFilter === 'events';
+
+  const anns = showAnn
+    ? teacherBoardAnnouncements.filter(a => teacherBoardFilter !== 'important' || a.priority === 'important')
+    : [];
+  const evts = showEvt ? teacherBoardEvents : [];
+
+  if (anns.length === 0 && evts.length === 0) {
+    container.innerHTML = `
+      <div class="p-10 text-center rounded-3xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm space-y-2">
+        <div class="w-12 h-12 rounded-2xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center mx-auto">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path></svg>
+        </div>
+        <h4 class="text-sm font-black text-[var(--text-main)]">No Updates Yet</h4>
+        <p class="text-xs text-[var(--text-sub)] max-w-sm mx-auto">Official school announcements and upcoming events published by the administration will appear here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+
+  if (anns.length > 0) {
+    html += `
+      <div class="space-y-3">
+        <div class="flex items-center gap-2 px-1">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <h3 class="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">Official Announcements (${anns.length})</h3>
+        </div>
+        ${anns.map(a => {
+          const isImp = a.priority === 'important';
+          const dateStr = a.publishedAt ? new Date(a.publishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          return `
+            <div class="relative overflow-hidden rounded-3xl p-4 sm:p-5 border shadow-sm transition-all ${
+              isImp
+                ? 'bg-gradient-to-br from-amber-500/12 via-orange-500/5 to-[var(--card-bg)] border-amber-500/40'
+                : 'bg-gradient-to-br from-[#245b70]/8 via-cyan-500/4 to-[var(--card-bg)] border-[var(--border-color)]'
+            }">
+              <div class="absolute -top-10 -right-10 w-28 h-28 rounded-full ${isImp ? 'bg-amber-400/15' : 'bg-cyan-400/10'} blur-2xl pointer-events-none"></div>
+              <div class="relative z-10 space-y-2">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      isImp ? 'bg-amber-500 text-white shadow-xs' : 'bg-[#245b70] text-white'
+                    }">${isImp ? 'Important Notice' : 'Announcement'}</span>
+                    <span class="text-[11px] font-bold text-[var(--text-sub)]">${escapeHtml(dateStr)}</span>
+                  </div>
+                  <span class="text-[10px] font-bold text-[var(--text-sub)]">By ${escapeHtml(a.createdByName || 'Administration')}</span>
+                </div>
+                <h4 class="text-sm sm:text-base font-black text-[var(--text-main)] leading-snug">${escapeHtml(a.title)}</h4>
+                <p class="text-xs text-[var(--text-sub)] leading-relaxed whitespace-pre-line">${escapeHtml(a.description || '')}</p>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  if (evts.length > 0) {
+    html += `
+      <div class="space-y-3 pt-1">
+        <div class="flex items-center gap-2 px-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <h3 class="text-xs font-black uppercase tracking-wider text-[var(--text-main)]">School Events (${evts.length})</h3>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${evts.map(ev => {
+            const st = ev.status || 'upcoming';
+            const badgeCls = st === 'upcoming'
+              ? 'bg-emerald-500 text-white'
+              : (st === 'cancelled' ? 'bg-rose-600 text-white' : 'bg-slate-500 text-white');
+            let monthStr = 'EVT';
+            let dayStr = '--';
+            if (ev.date) {
+              const dt = new Date(ev.date + 'T00:00:00');
+              if (!isNaN(dt.getTime())) {
+                monthStr = dt.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+                dayStr = String(dt.getDate());
+              }
+            }
+            return `
+              <div class="relative overflow-hidden rounded-3xl p-4 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-[var(--card-bg)] border border-emerald-500/25 shadow-sm flex items-start gap-3.5">
+                <div class="w-13 h-14 rounded-2xl bg-gradient-to-b from-[#245b70] to-[#163d4d] text-white flex flex-col items-center justify-center flex-shrink-0 shadow-md px-2.5 py-1.5 text-center">
+                  <span class="text-[9px] font-black uppercase tracking-widest text-cyan-200 leading-none">${escapeHtml(monthStr)}</span>
+                  <span class="text-lg font-black leading-tight mt-0.5">${escapeHtml(dayStr)}</span>
+                </div>
+                <div class="min-w-0 flex-1 space-y-1.5">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${badgeCls}">${escapeHtml(st)}</span>
+                    ${ev.time ? `<span class="text-[10px] font-bold text-[#245b70] dark:text-cyan-300">${escapeHtml(ev.time)}</span>` : ''}
+                  </div>
+                  <h4 class="text-sm font-black text-[var(--text-main)] leading-snug">${escapeHtml(ev.name)}</h4>
+                  ${ev.location ? `<p class="text-[11px] font-bold text-[var(--text-sub)] flex items-center gap-1"><svg class="w-3 h-3 text-emerald-600 dark:text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span class="truncate">${escapeHtml(ev.location)}</span></p>` : ''}
+                  ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)] leading-relaxed">${escapeHtml(ev.description)}</p>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
 }
 
 
