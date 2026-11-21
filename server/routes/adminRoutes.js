@@ -39,7 +39,7 @@ router.use(adminMiddleware);
 // @desc    Update App Name & School Name & Permissions & App Logo
 router.put('/settings', async (req, res) => {
   try {
-    const { appName, schoolName, appLogo, headerActionButton, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint, studentFormFields } = req.body;
+    const { appName, schoolName, appLogo, headerActionButton, allowNonAdminEditDelete, showTeachersTabToAll, allowStudentDetailsPrint, studentFormFields, currentAcademicYear } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings();
@@ -51,6 +51,9 @@ router.put('/settings', async (req, res) => {
     if (allowNonAdminEditDelete !== undefined) settings.allowNonAdminEditDelete = Boolean(allowNonAdminEditDelete);
     if (showTeachersTabToAll !== undefined) settings.showTeachersTabToAll = Boolean(showTeachersTabToAll);
     if (allowStudentDetailsPrint !== undefined) settings.allowStudentDetailsPrint = Boolean(allowStudentDetailsPrint);
+    if (currentAcademicYear !== undefined && String(currentAcademicYear).trim()) {
+      settings.currentAcademicYear = String(currentAcademicYear).trim();
+    }
 
 
     if (Array.isArray(studentFormFields)) settings.studentFormFields = studentFormFields;

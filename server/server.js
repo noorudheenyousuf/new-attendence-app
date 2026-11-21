@@ -122,6 +122,7 @@ app.use('/api/timetable', require('./routes/timetableRoutes'));
 app.use('/api/student-portal', require('./routes/studentPortalRoutes'));
 app.use('/api/announcements', require('./routes/announcementRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
+app.use('/api/promotion', require('./routes/promotionRoutes'));
 
 // Fallback for SPA routing
 app.use((req, res) => {

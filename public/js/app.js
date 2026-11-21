@@ -5800,6 +5800,7 @@ let cachedActivityLogs = [];
 let currentActivityLogFilter = 'all';
 
 function setActivityLogFilter(filter) {
+  window._activityLogFilterUserSet = true;
   currentActivityLogFilter = filter;
   const btnAll = document.getElementById('btn-log-filter-all');
   const btnMine = document.getElementById('btn-log-filter-mine');
@@ -5813,6 +5814,67 @@ function setActivityLogFilter(filter) {
     }
   }
   renderActivityLogsList();
+}
+
+function formatActivityLogDetails(log) {
+  const details = log.details || '';
+  const actionLower = (log.action || '').toLowerCase();
+  const isAttendance = actionLower.includes('attendance') || log.entityType === 'attendance';
+
+  if (isAttendance) {
+    let p = log.counts && typeof log.counts.present === 'number' ? log.counts.present : null;
+    let a = log.counts && typeof log.counts.absent === 'number' ? log.counts.absent : null;
+    let l = log.counts && typeof log.counts.leave === 'number' ? log.counts.leave : (log.counts && typeof log.counts.late === 'number' ? log.counts.late : null);
+
+    if (p === null) {
+      const pm = details.match(/(\d+)\s*Present/i);
+      if (pm) p = parseInt(pm[1], 10);
+    }
+    if (a === null) {
+      const am = details.match(/(\d+)\s*Absent/i);
+      if (am) a = parseInt(am[1], 10);
+    }
+    if (l === null) {
+      const lm = details.match(/(\d+)\s*Leave/i) || details.match(/(\d+)\s*Late/i);
+      if (lm) l = parseInt(lm[1], 10);
+    }
+
+    let pct = '';
+    const pctMatch = details.match(/\((\d+(?:\.\d+)?%)\)/);
+    if (pctMatch) {
+      pct = pctMatch[1];
+    } else if (p !== null && a !== null) {
+      const total = p + a + (l || 0);
+      pct = total > 0 ? Math.round((p / total) * 100) + '%' : '0%';
+    }
+
+    if (p !== null || a !== null) {
+      return `
+        <div class="flex items-center gap-1.5 flex-wrap text-[11px] leading-tight">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${p !== null ? p : 0} Present
+          </span>
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>${a !== null ? a : 0} Absent
+          </span>
+          ${l !== null && l > 0 ? `
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>${l} Leave
+          </span>` : (l !== null ? `
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[var(--text-sub)] font-semibold border border-[var(--border-color)]">
+            0 Leave
+          </span>` : '')}
+          ${pct ? `
+          <span class="px-1.5 py-0.5 rounded-md bg-[#245b70]/10 text-[#245b70] dark:text-cyan-300 font-black border border-[#245b70]/20 text-[10px]">
+            ${pct}
+          </span>` : ''}
+        </div>
+      `;
+    }
+  }
+
+  if (!details) return '';
+  return `<div class="text-[11px] text-[var(--text-sub)] line-clamp-2 leading-tight">${escapeHtml(details)}</div>`;
 }
 
 function renderActivityLogsList() {
@@ -5836,7 +5898,13 @@ function renderActivityLogsList() {
   }
 
   if (filteredLogs.length === 0) {
-    container.innerHTML = `<div class="p-3 text-xs text-center text-[var(--text-sub)]">${currentActivityLogFilter === 'mine' ? 'No actions recorded for your account yet.' : 'No recent activity logs.'}</div>`;
+    container.innerHTML = `
+      <div class="py-4 px-3 text-center rounded-xl bg-[var(--bg-page)]/60 border border-dashed border-[var(--border-color)]">
+        <svg class="w-6 h-6 mx-auto mb-1 text-[var(--text-sub)] opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        <p class="text-xs font-bold text-[var(--text-main)]">${currentActivityLogFilter === 'mine' ? 'No Actions Yet' : 'No Activity Logs'}</p>
+        <p class="text-[10px] text-[var(--text-sub)] mt-0.5">${currentActivityLogFilter === 'mine' ? 'Your attendance marks and updates will show here.' : 'Recent attendance actions will appear here.'}</p>
+      </div>
+    `;
     return;
   }
 
@@ -5863,30 +5931,59 @@ function renderActivityLogsList() {
       dotBorder = 'ring-blue-500/30';
     }
 
-    const logDate = log.createdAt ? new Date(log.createdAt) : null;
-    const timeFormatted = logDate ? logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    const dateFormatted = logDate ? logDate.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-    const dateTimeStr = logDate ? `${dateFormatted} • ${timeFormatted}` : '';
+    let dateTimeStr = '';
+    if (log.createdAt) {
+      const logDate = new Date(log.createdAt);
+      const dateFormatted = logDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      const timeFormatted = logDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      dateTimeStr = `${dateFormatted} • ${timeFormatted}`;
+    }
+
+    const _le = (log.performedByEmail || '').toLowerCase();
+    let _dn = log.performedBy || 'Teacher';
+    if (_le) {
+      if (currentUser && (currentUser.email || '').toLowerCase() === _le) {
+        _dn = currentUser.name || _dn;
+      } else if (cachedTeachersList) {
+        const _f = cachedTeachersList.find(t => (t.email || '').toLowerCase() === _le);
+        if (_f && _f.name) _dn = _f.name;
+      }
+    }
+
+    const formattedDetails = formatActivityLogDetails(log);
 
     return `
-      <div id="log-item-${log._id}" class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-start justify-between gap-3 ${log.isUndone ? 'opacity-50' : ''} hover:border-[#245b70]/40 transition shadow-sm">
+      <div id="log-item-${log._id}" class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-start justify-between gap-2.5 ${log.isUndone ? 'opacity-50' : ''} hover:border-[#245b70]/40 transition shadow-2xs">
         <div class="flex items-start gap-2.5 min-w-0 flex-1">
-          <span class="w-2.5 h-2.5 rounded-full ${dotColor} mt-1.5 flex-shrink-0 ring-2 ${dotBorder}"></span>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="font-extrabold text-[var(--text-main)] text-xs">${escapeHtml(log.action)}</span>
-              ${dateTimeStr ? `<span class="text-[9.5px] font-semibold text-[var(--text-sub)] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md flex-shrink-0">${dateTimeStr}</span>` : ''}
+          <span class="w-2.5 h-2.5 rounded-full ${dotColor} mt-0.5 flex-shrink-0 ring-2 ${dotBorder}"></span>
+          <div class="flex flex-col gap-1 min-w-0 flex-1">
+            <!-- Line 1: Heading -->
+            <div class="font-extrabold text-[var(--text-main)] text-xs leading-tight">
+              ${escapeHtml(log.action)}
             </div>
-            <div class="text-[11px] text-[var(--text-sub)] mt-0.5 line-clamp-2 leading-relaxed">${escapeHtml(log.details || '')}</div>
-            <div class="text-[10px] text-[#245b70] dark:text-cyan-400 font-bold mt-1">${(() => { const _le = (log.performedByEmail || '').toLowerCase(); let _dn = log.performedBy || ''; if (_le) { if (currentUser && (currentUser.email || '').toLowerCase() === _le) { _dn = currentUser.name || _dn; } else if (cachedTeachersList) { const _f = cachedTeachersList.find(t => (t.email || '').toLowerCase() === _le); if (_f && _f.name) _dn = _f.name; } } return 'by ' + escapeHtml(_dn); })()}</div>
+
+            <!-- Line 2: 2 Present, 2 Absent / Details -->
+            ${formattedDetails}
+
+            <!-- Line 3: Date • Time -->
+            ${dateTimeStr ? `
+            <div class="text-[10px] text-[var(--text-sub)] font-medium leading-tight flex items-center gap-1 opacity-80">
+              <svg class="w-2.5 h-2.5 opacity-60 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>${dateTimeStr}</span>
+            </div>` : ''}
+
+            <!-- Line 4: by Teacher -->
+            <div class="text-[10.5px] font-bold text-[#245b70] dark:text-cyan-400 leading-tight">
+              by ${escapeHtml(_dn)}
+            </div>
           </div>
         </div>
-        <div class="flex items-center gap-2 flex-shrink-0 pt-0.5">
+        <div class="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
           ${log.isUndone ? `
-            <span class="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Reverted</span>
+            <span class="text-[9.5px] font-bold px-2 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Reverted</span>
           ` : (isAdmin && log.canUndo ? `
             <!-- UNDO BUTTON: ONLY shown for Admin accounts as explicitly requested! -->
-            <button onclick="undoLog('${log._id}')" class="px-3 py-1 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-white border border-amber-500/30 active:scale-95 transition flex items-center gap-1 shadow-sm">
+            <button onclick="undoLog('${log._id}')" class="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500 hover:text-white border border-amber-500/30 active:scale-95 transition flex items-center gap-1 shadow-2xs">
               <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
               <span>Undo</span>
             </button>
@@ -5905,6 +6002,15 @@ async function loadActivityLogs() {
     const res = await API.getLogs();
     if (res.success && res.data) {
       cachedActivityLogs = res.data;
+      if (currentUser && currentUser.role === 'teacher' && !window._activityLogFilterUserSet) {
+        currentActivityLogFilter = 'mine';
+        const btnAll = document.getElementById('btn-log-filter-all');
+        const btnMine = document.getElementById('btn-log-filter-mine');
+        if (btnAll && btnMine) {
+          btnMine.className = 'px-2 py-0.5 rounded-lg bg-[#245b70] text-white shadow-xs font-bold transition';
+          btnAll.className = 'px-2 py-0.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text-main)] font-semibold transition';
+        }
+      }
       renderActivityLogsList();
       updateProfileDashboardKPIs();
     }
@@ -6136,6 +6242,7 @@ function handleAdminToggleNotifVibrate(enabled) {
 function openAdminPanel() {
   selectTab('admin');
   loadAdminTeachersList();
+  if (typeof syncAdminPromotionCard === 'function') syncAdminPromotionCard();
 
   // Scroll to top of main viewport
   const mainViewport = document.querySelector('main');
@@ -6809,7 +6916,9 @@ function updateWelcomeGreeting() {
   const todayDay = dayNames[now.getDay()];
 
   if (academicYearEl) {
-    const yr = appSettings && appSettings.academicYear ? appSettings.academicYear : `${now.getFullYear()}/${String(now.getFullYear() + 1).slice(2)}`;
+    const yr = (appSettings && (appSettings.currentAcademicYear || appSettings.academicYear))
+      ? (appSettings.currentAcademicYear || appSettings.academicYear)
+      : `${now.getFullYear()}-${String(now.getFullYear() + 1).slice(2)}`;
     academicYearEl.textContent = `Academic Year ${yr}`;
   }
   if (dayNameEl) {

@@ -637,5 +637,62 @@ const API = {
     return this.request(`/students/outcomers/${id}/reject`, {
       method: 'DELETE'
     });
+  },
+
+  // ===================== ACADEMIC YEAR, PROMOTION & ARCHIVE API =====================
+  async getPromotionOverview(scope = 'public') {
+    const params = new URLSearchParams({ scope });
+    return this.request(`/promotion/overview?${params.toString()}`);
+  },
+
+  async previewPromotion(payload) {
+    return this.request('/promotion/preview', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async executePromotion(payload) {
+    return this.request('/promotion/execute', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async undoPromotion(batchId) {
+    return this.request(`/promotion/undo/${encodeURIComponent(batchId)}`, {
+      method: 'POST'
+    });
+  },
+
+  async reorderClassRolls(payload) {
+    return this.request('/promotion/reorder-rolls', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async getPromotionDirectory(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.type) qs.append('type', params.type);
+    if (params.year && params.year !== 'all') qs.append('year', params.year);
+    if (params.lastClass && params.lastClass !== 'all') qs.append('lastClass', params.lastClass);
+    if (params.search) qs.append('search', params.search);
+    if (params.scope) qs.append('scope', params.scope);
+    return this.request(`/promotion/directory?${qs.toString()}`);
+  },
+
+  async readmitStudent(id, payload = {}) {
+    return this.request(`/promotion/readmit/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async cleanupYearAttendance(payload = {}) {
+    return this.request('/backup/cleanup-year', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
   }
 };

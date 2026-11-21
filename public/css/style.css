@@ -995,6 +995,26 @@ input:checked + .switch-slider:before {
   line-height: 1.35;
 }
 
+/* ==========================================================================
+   ACADEMIC YEAR PROMOTION WIZARD & OFFLINE ARCHIVE VIEWER
+   ========================================================================== */
+.archive-readonly-banner {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  color: #ffffff;
+}
+.promo-sticky-footer {
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+}
+.dark .promo-sticky-footer {
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
+}
+.promo-seg-pill button {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 
 
 

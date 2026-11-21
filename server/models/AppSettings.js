@@ -45,6 +45,20 @@ const appSettingsSchema = new mongoose.Schema({
     type: Array,
     default: []
   },
+  currentAcademicYear: {
+    type: String,
+    default: '2026-27',
+    trim: true
+  },
+  lastYearBackupAt: {
+    type: Date,
+    default: null
+  },
+  lastYearBackupYear: {
+    type: String,
+    default: '',
+    trim: true
+  },
   updatedAt: {
     type: Date,
     default: Date.now

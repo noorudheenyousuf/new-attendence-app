@@ -84,7 +84,7 @@ async function attachAttendanceStatsToStudents(studentsList) {
 // @desc    Get all students (with class filter, search, and scope: 'all' | 'private' | 'public')
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { class: classFilter, search, scope, status } = req.query;
+    const { class: classFilter, search, scope, status, lifecycle } = req.query;
     const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
     let query = {};
 
@@ -92,6 +92,12 @@ router.get('/', optionalAuth, async (req, res) => {
       query.registrationStatus = 'pending';
     } else if (status !== 'all') {
       query.registrationStatus = { $ne: 'pending' };
+    }
+
+    if (lifecycle === 'alumni' || lifecycle === 'tc') {
+      query.lifecycleStatus = lifecycle;
+    } else if (lifecycle !== 'all') {
+      query.lifecycleStatus = { $nin: ['alumni', 'tc'] };
     }
 
     if (scope === 'private') {
@@ -130,16 +136,21 @@ router.get('/', optionalAuth, async (req, res) => {
       }
 
       if (query.$or) {
-        // Combine scope $or with search conditions
-        query = {
-          $and: [
-            { $or: query.$or },
-            { $or: searchConditions }
-          ]
-        };
-        if (classFilter && classFilter !== 'all') {
-          query.$and.push({ class: caseInsensitiveRegex(classFilter) });
+        // Combine scope $or with search conditions while preserving registrationStatus & lifecycleStatus
+        const andConditions = [
+          { $or: query.$or },
+          { $or: searchConditions }
+        ];
+        if (query.registrationStatus !== undefined) {
+          andConditions.push({ registrationStatus: query.registrationStatus });
         }
+        if (query.lifecycleStatus !== undefined) {
+          andConditions.push({ lifecycleStatus: query.lifecycleStatus });
+        }
+        if (classFilter && classFilter !== 'all') {
+          andConditions.push({ class: caseInsensitiveRegex(classFilter) });
+        }
+        query = { $and: andConditions };
       } else {
         query.$or = searchConditions;
       }

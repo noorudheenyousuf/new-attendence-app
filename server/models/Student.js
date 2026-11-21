@@ -103,6 +103,30 @@ const studentSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'],
     default: 'approved'
   },
+  lifecycleStatus: {
+    type: String,
+    enum: ['active', 'alumni', 'tc'],
+    default: 'active',
+    index: true
+  },
+  exitInfo: {
+    exitYear: { type: String, default: '' },
+    lastClass: { type: String, default: '' },
+    lastRoll: { type: Number, default: null },
+    tcNumber: { type: String, default: '' },
+    exitDate: { type: String, default: '' },
+    reason: { type: String, default: '' }
+  },
+  academicHistory: [{
+    academicYear: { type: String, default: '' },
+    className: { type: String, default: '' },
+    roll: { type: Number, default: null },
+    rank: { type: String, default: '' },
+    attendancePercentage: { type: Number, default: null },
+    attendanceSessions: { type: Number, default: 0 },
+    attendancePresent: { type: Number, default: 0 },
+    action: { type: String, default: '' }
+  }],
   createdAt: {
     type: Date,
     default: Date.now
