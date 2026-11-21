@@ -13356,62 +13356,80 @@ async function handleStudentPhotoSelect(e) {
 
 async function handleStudentDetailsSubmit(e) {
   e.preventDefault();
+  if (currentStudentData) {
+    showToast('Student details are locked and cannot be edited.', true);
+    return;
+  }
+
   const btn = document.getElementById('spf-submit-btn');
   const originalBtn = btn ? btn.innerHTML : '';
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>Saving Details...</span>';
+    btn.innerHTML = '<span>Submitting Details...</span>';
   }
 
   try {
-    const name = document.getElementById('spf-name')?.value?.trim();
-    const studentClass = document.getElementById('spf-class')?.value?.trim();
-    const roll = document.getElementById('spf-roll')?.value?.trim();
-    const photoUrl = document.getElementById('spf-photo-url')?.value?.trim();
+    const val = (id) => document.getElementById(id)?.value?.trim() || '';
+    const name = val('spf-name');
+    const studentClass = val('spf-class');
+    const roll = val('spf-roll');
+    const photoUrl = val('spf-photo-url') || 'default_avatar.jpg';
+    const guardian = val('spf-guardian');
 
     const payload = {
       name,
       class: studentClass,
-      roll: Number(roll),
+      roll: roll ? Number(roll) : undefined,
       photoUrl,
       personalDetails: {
-        dob: document.getElementById('spf-dob')?.value?.trim(),
-        gender: document.getElementById('spf-gender')?.value?.trim(),
-        bloodGroup: document.getElementById('spf-blood-group')?.value?.trim()
+        dob: val('spf-dob'),
+        gender: val('spf-gender'),
+        bloodGroup: val('spf-blood-group'),
+        studentPhone: val('spf-student-phone').replace(/\D/g, '').slice(-10),
+        studentEmail: val('spf-student-email')
       },
       address: {
-        fullAddress: document.getElementById('spf-full-address')?.value?.trim(),
-        place: document.getElementById('spf-place')?.value?.trim(),
-        district: document.getElementById('spf-district')?.value?.trim(),
-        state: document.getElementById('spf-state')?.value?.trim(),
-        pinCode: document.getElementById('spf-pincode')?.value?.trim()
+        fullAddress: val('spf-full-address'),
+        place: val('spf-place'),
+        district: val('spf-district'),
+        state: val('spf-state'),
+        pinCode: val('spf-pincode')
       },
       familyDetails: {
-        fatherName: document.getElementById('spf-father-name')?.value?.trim(),
-        fatherMobile: document.getElementById('spf-father-mobile')?.value?.trim(),
-        motherName: document.getElementById('spf-mother-name')?.value?.trim(),
-        motherNumber: document.getElementById('spf-mother-mobile')?.value?.trim()
+        fatherName: val('spf-father-name'),
+        fatherMobile: val('spf-father-mobile').replace(/\D/g, '').slice(-10),
+        motherName: val('spf-mother-name'),
+        motherNumber: val('spf-mother-mobile').replace(/\D/g, '').slice(-10),
+        guardian,
+        guardianName: guardian === 'Other' ? val('spf-guardian-name') : '',
+        guardianNumber: guardian === 'Other' ? val('spf-guardian-number').replace(/\D/g, '').slice(-10) : '',
+        guardianRelation: guardian === 'Other' ? val('spf-guardian-relation') : '',
+        guardianOccupation: val('spf-guardian-occupation')
+      },
+      academicStatus: {
+        admissionNo: val('spf-admission-no'),
+        admissionDate: val('spf-admission-date'),
+        rank: val('spf-rank'),
+        previousCollege: val('spf-prev-college'),
+        stream: val('spf-stream'),
+        degreeYear: val('spf-degreeYear')
       }
     };
 
-    const isEdit = Boolean(currentStudentData);
-    let res;
-    if (isEdit) {
-      res = await API.updateStudentDetails(payload);
-    } else {
-      res = await API.submitStudentDetails(payload);
-    }
+    const res = await API.submitStudentDetails(payload);
 
     if (res.success && res.data) {
       currentStudentData = res.data;
-      showToast(res.message || 'Details saved successfully!');
+      const formModal = document.getElementById('modal-sp-onboarding-form');
+      if (formModal) formModal.classList.add('hidden');
+      showToast(res.message || 'Student details submitted!');
       await initStudentPortal();
     } else {
-      showToast(res.message || 'Failed to save details');
+      showToast(res.message || 'Failed to save details', true);
     }
   } catch (err) {
     console.error('[Student Details Save Error]', err);
-    showToast(err.message || 'Error saving student details');
+    showToast(err.message || 'Error saving student details', true);
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -13588,24 +13606,25 @@ async function loadStudentHomeDashboard() {
 // 2. CLASSES & ACADEMICS CONTROLLER
 // -------------------------------------------------------------------------
 function switchClassesSubTab(subTab) {
-  currentClassesSubTab = subTab;
-  const subTabs = ['timetable', 'subjects', 'materials'];
+  const safeTab = (subTab === 'subjects') ? 'subjects' : 'timetable';
+  currentClassesSubTab = safeTab;
+  const subTabs = ['timetable', 'subjects'];
 
   subTabs.forEach(st => {
     const btn = document.getElementById(`sp-csubtab-${st}`);
     const view = document.getElementById(`sp-classes-view-${st}`);
-    if (st === subTab) {
-      if (btn) btn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-black custom-gradient-btn text-white transition shadow-2xs flex items-center justify-center gap-1.5";
+    if (st === safeTab) {
+      if (btn) btn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-black custom-gradient-btn text-white transition shadow-2xs flex items-center justify-center gap-1.5";
       if (view) view.classList.remove('hidden');
     } else {
-      if (btn) btn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition flex items-center justify-center gap-1.5";
+      if (btn) btn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition flex items-center justify-center gap-1.5";
       if (view) view.classList.add('hidden');
     }
   });
 
-  if (subTab === 'timetable') {
+  if (safeTab === 'timetable') {
     loadStudentTimetable(currentStudentTimetableDay);
-  } else if (subTab === 'subjects') {
+  } else if (safeTab === 'subjects') {
     loadStudentSubjects();
   }
 }
@@ -14260,107 +14279,164 @@ function closeStudentNoticeModal() {
 }
 
 // -------------------------------------------------------------------------
-// 5. PROFILE & LEAVE APPLICATION CONTROLLER
+// 5. PROFILE, CHANGE PASSWORD & FORGOT PASSWORD (OTP) CONTROLLER
 // -------------------------------------------------------------------------
 async function loadStudentProfile() {
-  loadStudentLeaveRequests();
+  // Always open on the ID Card main view
+  closeStudentFullDetailsPage();
+  if (currentStudentData) {
+    renderStudentIdCard(currentStudentData);
+    populateProfileOrganizedSections(currentStudentData);
+  }
 }
 
-function openStudentLeaveModal() {
-  const modal = document.getElementById('modal-student-leave-request');
+function openStudentChangePasswordModal() {
+  const modal = document.getElementById('modal-sp-change-password');
   if (!modal) return;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const fromEl = document.getElementById('slr-from-date');
-  const toEl = document.getElementById('slr-to-date');
-  const reasonEl = document.getElementById('slr-reason');
-
-  if (fromEl) fromEl.value = todayStr;
-  if (toEl) toEl.value = todayStr;
-  if (reasonEl) reasonEl.value = '';
-
+  const cur = document.getElementById('sp-pw-current');
+  const nw = document.getElementById('sp-pw-new');
+  if (cur) cur.value = '';
+  if (nw) nw.value = '';
   modal.classList.remove('hidden');
 }
 
-function closeStudentLeaveModal() {
-  const modal = document.getElementById('modal-student-leave-request');
+function closeStudentChangePasswordModal() {
+  const modal = document.getElementById('modal-sp-change-password');
   if (modal) modal.classList.add('hidden');
 }
 
-async function handleStudentLeaveSubmit(e) {
+// ---- Forgot Password via Phone OTP ----
+function showForgotPasswordAlert(msg, isError = false) {
+  const box = document.getElementById('fp-alert');
+  if (!box) return;
+  box.textContent = msg;
+  box.className = isError
+    ? 'p-2.5 rounded-xl text-xs font-semibold bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400'
+    : 'p-2.5 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300';
+  box.classList.remove('hidden');
+}
+
+function openForgotPasswordModal() {
+  const modal = document.getElementById('modal-forgot-password-otp');
+  if (!modal) return;
+  resetForgotPasswordStep1();
+  const phoneEl = document.getElementById('fp-phone');
+  const idEl = document.getElementById('fp-identifier');
+  const loginEmail = document.getElementById('login-email')?.value?.trim() || '';
+  if (phoneEl) phoneEl.value = '';
+  if (idEl) idEl.value = loginEmail;
+  const alertEl = document.getElementById('fp-alert');
+  if (alertEl) alertEl.classList.add('hidden');
+  modal.classList.remove('hidden');
+}
+
+function closeForgotPasswordModal() {
+  const modal = document.getElementById('modal-forgot-password-otp');
+  if (modal) modal.classList.add('hidden');
+}
+
+function resetForgotPasswordStep1() {
+  const s1 = document.getElementById('fp-step-1-form');
+  const s2 = document.getElementById('fp-step-2-form');
+  if (s1) s1.classList.remove('hidden');
+  if (s2) s2.classList.add('hidden');
+}
+
+async function handleForgotPasswordRequestOtp(e) {
   e.preventDefault();
-  const btn = document.getElementById('slr-submit-btn');
-  const originalText = btn ? btn.innerHTML : '';
+  const phone = (document.getElementById('fp-phone')?.value || '').replace(/\D/g, '').slice(-10);
+  const identifier = (document.getElementById('fp-identifier')?.value || '').trim();
+  const btn = document.getElementById('fp-send-otp-btn');
+
+  if (!/^\d{10}$/.test(phone)) {
+    showForgotPasswordAlert('Please enter a valid 10-digit phone number.', true);
+    return;
+  }
+
+  const orig = btn ? btn.innerHTML : '';
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Submitting...';
+    btn.textContent = 'Sending OTP...';
   }
 
   try {
-    const fromDate = document.getElementById('slr-from-date')?.value?.trim();
-    const toDate = document.getElementById('slr-to-date')?.value?.trim();
-    const reason = document.getElementById('slr-reason')?.value?.trim();
-
-    if (!fromDate || !toDate || !reason) {
-      showToast('Please provide from date, to date, and reason');
-      return;
-    }
-
-    const res = await API.submitStudentLeaveRequest({ fromDate, toDate, reason });
+    const res = await API.requestForgotPasswordOtp(phone, identifier);
     if (res.success) {
-      showToast(res.message || 'Leave request submitted successfully');
-      closeStudentLeaveModal();
-      loadStudentLeaveRequests();
+      const s1 = document.getElementById('fp-step-1-form');
+      const s2 = document.getElementById('fp-step-2-form');
+      const info = document.getElementById('fp-otp-info');
+      const alertEl = document.getElementById('fp-alert');
+      if (alertEl) alertEl.classList.add('hidden');
+      if (s1) s1.classList.add('hidden');
+      if (s2) s2.classList.remove('hidden');
+      if (info) {
+        let html = `OTP sent to <b>${res.maskedPhone || phone}</b>${res.accountHint ? ` for account <b>${escapeHtml(res.accountHint)}</b>` : ''}. Valid for 5 minutes.`;
+        if (res.devOtp) {
+          html += `<div class="mt-1.5 px-2 py-1 rounded-lg bg-amber-500/15 text-amber-900 dark:text-amber-200 font-black">Test OTP (SMS not configured): <span class="tracking-widest">${res.devOtp}</span></div>`;
+        }
+        info.innerHTML = html;
+      }
+      const otpIn = document.getElementById('fp-otp-input');
+      if (otpIn) {
+        otpIn.value = '';
+        otpIn.focus();
+      }
     } else {
-      showToast(res.message || 'Failed to submit leave request');
+      showForgotPasswordAlert(res.message || 'Could not send OTP', true);
     }
   } catch (err) {
-    showToast(err.message || 'Error submitting leave request');
+    showForgotPasswordAlert(err.message || 'Failed to request OTP', true);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = originalText;
+      btn.innerHTML = orig;
     }
   }
 }
 
-async function loadStudentLeaveRequests() {
-  const container = document.getElementById('sp-my-leave-requests');
-  if (!container) return;
+async function handleForgotPasswordResetSubmit(e) {
+  e.preventDefault();
+  const phone = (document.getElementById('fp-phone')?.value || '').replace(/\D/g, '').slice(-10);
+  const identifier = (document.getElementById('fp-identifier')?.value || '').trim();
+  const otp = (document.getElementById('fp-otp-input')?.value || '').trim();
+  const newPw = document.getElementById('fp-new-password')?.value || '';
+  const confirmPw = document.getElementById('fp-confirm-password')?.value || '';
+  const btn = document.getElementById('fp-reset-btn');
+
+  if (!/^\d{6}$/.test(otp)) {
+    showForgotPasswordAlert('Please enter the 6-digit OTP.', true);
+    return;
+  }
+  if (newPw.length < 6) {
+    showForgotPasswordAlert('Password must be at least 6 characters long.', true);
+    return;
+  }
+  if (newPw !== confirmPw) {
+    showForgotPasswordAlert('Passwords do not match.', true);
+    return;
+  }
+
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Resetting...';
+  }
 
   try {
-    const res = await API.getStudentLeaveRequests();
-    const requests = res.requests || [];
-    currentStudentLeaveRequests = requests;
-
-    if (requests.length === 0) {
-      container.innerHTML = '<div class="p-3 text-center text-xs text-[var(--text-sub)]">No leave applications submitted yet.</div>';
-      return;
+    const res = await API.resetPasswordWithOtp(phone, identifier, otp, newPw);
+    if (res.success) {
+      showToast(res.message || 'Password reset successfully!');
+      closeForgotPasswordModal();
+    } else {
+      showForgotPasswordAlert(res.message || 'Invalid or expired OTP', true);
     }
-
-    container.innerHTML = requests.map(r => {
-      let statusColor = 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30';
-      let statusLabel = 'Pending Review';
-      if (r.status === 'approved') {
-        statusColor = 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30';
-        statusLabel = 'Approved';
-      } else if (r.status === 'rejected') {
-        statusColor = 'bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/30';
-        statusLabel = 'Rejected';
-      }
-
-      return `
-        <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] space-y-1.5 shadow-2xs">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-xs font-black text-[var(--text-main)]">${r.fromDate} to ${r.toDate}</span>
-            <span class="px-2 py-0.5 rounded-lg text-[10px] font-black border ${statusColor}">${statusLabel}</span>
-          </div>
-          <p class="text-xs text-[var(--text-sub)]">${r.reason || ''}</p>
-          ${r.teacherRemarks ? `<p class="text-[10px] text-teal-700 dark:text-teal-300 font-semibold">Teacher Remark: ${r.teacherRemarks}</p>` : ''}
-        </div>
-      `;
-    }).join('');
   } catch (err) {
-    container.innerHTML = '<div class="p-3 text-center text-xs text-rose-500">Failed to load leave requests</div>';
+    showForgotPasswordAlert(err.message || 'Password reset failed', true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
   }
 }
 
@@ -14384,8 +14460,11 @@ async function handleStudentPasswordChange(e) {
     const res = await API.changeStudentPassword({ currentPassword, newPassword });
     if (res.success) {
       showToast(res.message || 'Password updated successfully');
-      document.getElementById('sp-pw-current').value = '';
-      document.getElementById('sp-pw-new').value = '';
+      const curEl = document.getElementById('sp-pw-current');
+      const newEl = document.getElementById('sp-pw-new');
+      if (curEl) curEl.value = '';
+      if (newEl) newEl.value = '';
+      closeStudentChangePasswordModal();
     } else {
       showToast(res.message || 'Failed to update password');
     }
