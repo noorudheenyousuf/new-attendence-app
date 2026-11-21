@@ -159,4 +159,37 @@ router.get('/download-proxy', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/upload/public-student-photo
+ * Public photo upload for standalone student self-submission page (images only, max 5MB, students folder)
+ */
+const publicPhotoUpload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedMimes.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only image files (JPEG, PNG, WEBP) are allowed'), false);
+  }
+});
+
+router.post('/public-student-photo', publicPhotoUpload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No photo file provided.' });
+    }
+    const rawExt = (path.extname(req.file.originalname) || '').toLowerCase();
+    const ext = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : '.jpg';
+    const result = await uploadService.uploadPhoto(req.file.buffer, 'students', ext);
+    res.json({
+      success: true,
+      url: result.url,
+      provider: result.provider
+    });
+  } catch (error) {
+    console.error('[Public Photo Upload Error]', error);
+    res.status(500).json({ success: false, message: error.message || 'Photo upload failed' });
+  }
+});
+
 module.exports = router;

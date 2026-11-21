@@ -913,7 +913,7 @@ function checkDuplicateStudentId(mode) {
 
   if (matched) {
     if (warnEl) {
-      warnEl.innerText = `⚠️ Duplicate Warning: ID "${inputEl.value}" is already assigned to "${matched.name}" (Class: ${matched.class}). Please choose a unique ID.`;
+      warnEl.innerHTML = `<span class="inline-flex items-start gap-1.5"><svg class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><span>Duplicate Warning: ID "${escapeHtml(inputEl.value)}" is already assigned to "${escapeHtml(matched.name)}" (Class: ${escapeHtml(matched.class)}). Please choose a unique ID.</span></span>`;
       warnEl.classList.remove('hidden');
     }
     return true;
@@ -935,7 +935,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 async function triggerPwaInstall() {
   if (!deferredPrompt) {
-    showToast('To install in Chrome, open menu (☰) > "Install app" or "Add to Home screen"');
+    showToast('To install in Chrome, open browser menu > "Install app" or "Add to Home screen"');
     return;
   }
   deferredPrompt.prompt();
@@ -4596,6 +4596,32 @@ function handleStudentNameInput(type) {
   preview.src = getInitialsAvatar(nameVal, '245b70');
 }
 
+// Helper: Enforce auto-roll lock for non-admin users (only Admin can edit roll number)
+function applyRollInputPermission(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  if (isAdmin) {
+    el.removeAttribute('readonly');
+    el.classList.remove('cursor-not-allowed', 'opacity-75');
+    el.title = 'Admin: Roll Number (Editable)';
+  } else {
+    el.setAttribute('readonly', 'true');
+    el.classList.add('cursor-not-allowed', 'opacity-75');
+    el.title = 'Auto-assigned by system (Only Admin can edit)';
+  }
+}
+
+function getNextRollForClassLocal(selClass) {
+  if (!selClass) return 1;
+  const inClass = (cachedAllStudents || []).filter(s => isClassEqual(s.class, selClass));
+  const maxRoll = inClass.reduce((max, s) => {
+    const r = parseInt(s.roll, 10);
+    return (!isNaN(r) && r > max) ? r : max;
+  }, 0);
+  return maxRoll > 0 ? (maxRoll + 1) : 1;
+}
+
 // Auto-suggest next roll number in ascending order for chosen class
 function handleNewStudentClassChanged() {
   const classSelect = document.getElementById('new-student-class');
@@ -4603,14 +4629,10 @@ function handleNewStudentClassChanged() {
   if (!classSelect) return;
   const selClass = classSelect.value || '';
   updateDynamicClassFields('new', selClass);
+  applyRollInputPermission('new-student-roll');
   if (!rollInput || !selClass) return;
 
-  const inClass = (cachedAllStudents || []).filter(s => isClassEqual(s.class, selClass));
-  const maxRoll = inClass.reduce((max, s) => {
-    const r = parseInt(s.roll, 10);
-    return (!isNaN(r) && r > max) ? r : max;
-  }, 0);
-  rollInput.value = maxRoll > 0 ? (maxRoll + 1) : 1;
+  rollInput.value = getNextRollForClassLocal(selClass);
 }
 
 function handleEditStudentClassChanged() {
@@ -4618,6 +4640,13 @@ function handleEditStudentClassChanged() {
   if (!classSelect) return;
   const selClass = classSelect.value || '';
   updateDynamicClassFields('edit', selClass);
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  if (!isAdmin) {
+    const rollInput = document.getElementById('edit-student-roll');
+    if (rollInput && selClass) {
+      rollInput.value = getNextRollForClassLocal(selClass);
+    }
+  }
 }
 
 // ================= STUDENT MODAL HELPERS (AGE, GUARDIAN, VALIDATION, DISCARD, REMARKS) =================
@@ -5065,6 +5094,7 @@ async function openEditStudentModal(id) {
     setVal('edit-student-name', student.name);
     setVal('edit-student-class', student.class);
     setVal('edit-student-roll', student.roll);
+    applyRollInputPermission('edit-student-roll');
     setVal('edit-student-stream', student.academicStatus?.stream || student.stream || '');
     setVal('edit-student-degreeYear', student.academicStatus?.degreeYear || student.degreeYear || '');
     updateDynamicClassFields('edit', student.class);
@@ -6643,7 +6673,7 @@ async function checkUnassignedTimetableForAttendance() {
       return {
         type: 'unassigned_timetable',
         title: "You Didn't Assign a Class or Subject",
-        badge: '⚠️ Timetable Warning',
+        badge: 'Timetable Warning',
         message: `Your timetable contains ${unassignedSlots.length} slot(s) with an unassigned class or subject. You cannot enter the Attendance page until all timetable slots are assigned properly.`,
         unassignedSlots
       };
@@ -6655,7 +6685,7 @@ async function checkUnassignedTimetableForAttendance() {
     return {
       type: 'no_assignments',
       title: "You Didn't Assign a Class or Subject",
-      badge: '⚠️ Assignment Required',
+      badge: 'Assignment Required',
       message: "You have not been assigned any class or subject yet. Please assign a class or subject to your account before taking attendance.",
       unassignedSlots: []
     };
@@ -7198,7 +7228,7 @@ async function loadDashboardTimetable() {
         statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white shadow-sm animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-white"></span>Live Now</span>`;
         cardStyle = `bg-white dark:bg-slate-900 border-2 border-[#245b70] dark:border-cyan-400 shadow-md ring-2 ring-[#245b70]/15`;
       } else if (isCompleted) {
-        statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">✓ Completed</span>`;
+        statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>Completed</span>`;
         cardStyle = `bg-white/60 dark:bg-slate-900/40 border border-[#245b70]/15 opacity-75`;
       } else {
         statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Upcoming</span>`;
@@ -7472,7 +7502,11 @@ function showAuthAlert(message, isError = true) {
   if (!alertEl || !textEl) return;
 
   textEl.innerText = message;
-  if (iconEl) iconEl.innerText = isError ? '⚠' : '✓';
+  if (iconEl) {
+    iconEl.innerHTML = isError
+      ? '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'
+      : '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+  }
   alertEl.className = `p-3 rounded-2xl text-xs font-semibold flex items-center gap-2 transition-all ${
     isError ? 'alert-error' : 'alert-success'
   }`;
@@ -7509,7 +7543,7 @@ function renderGoogleButton() {
     if (directBtn) directBtn.classList.add('hidden');
     container.innerHTML = `
       <div class="w-full py-2.5 px-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-800 text-center">
-        <span class="text-xs font-bold text-amber-700 dark:text-amber-300">🔑 Google OAuth awaiting Client ID in .env</span>
+        <span class="text-xs font-bold text-amber-700 dark:text-amber-300 inline-flex items-center gap-1.5"><svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>Google OAuth awaiting Client ID in .env</span>
       </div>
     `;
     return;
@@ -9545,11 +9579,11 @@ function showTimetableConflictModal(conflictType, conflictSlot, onConfirm) {
   const isEditingOther = Boolean(currentUser && currentUser.role === 'admin' && currentUser.email && currentUser.email.toLowerCase() !== ownerEmail);
 
   if (conflictType === 'self') {
-    if (badge) badge.textContent = isEditingOther ? '⚠️ Teacher Schedule Conflict' : '⚠️ Your Own Conflict';
+    if (badge) badge.textContent = isEditingOther ? 'Teacher Schedule Conflict' : 'Your Own Conflict';
     if (title) title.textContent = isEditingOther ? `${teacherName} Already Has a Class!` : 'You Already Have a Class!';
     if (desc) desc.textContent = isEditingOther ? `${teacherName} already has a slot scheduled at this time:` : 'You already have a slot scheduled at this time:';
   } else {
-    if (badge) badge.textContent = isOwnerCurrent ? '⚠️ Your Class Overlap' : '⚠️ Class Schedule Conflict';
+    if (badge) badge.textContent = isOwnerCurrent ? 'Your Class Overlap' : 'Class Schedule Conflict';
     if (title) title.textContent = `${teacherName} Already Has a Class Here!`;
     if (desc) desc.textContent = isOwnerCurrent
       ? `You already have "${conflictSlot.subject || 'a subject'}" scheduled for ${conflictSlot.class || 'this class'} at this time:`
@@ -12062,7 +12096,7 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
   // USER DIRECTIVE:
   // "If no set the account any time table....show at the morning a message to set time table...with not snooze only ok........"
   if (isTimetableNotSet) {
-    if (badgeEl) badgeEl.innerHTML = `<span>⚠️ Notice</span>`;
+    if (badgeEl) badgeEl.innerHTML = `<span class="inline-flex items-center gap-1"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>Notice</span>`;
     if (titleEl) titleEl.textContent = 'Set Up Timetable';
     if (subtitleEl) subtitleEl.textContent = currentUserName ? `Schedule not set for ${currentUserName}:` : 'Your timetable is not configured yet:';
     listEl.innerHTML = `
@@ -12086,7 +12120,7 @@ function renderBubbleTimetableModal(dayName, slots, isTimetableNotSet = false) {
       `;
     }
   } else {
-    if (badgeEl) badgeEl.innerHTML = `<span>🌅 Morning Timetable</span>`;
+    if (badgeEl) badgeEl.innerHTML = `<span class="inline-flex items-center gap-1"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"></path><path d="m4.93 10.93 1.41 1.41"></path><path d="M2 18h2"></path><path d="M20 18h2"></path><path d="m19.07 10.93-1.41 1.41"></path><path d="M22 22H2"></path><path d="M16 18a4 4 0 0 0-8 0"></path></svg>Morning Timetable</span>`;
     if (titleEl) titleEl.textContent = `${dayName}'s Schedule`;
     if (subtitleEl) subtitleEl.textContent = currentUserName ? `Classes for ${currentUserName}:` : 'Scheduled classes for today:';
     if (snoozeBtn) snoozeBtn.classList.remove('hidden');
@@ -14249,6 +14283,35 @@ function shareTeacherPortalWhatsApp() {
   window.open(`https://wa.me/?text=${text}`, '_blank');
 }
 
+function openPortalLinksModal() {
+  const modal = document.getElementById('modal-portal-links');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closePortalLinksModal() {
+  const modal = document.getElementById('modal-portal-links');
+  if (modal) modal.classList.add('hidden');
+}
+
+function copyStudentSubmitOnlyLink() {
+  const url = `${window.location.origin}/submit-details.html`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Student registration form link copied!');
+    }).catch(() => {
+      window.prompt('Copy this link:', url);
+    });
+  } else {
+    window.prompt('Copy this link:', url);
+  }
+}
+
+function shareStudentSubmitOnlyWhatsApp() {
+  const url = `${window.location.origin}/submit-details.html`;
+  const text = encodeURIComponent(`Hello! Please use this link to submit your student registration details for verification:\n${url}`);
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
 function openOutcomersPage() {
   selectTab('outcomers');
 }
@@ -14317,13 +14380,14 @@ async function loadOutcomers(status) {
 
 function filterOutcomers(filter) {
   currentOutcomersFilter = filter;
-  ['pending', 'approved', 'all'].forEach(f => {
+  ['pending', 'approved', 'rejected', 'all'].forEach(f => {
     const btn = document.getElementById(`outcomers-tab-${f}`);
     if (btn) {
       if (f === filter) {
-        btn.className = "px-3 py-1.5 rounded-xl text-xs font-black bg-amber-500 text-white shadow-2xs transition flex items-center gap-1.5";
+        const activeBg = f === 'rejected' ? 'bg-rose-600' : (f === 'approved' ? 'bg-teal-600' : 'bg-amber-500');
+        btn.className = `px-3 py-2 rounded-xl text-xs font-black ${activeBg} text-white shadow-2xs transition flex items-center gap-1.5 whitespace-nowrap flex-shrink-0`;
       } else {
-        btn.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--card-bg)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex items-center gap-1.5";
+        btn.className = "px-3 py-2 rounded-xl text-xs font-bold bg-[var(--card-bg)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex items-center gap-1.5 whitespace-nowrap flex-shrink-0";
       }
     }
   });
@@ -14368,48 +14432,70 @@ function renderOutcomers(list) {
   }
 
   container.innerHTML = list.map(s => {
-    const isPending = s.registrationStatus === 'pending';
+    const status = s.registrationStatus || 'pending';
+    const isPending = status === 'pending';
+    const isRejected = status === 'rejected';
     const p = s.personalDetails || {};
     const a = s.address || {};
     const f = s.familyDetails || {};
     const createdDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
     const fullAddr = [a.fullAddress, a.place, a.district, a.state, a.pinCode ? `PIN: ${a.pinCode}` : ''].filter(Boolean).join(', ') || 'No address provided';
 
+    const borderClass = isPending
+      ? 'border-amber-500/40'
+      : (isRejected ? 'border-rose-500/35' : 'border-[var(--border-color)]');
+
+    const statusBadge = isPending
+      ? '<span class="px-2 py-0.5 rounded-lg bg-amber-500 text-white font-black text-[10px] uppercase tracking-wide whitespace-nowrap">Pending</span>'
+      : (isRejected
+          ? '<span class="px-2 py-0.5 rounded-lg bg-rose-600 text-white font-black text-[10px] uppercase tracking-wide whitespace-nowrap">Not Approved</span>'
+          : '<span class="px-2 py-0.5 rounded-lg bg-teal-600 text-white font-black text-[10px] uppercase tracking-wide whitespace-nowrap">Enrolled</span>');
+
     return `
-      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border ${isPending ? 'border-amber-500/40' : 'border-[var(--border-color)]'} shadow-sm space-y-3.5 transition-all">
-        <!-- Top Row: Student Avatar, Name, Requested Class & Actions -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-color)] pb-3">
-          <div class="flex items-center gap-3">
-            <img src="${s.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(s.name)}" class="w-13 h-13 rounded-2xl object-cover border-2 border-[var(--border-color)] bg-slate-200 flex-shrink-0">
-            <div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <h4 class="font-black text-sm sm:text-base text-[var(--text-main)]">${escapeHtml(s.name)}</h4>
-                <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/15 text-[#245b70] dark:text-cyan-300 font-extrabold text-xs">Class: ${escapeHtml(s.class || 'Unassigned')}</span>
-                <span class="px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] font-bold text-xs">Roll: #${s.roll ?? '-'}</span>
-                ${isPending
-                  ? '<span class="px-2 py-0.5 rounded-lg bg-amber-500 text-white font-black text-[10px] uppercase shadow-2xs">Pending Verification</span>'
-                  : '<span class="px-2 py-0.5 rounded-lg bg-teal-500 text-white font-black text-[10px] uppercase shadow-2xs">Enrolled</span>'}
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border ${borderClass} shadow-sm space-y-3.5 transition-all">
+        <!-- Top Row: Avatar, Info & Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-color)] pb-3.5">
+          <div class="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+            <img src="${s.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(s.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[var(--border-color)] bg-slate-200 flex-shrink-0">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <h4 class="font-black text-sm sm:text-base text-[var(--text-main)] truncate max-w-full">${escapeHtml(s.name)}</h4>
+                ${statusBadge}
               </div>
-              <p class="text-[11px] text-[var(--text-sub)] font-medium mt-0.5">Submitted: ${createdDate} • Email: ${escapeHtml(p.studentEmail || 'No email')}</p>
+              <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/12 text-[#245b70] dark:text-cyan-300 font-extrabold text-[11px] whitespace-nowrap">Class: ${escapeHtml(s.class || 'Unassigned')}</span>
+                <span class="px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] font-bold text-[11px] whitespace-nowrap">Roll: #${s.roll ?? '-'}</span>
+              </div>
+              <p class="text-[11px] text-[var(--text-sub)] font-medium mt-1 truncate">Submitted: ${createdDate}${p.studentEmail ? ` • ${escapeHtml(p.studentEmail)}` : ''}</p>
             </div>
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center gap-2 self-end sm:self-center">
+          <div class="flex items-center gap-2 w-full sm:w-auto sm:flex-shrink-0 justify-end">
             ${isPending ? `
-              <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="touch-btn px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+              <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition whitespace-nowrap">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>Verify & Add to Class</span>
+                <span>Approve & Add</span>
               </button>
-              <button type="button" onclick="triggerRejectOutcomer('${s._id}')" class="touch-btn px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1 transition active:scale-95">
+              <button type="button" onclick="triggerRejectOutcomer('${s._id}', false)" class="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95 whitespace-nowrap">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                <span>Cancel</span>
+                <span>Reject</span>
+              </button>
+            ` : (isRejected ? `
+              <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="px-3 py-1.5 rounded-xl bg-teal-600/15 hover:bg-teal-600/25 text-teal-700 dark:text-teal-300 font-bold text-xs flex items-center gap-1 transition whitespace-nowrap">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Approve</span>
+              </button>
+              <button type="button" onclick="triggerRejectOutcomer('${s._id}', true)" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1 transition whitespace-nowrap">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Remove</span>
               </button>
             ` : `
-              <span class="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1">
-                <span>✓ Active in Roster (ID: ${s.studentId || '-'})</span>
+              <span class="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1.5 whitespace-nowrap">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Active in Roster (ID: ${s.studentId || '-'})</span>
               </span>
-            `}
+            `)}
           </div>
         </div>
 
@@ -14422,15 +14508,15 @@ function renderOutcomers(list) {
           <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
             <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Father's Contact</span>
             <p class="font-extrabold text-[var(--text-main)] mt-0.5">
-              ${f.fatherName || 'Not specified'} 
-              ${f.fatherMobile ? `<a href="tel:${f.fatherMobile}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${f.fatherMobile}</a>` : ''}
+              ${escapeHtml(f.fatherName || 'Not specified')} 
+              ${f.fatherMobile ? `<a href="tel:${f.fatherMobile}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${escapeHtml(f.fatherMobile)}</a>` : ''}
             </p>
           </div>
           <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
             <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Mother's Contact</span>
             <p class="font-extrabold text-[var(--text-main)] mt-0.5">
-              ${f.motherName || 'Not specified'}
-              ${f.motherNumber ? `<a href="tel:${f.motherNumber}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${f.motherNumber}</a>` : ''}
+              ${escapeHtml(f.motherName || 'Not specified')}
+              ${f.motherNumber ? `<a href="tel:${f.motherNumber}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${escapeHtml(f.motherNumber)}</a>` : ''}
             </p>
           </div>
           <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] sm:col-span-2 lg:col-span-3">
@@ -14479,10 +14565,20 @@ function openApproveOutcomerModal(id) {
 
   const rollInput = document.getElementById('aom-roll');
   if (rollInput) {
-    rollInput.value = student.roll ?? 1;
+    const selectedCls = classSelect ? classSelect.value : student.class;
+    rollInput.value = getNextRollForClassLocal(selectedCls);
+    applyRollInputPermission('aom-roll');
   }
 
   modal.classList.remove('hidden');
+}
+
+function handleApproveOutcomerClassChanged() {
+  const classSelect = document.getElementById('aom-class-select');
+  const rollInput = document.getElementById('aom-roll');
+  if (!classSelect || !rollInput) return;
+  rollInput.value = getNextRollForClassLocal(classSelect.value);
+  applyRollInputPermission('aom-roll');
 }
 
 function closeApproveOutcomerModal() {
@@ -14531,24 +14627,27 @@ async function submitApproveOutcomer(e) {
   }
 }
 
-async function triggerRejectOutcomer(id) {
+async function triggerRejectOutcomer(id, permanent = false) {
   const student = currentOutcomersList.find(s => String(s._id) === String(id));
   const sName = student ? student.name : 'this student';
-  if (!confirm(`Are you sure you want to cancel the registration for ${sName}? This student will not be included in the roster.`)) {
+  const msg = permanent
+    ? `Permanently delete the rejected submission for ${sName}?`
+    : `Mark the registration for ${sName} as Not Approved? The student will see a message to verify their details and submit again.`;
+  if (!confirm(msg)) {
     return;
   }
 
   try {
-    const res = await API.rejectOutcomer(id);
+    const res = await API.rejectOutcomer(id, permanent);
     if (res.success) {
-      showToast(res.message || 'Registration submission cancelled');
+      showToast(res.message || (permanent ? 'Submission removed' : 'Marked as Not Approved'));
       await loadOutcomers();
     } else {
-      showToast(res.message || 'Failed to cancel submission');
+      showToast(res.message || 'Failed to update submission');
     }
   } catch (err) {
     console.error('[Reject Outcomer Error]', err);
-    showToast(err.message || 'Error cancelling outcomer');
+    showToast(err.message || 'Error updating submission');
   }
 }
 

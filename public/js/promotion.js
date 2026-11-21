@@ -35,6 +35,19 @@
     archiveSearch: ''
   };
 
+  const ICON = {
+    award: '<svg class="w-3.5 h-3.5 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"></path></svg>',
+    grad: '<svg class="w-3.5 h-3.5 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>',
+    folder: '<svg class="w-4 h-4 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+    folderLg: '<svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+    rocket: '<svg class="w-4 h-4 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path></svg>',
+    file: '<svg class="w-3.5 h-3.5 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>',
+    print: '<svg class="w-3.5 h-3.5 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>',
+    check: '<svg class="w-3.5 h-3.5 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    alert: '<svg class="w-3.5 h-3.5 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+    info: '<svg class="w-3.5 h-3.5 inline-block align-[-2px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+  };
+
   function esc(str) {
     if (str === null || str === undefined) return '';
     return String(str)
@@ -119,9 +132,9 @@
       if (backupStatusEl) {
         if (hasBackup) {
           const dt = new Date(res.data.lastYearBackupAt).toLocaleString();
-          backupStatusEl.innerHTML = `<span class="text-emerald-600 dark:text-emerald-400 font-bold">✓ Backup Ready (${esc(res.data.lastYearBackupYear || res.data.currentAcademicYear)})</span> · ${esc(dt)} · ${res.data.attendanceCount} attendance logs`;
+          backupStatusEl.innerHTML = `<span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">${ICON.check} Backup Ready (${esc(res.data.lastYearBackupYear || res.data.currentAcademicYear)})</span> · ${esc(dt)} · ${res.data.attendanceCount} attendance logs`;
         } else {
-          backupStatusEl.innerHTML = `<span class="text-amber-600 dark:text-amber-400 font-bold">⚠ Download Full Year JSON Archive first to unlock Safe Cleanup</span> · ${res.data.attendanceCount} attendance logs`;
+          backupStatusEl.innerHTML = `<span class="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">${ICON.alert} Download Full Year JSON Archive first to unlock Safe Cleanup</span> · ${res.data.attendanceCount} attendance logs`;
         }
       }
 
@@ -146,8 +159,8 @@
           recentContainer.innerHTML = batches.map(b => `
             <div class="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)]">
               <div class="min-w-0">
-                <div class="text-xs font-bold text-[var(--text-main)] truncate">
-                  ${b.mode === 'reorder' ? '🏆 Roll Reorder' : `🎓 ${esc(b.fromAcademicYear)} → ${esc(b.toAcademicYear)}`}
+                <div class="text-xs font-bold text-[var(--text-main)] truncate flex items-center gap-1.5">
+                  ${b.mode === 'reorder' ? `${ICON.award}<span>Roll Reorder</span>` : `${ICON.grad}<span>${esc(b.fromAcademicYear)} → ${esc(b.toAcademicYear)}</span>`}
                 </div>
                 <div class="text-[10px] text-[var(--text-sub)] truncate">
                   ${b.summary ? `${b.summary.promoted || 0} Promoted · ${b.summary.retained || 0} Retained · ${b.summary.graduated || 0} Alumni · ${b.summary.tc || 0} TC` : ''}
@@ -212,7 +225,7 @@
           <div class="space-y-2.5">
             <button type="button" onclick="closePromotionModal('modal-academic-year-quick'); openOfflineArchiveViewer();" class="touch-btn w-full p-3.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/25 flex items-center justify-between gap-3 text-left transition">
               <div class="min-w-0">
-                <div class="text-xs font-black text-amber-800 dark:text-amber-300">📂 Open Archive JSON (Read-Only)</div>
+                <div class="text-xs font-black text-amber-800 dark:text-amber-300 flex items-center gap-1.5">${ICON.folder}<span>Open Archive JSON (Read-Only)</span></div>
                 <div class="text-[11px] text-[var(--text-sub)]">View & print past year records offline with zero DB load</div>
               </div>
               <span class="text-amber-600 font-black">→</span>
@@ -220,7 +233,7 @@
 
             <button type="button" onclick="closePromotionModal('modal-academic-year-quick'); openAlumniDirectoryModal();" class="touch-btn w-full p-3.5 rounded-2xl bg-[var(--bg-page)] hover:bg-[#245b70]/10 border border-[var(--border-color)] flex items-center justify-between gap-3 text-left transition">
               <div class="min-w-0">
-                <div class="text-xs font-black text-[var(--text-main)]">🎓 Alumni & TC Directory</div>
+                <div class="text-xs font-black text-[var(--text-main)] flex items-center gap-1.5">${ICON.grad}<span>Alumni & TC Directory</span></div>
                 <div class="text-[11px] text-[var(--text-sub)]">Search graduated & transferred students, print profiles</div>
               </div>
               <span class="text-[#245b70] dark:text-cyan-400 font-black">→</span>
@@ -229,7 +242,7 @@
             ${admin ? `
               <button type="button" onclick="closePromotionModal('modal-academic-year-quick'); openPromotionWizard();" class="touch-btn w-full p-3.5 rounded-2xl bg-[#245b70] hover:bg-[#1a4454] text-white flex items-center justify-between gap-3 text-left transition shadow-sm">
                 <div class="min-w-0">
-                  <div class="text-xs font-black">🚀 Student Promotion Wizard</div>
+                  <div class="text-xs font-black flex items-center gap-1.5">${ICON.rocket}<span>Student Promotion Wizard</span></div>
                   <div class="text-[11px] text-white/80">Promote classes, auto-assign roll numbers by Rank & Undo</div>
                 </div>
                 <span class="font-black">→</span>
@@ -378,7 +391,7 @@
       const opts = classes.map(c =>
         `<option value="${esc(c.name)}" ${c.name === selectedVal ? 'selected' : ''}>→ ${esc(c.name)}</option>`
       ).join('');
-      return opts + `<option value="__ALUMNI__" ${selectedVal === '__ALUMNI__' ? 'selected' : ''}>🎓 Graduate (Alumni)</option>`;
+      return opts + `<option value="__ALUMNI__" ${selectedVal === '__ALUMNI__' ? 'selected' : ''}>Graduate (Alumni)</option>`;
     };
 
     // Student review cards (Class-wise mode)
@@ -395,7 +408,7 @@
           const primaryAction = isLastOrAlumni ? 'graduate' : 'promote';
           const primaryLabel = isLastOrAlumni ? 'Graduate' : 'Promote';
           const rollArrow = (act === 'graduate' || act === 'tc')
-            ? `<span class="text-[11px] font-bold text-amber-600 dark:text-amber-400">Roll #${esc(st.currentRoll)} → ${act === 'graduate' ? '🎓 Alumni' : '📄 TC / Left'}</span>`
+            ? `<span class="text-[11px] font-bold text-amber-600 dark:text-amber-400 inline-flex items-center gap-1">Roll #${esc(st.currentRoll)} → ${act === 'graduate' ? `${ICON.grad} Alumni` : `${ICON.file} TC / Left`}</span>`
             : `<span class="text-[11px] font-bold text-teal-700 dark:text-teal-300">Roll #${esc(st.currentRoll)} → New #${esc(st.newRoll)}</span> <span class="text-[10px] text-[var(--text-sub)]">(${esc(st.newClass)})</span>`;
 
           return `
@@ -404,7 +417,7 @@
               <div class="flex items-center justify-between gap-2">
                 <div class="font-extrabold text-xs text-[var(--text-main)] truncate">${esc(st.name)}</div>
                 ${st.parsedRank !== null
-                  ? `<span class="flex-shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">🏆 Rank ${st.parsedRank}</span>`
+                  ? `<span class="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">${ICON.award} Rank ${st.parsedRank}</span>`
                   : `<span class="flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-[var(--text-sub)]">ID ${esc(st.studentId)}</span>`
                 }
               </div>
@@ -482,7 +495,7 @@
           <div>
             <label class="block text-[10px] font-bold text-[var(--text-sub)] mb-1">New Roll Number Order</label>
             <select onchange="setPromotionRollMode(this.value)" class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-main)]">
-              <option value="rank" ${PromoState.rollOrderMode === 'rank' ? 'selected' : ''}>🏆 By Rank (Smart Auto)</option>
+              <option value="rank" ${PromoState.rollOrderMode === 'rank' ? 'selected' : ''}>By Rank (Smart Auto)</option>
               <option value="previous" ${PromoState.rollOrderMode === 'previous' ? 'selected' : ''}>Keep Previous Roll</option>
               <option value="alpha" ${PromoState.rollOrderMode === 'alpha' ? 'selected' : ''}>Alphabetical (A–Z)</option>
             </select>
@@ -506,13 +519,13 @@
           </div>
           ${selectedClsObj ? `
             <div class="flex items-center justify-between gap-2 pt-1 flex-wrap">
-              <span class="text-[10px] text-[var(--text-sub)]">
+              <span class="text-[10px] text-[var(--text-sub)] inline-flex items-center gap-1">
                 ${selectedClsObj.rankedCount > 0
-                  ? `🏆 ${selectedClsObj.rankedCount} ranked · ${selectedClsObj.unrankedCount} unranked`
-                  : `ℹ️ No ranks entered — will preserve Roll #1..N automatically`}
+                  ? `${ICON.award} ${selectedClsObj.rankedCount} ranked · ${selectedClsObj.unrankedCount} unranked`
+                  : `${ICON.info} No ranks entered — will preserve Roll #1..N automatically`}
               </span>
-              <button type="button" onclick="reorderCurrentClassRollsByRank()" class="text-[10px] font-black text-[#245b70] dark:text-cyan-400 hover:underline">
-                🏆 Re-order Existing Rolls by Rank Only
+              <button type="button" onclick="reorderCurrentClassRollsByRank()" class="text-[10px] font-black text-[#245b70] dark:text-cyan-400 hover:underline inline-flex items-center gap-1">
+                ${ICON.award}<span>Re-order Existing Rolls by Rank Only</span>
               </button>
             </div>
           ` : ''}
@@ -577,7 +590,7 @@
               <div class="py-1.5 flex items-center justify-between gap-2 text-[11px]">
                 <div class="min-w-0 truncate">
                   <span class="font-bold text-[var(--text-main)]">${esc(s.name)}</span>
-                  ${s.parsedRank !== null ? `<span class="ml-1 text-[10px] text-amber-600 dark:text-amber-400 font-bold">🏆R${s.parsedRank}</span>` : ''}
+                  ${s.parsedRank !== null ? `<span class="ml-1 inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 font-bold">${ICON.award}R${s.parsedRank}</span>` : ''}
                   ${s.action === 'retain' ? `<span class="ml-1 text-[10px] text-amber-600 font-bold">(Retained)</span>` : ''}
                 </div>
                 <span class="flex-shrink-0 font-bold text-teal-700 dark:text-teal-300">#${esc(s.currentRoll)} → #${esc(s.newRoll)}</span>
@@ -594,8 +607,8 @@
             ${exitItems.map(s => `
               <div class="py-1.5 flex items-center justify-between gap-2 text-[11px]">
                 <span class="font-bold text-[var(--text-main)] truncate">${esc(s.name)} (${esc(s.currentClass)})</span>
-                <span class="flex-shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full ${s.action === 'graduate' ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300' : 'bg-rose-500/15 text-rose-700 dark:text-rose-300'}">
-                  ${s.action === 'graduate' ? '🎓 Alumni' : `📄 TC${s.tcNumber ? ` #${esc(s.tcNumber)}` : ''}`}
+                <span class="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${s.action === 'graduate' ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300' : 'bg-rose-500/15 text-rose-700 dark:text-rose-300'}">
+                  ${s.action === 'graduate' ? `${ICON.grad} Alumni` : `${ICON.file} TC${s.tcNumber ? ` #${esc(s.tcNumber)}` : ''}`}
                 </span>
               </div>
             `).join('')}
@@ -610,8 +623,8 @@
         <button type="button" onclick="backToPromotionSelectStep()" class="touch-btn px-3 py-2 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] text-[var(--text-main)] font-bold text-xs">
           ← Back
         </button>
-        <button type="button" id="btn-confirm-execute-promo" onclick="executePromotionNow()" class="touch-btn px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition">
-          ✓ Confirm & Promote
+        <button type="button" id="btn-confirm-execute-promo" onclick="executePromotionNow()" class="touch-btn px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition inline-flex items-center gap-1.5">
+          ${ICON.check}<span>Confirm & Promote</span>
         </button>
       `;
     }
@@ -656,7 +669,7 @@
       notify(err.message || 'Promotion failed', true);
       if (btn) {
         btn.disabled = false;
-        btn.textContent = '✓ Confirm & Promote';
+        btn.innerHTML = `${ICON.check}<span>Confirm & Promote</span>`;
       }
     }
   }
@@ -725,7 +738,7 @@
         <div class="bg-[var(--card-bg)] w-full max-w-2xl h-[90vh] sm:h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-[var(--border-color)] flex flex-col overflow-hidden">
           <div class="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border-color)] flex-shrink-0">
             <div>
-              <h3 class="text-sm sm:text-base font-black text-[var(--text-main)]">🎓 Alumni & TC Directory</h3>
+              <h3 class="text-sm sm:text-base font-black text-[var(--text-main)] flex items-center gap-1.5">${ICON.grad}<span>Alumni & TC Directory</span></h3>
               <p class="text-[10px] text-[var(--text-sub)]">Graduated & transferred students separated from active classes</p>
             </div>
             <button type="button" onclick="closePromotionModal('modal-alumni-directory')" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-[var(--text-sub)] font-bold flex items-center justify-center">✕</button>
@@ -734,8 +747,8 @@
           <div class="p-3.5 sm:p-4 space-y-3 border-b border-[var(--border-color)] flex-shrink-0">
             <!-- Segmented Tabs -->
             <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)]">
-              <button type="button" id="dir-tab-alumni" onclick="switchDirectoryTab('alumni')" class="py-2 rounded-xl text-xs font-black transition">🎓 Alumni</button>
-              <button type="button" id="dir-tab-tc" onclick="switchDirectoryTab('tc')" class="py-2 rounded-xl text-xs font-black transition">📄 TC / Left</button>
+              <button type="button" id="dir-tab-alumni" onclick="switchDirectoryTab('alumni')" class="py-2 rounded-xl text-xs font-black transition inline-flex items-center justify-center gap-1.5">${ICON.grad}<span>Alumni</span></button>
+              <button type="button" id="dir-tab-tc" onclick="switchDirectoryTab('tc')" class="py-2 rounded-xl text-xs font-black transition inline-flex items-center justify-center gap-1.5">${ICON.file}<span>TC / Left</span></button>
             </div>
 
             <!-- Filters -->
@@ -783,8 +796,8 @@
       PromoState.dirStudents = res.data || [];
       PromoState.dirMeta = res.meta || { alumniCount: 0, tcCount: 0, years: [], lastClasses: [] };
 
-      if (tabAlumni) tabAlumni.textContent = `🎓 Alumni (${PromoState.dirMeta.alumniCount})`;
-      if (tabTc) tabTc.textContent = `📄 TC / Left (${PromoState.dirMeta.tcCount})`;
+      if (tabAlumni) tabAlumni.innerHTML = `${ICON.grad}<span>Alumni (${PromoState.dirMeta.alumniCount})</span>`;
+      if (tabTc) tabTc.innerHTML = `${ICON.file}<span>TC / Left (${PromoState.dirMeta.tcCount})</span>`;
 
       const yearSel = document.getElementById('dir-filter-year');
       if (yearSel && yearSel.options.length <= 1) {
@@ -825,8 +838,8 @@
             </div>
 
             <div class="flex items-center gap-2 pt-1">
-              <button type="button" onclick="printStandaloneStudentProfile(PromoState_getDirStudent(${idx}))" class="touch-btn flex-1 py-1.5 px-3 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] font-bold text-[11px] hover:bg-[#245b70]/10 transition">
-                🖨 Print Profile
+              <button type="button" onclick="printStandaloneStudentProfile(PromoState_getDirStudent(${idx}))" class="touch-btn flex-1 py-1.5 px-3 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] font-bold text-[11px] hover:bg-[#245b70]/10 transition inline-flex items-center justify-center gap-1.5">
+                ${ICON.print}<span>Print Profile</span>
               </button>
               ${admin ? `
                 <button type="button" onclick="handleReadmitStudent('${esc(s._id)}', '${esc(s.name)}', '${esc(ex.lastClass || s.class)}')" class="touch-btn flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition">
@@ -946,7 +959,7 @@
           <!-- Amber Read-Only Archive Banner -->
           <div class="archive-readonly-banner px-4 py-2.5 flex items-center justify-between gap-2 flex-shrink-0">
             <div class="flex items-center gap-2 min-w-0">
-              <span class="text-sm">📂</span>
+              ${ICON.folder}
               <div class="min-w-0">
                 <div class="text-xs font-black truncate" id="archive-viewer-title">Offline JSON Archive Viewer (Read-Only)</div>
                 <div class="text-[10px] opacity-90 truncate" id="archive-viewer-subtitle">Zero Server/DB load — opens directly from your device</div>
@@ -970,7 +983,7 @@
   function renderArchiveUploadPromptHtml() {
     return `
       <div class="py-10 px-4 text-center space-y-4">
-        <div class="w-16 h-16 mx-auto rounded-3xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center text-3xl">📂</div>
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">${ICON.folderLg}</div>
         <div class="space-y-1">
           <h4 class="text-sm font-black text-[var(--text-main)]">Open a Past Academic Year Archive</h4>
           <p class="text-xs text-[var(--text-sub)] max-w-sm mx-auto">
@@ -1081,16 +1094,16 @@
           return `
             <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] flex items-center justify-between gap-2">
               <div class="min-w-0">
-                <div class="text-xs font-extrabold text-[var(--text-main)] truncate">
-                  ${esc(s.name)}
-                  ${rank ? `<span class="ml-1 text-[10px] text-amber-600 dark:text-amber-400">🏆 ${esc(rank)}</span>` : ''}
+                <div class="text-xs font-extrabold text-[var(--text-main)] truncate flex items-center gap-1">
+                  <span class="truncate">${esc(s.name)}</span>
+                  ${rank ? `<span class="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 flex-shrink-0">${ICON.award}${esc(rank)}</span>` : ''}
                 </div>
                 <div class="text-[10px] text-[var(--text-sub)]">
                   ${esc(s.class)} · Roll #${esc(s.roll)} · ID: ${esc(s.studentId)} · Attendance: <b>${esc(attPct)}</b>
                 </div>
               </div>
-              <button type="button" onclick="printArchivedStudentByIndex(${idx})" class="touch-btn flex-shrink-0 px-2.5 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-main)] hover:bg-[#245b70]/10">
-                🖨 Print
+              <button type="button" onclick="printArchivedStudentByIndex(${idx})" class="touch-btn flex-shrink-0 px-2.5 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-main)] hover:bg-[#245b70]/10 inline-flex items-center gap-1">
+                ${ICON.print}<span>Print</span>
               </button>
             </div>
           `;

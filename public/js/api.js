@@ -58,6 +58,25 @@ const API = {
     return res;
   },
 
+  async requestForgotPasswordOtp(phone, identifier = '') {
+    return this.request('/auth/forgot-password/request-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone, identifier })
+    });
+  },
+
+  async resetPasswordWithOtp(phone, identifier, otp, newPassword) {
+    return this.request('/auth/forgot-password/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone, identifier, otp, newPassword })
+    });
+  },
+
+  async getNextStudentRoll(className) {
+    const params = new URLSearchParams({ class: className });
+    return this.request(`/student-portal/next-roll?${params.toString()}`);
+  },
+
   async getGoogleClientId() {
     return this.request('/auth/google-client-id');
   },
@@ -633,8 +652,9 @@ const API = {
     });
   },
 
-  async rejectOutcomer(id) {
-    return this.request(`/students/outcomers/${id}/reject`, {
+  async rejectOutcomer(id, permanent = false) {
+    const qs = permanent ? '?permanent=true' : '';
+    return this.request(`/students/outcomers/${id}/reject${qs}`, {
       method: 'DELETE'
     });
   },

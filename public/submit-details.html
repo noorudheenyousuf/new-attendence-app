@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Student Registration — REGISTERLY</title>
+  <link rel="icon" type="image/png" href="/favicon.ico">
+  <meta name="theme-color" content="#245b70">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem('registerly_theme');
+      if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+    })();
+  </script>
+</head>
+<body class="bg-[var(--bg-page)] text-[var(--text-main)] min-h-screen antialiased selection:bg-[#245b70]/20">
+
+  <!-- Top Brand Header -->
+  <header class="sticky top-0 z-30 custom-gradient-header text-white shadow-md">
+    <div class="max-w-2xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 overflow-hidden flex items-center justify-center flex-shrink-0 shadow-sm">
+          <img src="/icons/logo.png" alt="Logo" class="w-full h-full object-cover">
+        </div>
+        <div class="min-w-0">
+          <div id="pub-app-name" class="text-sm font-black tracking-wider uppercase truncate">REGISTERLY</div>
+          <div id="pub-school-name" class="text-[11px] text-white/80 font-medium truncate">Student Details Submission</div>
+        </div>
+      </div>
+      <span id="pub-year-pill" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 border border-white/25 text-[10px] font-bold flex-shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
+        <span>2026-27</span>
+      </span>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-3 sm:px-4 py-5 pb-16 space-y-4">
+
+    <!-- LIVE STATUS VIEW (Shown after submission or when returning with a saved submissionId) -->
+    <section id="pub-status-section" class="hidden space-y-4">
+      <div id="pub-status-card" class="bg-[var(--card-bg)] rounded-3xl p-6 sm:p-7 border border-[var(--border-color)] shadow-md text-center space-y-4">
+        <div id="pub-status-icon-wrap" class="w-16 h-16 mx-auto rounded-3xl flex items-center justify-center"></div>
+        <div class="space-y-1.5">
+          <span id="pub-status-badge" class="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider"></span>
+          <h1 id="pub-status-title" class="text-lg sm:text-xl font-black text-[var(--text-main)]"></h1>
+          <p id="pub-status-message" class="text-xs sm:text-sm text-[var(--text-sub)] max-w-md mx-auto leading-relaxed"></p>
+        </div>
+
+        <div id="pub-status-summary" class="bg-[var(--bg-page)] rounded-2xl p-4 border border-[var(--border-color)] grid grid-cols-2 sm:grid-cols-3 gap-3 text-left text-xs">
+          <div>
+            <div class="text-[10px] font-bold uppercase text-[var(--text-sub)]">Student Name</div>
+            <div id="pub-sum-name" class="font-extrabold text-[var(--text-main)] mt-0.5 truncate">-</div>
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-[var(--text-sub)]">Class</div>
+            <div id="pub-sum-class" class="font-extrabold text-[var(--text-main)] mt-0.5 truncate">-</div>
+          </div>
+          <div class="col-span-2 sm:col-span-1">
+            <div class="text-[10px] font-bold uppercase text-[var(--text-sub)]">Roll No.</div>
+            <div id="pub-sum-roll" class="font-extrabold text-[#245b70] dark:text-cyan-400 mt-0.5">-</div>
+          </div>
+        </div>
+
+        <div id="pub-status-actions" class="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-1">
+          <button type="button" onclick="refreshPublicSubmissionStatus(true)" class="touch-btn w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            <span>Refresh Status</span>
+          </button>
+          <button type="button" id="pub-btn-resubmit" onclick="startNewPublicSubmission()" class="hidden touch-btn w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[var(--bg-page)] hover:bg-slate-200 dark:hover:bg-slate-800 border border-[var(--border-color)] text-[var(--text-main)] font-bold text-xs flex items-center justify-center gap-2 transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            <span>Submit Details Again</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FULL STUDENT REGISTRATION FORM -->
+    <section id="pub-form-section" class="space-y-4">
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-sm flex items-start gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-[#245b70]/12 text-[#245b70] dark:text-cyan-400 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-base sm:text-lg font-black text-[var(--text-main)] leading-tight">Student Registration Form</h1>
+          <p class="text-xs text-[var(--text-sub)] mt-0.5">Complete your personal, family, and academic details accurately. Your submission will be reviewed by a teacher before enrollment.</p>
+        </div>
+      </div>
+
+      <form id="pub-student-form" onsubmit="handlePublicStudentSubmit(event)" novalidate class="space-y-4">
+
+        <!-- 1. Photo Upload -->
+        <div class="bg-[var(--card-bg)] p-4 rounded-3xl border border-[var(--border-color)] shadow-sm flex items-center gap-3.5">
+          <div class="relative w-18 h-18 rounded-2xl overflow-hidden border-2 border-[#245b70]/40 flex-shrink-0 cursor-pointer group bg-slate-100 dark:bg-slate-800" style="width:72px;height:72px;" onclick="document.getElementById('pub-photo-file').click()" title="Upload student photo">
+            <img id="pub-photo-preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z'/%3E%3C/svg%3E" alt="Student Photo" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-black/35 flex items-center justify-center opacity-80 group-hover:opacity-100 transition text-white">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+          </div>
+          <input type="file" id="pub-photo-file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handlePublicPhotoUpload(event)">
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-black text-[var(--text-main)]">Student Photograph</div>
+            <div id="pub-photo-status" class="text-[11px] text-[var(--text-sub)] mt-0.5">Optional · Clear portrait photo (JPG, PNG, WEBP)</div>
+            <button type="button" onclick="document.getElementById('pub-photo-file').click()" class="mt-1.5 inline-flex items-center gap-1.5 text-xs font-bold text-[#245b70] dark:text-cyan-400 hover:underline">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              <span>Choose Photo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Basic Information -->
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3 text-xs">
+          <div class="flex items-center gap-2 text-[11px] font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span>Basic Information</span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Full Name <span class="text-rose-500">*</span></label>
+            <input type="text" id="pub-name" required placeholder="Enter your full name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Class <span class="text-rose-500">*</span></label>
+              <select id="pub-class" required onchange="handlePublicClassChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+                <option value="">Loading classes...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1 flex items-center justify-between">
+                <span>Roll No.</span>
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--text-sub)]">
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                  <span>Auto-assigned</span>
+                </span>
+              </label>
+              <input type="text" id="pub-roll" readonly value="Auto" class="touch-input w-full bg-slate-100 dark:bg-slate-800/70 border border-[var(--border-color)] rounded-xl px-3 text-xs font-black text-[#245b70] dark:text-cyan-400 cursor-not-allowed">
+            </div>
+          </div>
+
+          <div id="pub-wrap-stream" class="hidden">
+            <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Stream <span class="text-[10px] text-[#245b70] dark:text-cyan-400">(Plus One / Plus Two)</span></label>
+            <input type="text" id="pub-stream" placeholder="e.g. Science, Commerce, Humanities" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+          </div>
+
+          <div id="pub-wrap-degreeYear" class="hidden">
+            <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Year <span class="text-[10px] text-[#245b70] dark:text-cyan-400">(Degree)</span></label>
+            <input type="text" id="pub-degreeYear" placeholder="e.g. 1st Year, 2nd Year, 3rd Year" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+          </div>
+        </div>
+
+        <!-- 3. Personal Details -->
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3 text-xs">
+          <div class="flex items-center gap-2 text-[11px] font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>Personal Details</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Date of Birth</label>
+              <input type="date" id="pub-dob" onchange="handlePublicDobChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Age</label>
+              <input type="text" id="pub-age" readonly placeholder="Auto-calculated" class="touch-input w-full bg-slate-100 dark:bg-slate-800/70 border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-sub)] cursor-not-allowed">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Gender</label>
+            <div class="grid grid-cols-2 gap-2.5">
+              <label class="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] cursor-pointer text-xs font-semibold text-[var(--text-main)]">
+                <input type="radio" name="pub-gender" value="Male" checked class="accent-[#245b70]">
+                <span>Male</span>
+              </label>
+              <label class="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] cursor-pointer text-xs font-semibold text-[var(--text-main)]">
+                <input type="radio" name="pub-gender" value="Female" class="accent-[#245b70]">
+                <span>Female</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Blood Group</label>
+              <select id="pub-bloodGroup" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+                <option value="">Select</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Student Email ID</label>
+              <input type="email" id="pub-studentEmail" placeholder="student@email.com" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Address Details -->
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3 text-xs">
+          <div class="flex items-center gap-2 text-[11px] font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            <span>Address Details</span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Full Address</label>
+            <input type="text" id="pub-fullAddress" placeholder="House name, street, locality" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Place</label>
+              <input type="text" id="pub-place" placeholder="Place" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">District</label>
+              <input type="text" id="pub-district" placeholder="District" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">State</label>
+              <input type="text" id="pub-state" placeholder="State" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">PIN Code</label>
+              <input type="text" id="pub-pinCode" inputmode="numeric" maxlength="6" placeholder="6 digits" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Family Details -->
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3 text-xs">
+          <div class="flex items-center gap-2 text-[11px] font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>Family Details</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Father's Name</label>
+              <input type="text" id="pub-fatherName" placeholder="Father's name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Mother's Name</label>
+              <input type="text" id="pub-motherName" placeholder="Mother's name" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Father's Mobile</label>
+              <input type="tel" id="pub-fatherMobile" inputmode="numeric" maxlength="10" placeholder="10-digit mobile" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Mother's Number</label>
+              <input type="tel" id="pub-motherNumber" inputmode="numeric" maxlength="10" placeholder="10-digit mobile" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Guardian</label>
+              <select id="pub-guardian" onchange="handlePublicGuardianChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+                <option value="">Select</option>
+                <option value="Father">Father</option>
+                <option value="Mother">Mother</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Guardian Occupation</label>
+              <input type="text" id="pub-guardianOccupation" placeholder="e.g. Business" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+
+          <div id="pub-guardian-other-box" class="hidden p-3 rounded-2xl border border-dashed border-[#245b70]/40 bg-[var(--bg-page)] space-y-2.5">
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Guardian Name</label>
+                <input type="text" id="pub-guardianName" placeholder="Full name" class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Guardian Number</label>
+                <input type="tel" id="pub-guardianNumber" inputmode="numeric" maxlength="10" placeholder="10-digit mobile" class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Relationship to Student</label>
+              <input type="text" id="pub-guardianRelation" placeholder="e.g. Uncle" class="touch-input w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Academic Status -->
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm space-y-3 text-xs">
+          <div class="flex items-center gap-2 text-[11px] font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+            <span>Academic Status</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Admission No.</label>
+              <input type="text" id="pub-admissionNo" placeholder="e.g. ADM-2026-001" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Admission Date</label>
+              <input type="date" id="pub-admissionDate" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Previous Rank</label>
+              <input type="text" id="pub-rank" placeholder="e.g. 1st / A+" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-sub)] mb-1">Previous Institution</label>
+              <input type="text" id="pub-previousCollege" placeholder="Previous school / college" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-semibold text-[var(--text-main)]">
+            </div>
+          </div>
+        </div>
+
+        <!-- Inline Error Box -->
+        <div id="pub-form-error" class="hidden p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2">
+          <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <span id="pub-form-error-text"></span>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="pub-submit-btn" class="touch-btn w-full py-3.5 rounded-2xl custom-gradient-btn text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 transition active:scale-98">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Submit Details for Verification</span>
+        </button>
+      </form>
+    </section>
+
+  </main>
+
+  <script src="/js/submit-details.js"></script>
+</body>
+</html>

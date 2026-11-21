@@ -778,11 +778,11 @@ function updateLanguageModalUI(lang) {
 
       cardMl.className = "touch-btn w-full p-3.5 rounded-2xl border-2 border-violet-500 bg-violet-500/10 flex items-center justify-between transition active:scale-98 group text-left shadow-xs";
       checkMl.className = "w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-xs";
-      checkMl.innerHTML = "✓";
+      checkMl.innerHTML = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
     } else {
       cardEn.className = "touch-btn w-full p-3.5 rounded-2xl border-2 border-violet-500 bg-violet-500/10 flex items-center justify-between transition active:scale-98 group text-left shadow-xs";
       checkEn.className = "w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-xs";
-      checkEn.innerHTML = "✓";
+      checkEn.innerHTML = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 
       cardMl.className = "touch-btn w-full p-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--card-bg)] hover:bg-[var(--bg-page)]/50 flex items-center justify-between transition active:scale-98 group text-left";
       checkMl.className = "w-6 h-6 rounded-full border-2 border-[var(--border-color)] flex items-center justify-center text-transparent text-xs";

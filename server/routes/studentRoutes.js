@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Student = require('../models/Student');
+const Class = require('../models/Class');
+const AppSettings = require('../models/AppSettings');
 const Attendance = require('../models/Attendance');
 const Subject = require('../models/Subject');
 const ActivityLog = require('../models/ActivityLog');
@@ -9,12 +11,32 @@ const authMiddleware = require('../middleware/auth');
 const optionalAuth = require('../middleware/optionalAuth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
+// Helper: Compute next sequential roll number for a class (1..N)
+async function getNextRollForClass(className, scopeFilter = { isPrivate: { $ne: true } }) {
+  if (!className || !String(className).trim()) return 1;
+  const highest = await Student.findOne({
+    ...scopeFilter,
+    class: caseInsensitiveRegex(className),
+    registrationStatus: { $nin: ['pending', 'rejected'] },
+    lifecycleStatus: { $nin: ['alumni', 'tc'] }
+  }).sort({ roll: -1 }).select('roll').lean();
+  return highest && Number.isFinite(Number(highest.roll)) && Number(highest.roll) > 0
+    ? Number(highest.roll) + 1
+    : 1;
+}
+
 // Helper: Validate optional fields only when filled
 function validateStudentOptionalFields({ personalDetails, address, familyDetails }) {
   if (personalDetails && personalDetails.studentEmail) {
     const email = String(personalDetails.studentEmail).trim();
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return { valid: false, field: 'studentEmail', message: 'Invalid student email format' };
+    }
+  }
+  if (personalDetails && personalDetails.studentPhone) {
+    const sp = String(personalDetails.studentPhone).trim();
+    if (sp && !/^\d{10}$/.test(sp)) {
+      return { valid: false, field: 'studentPhone', message: 'Student phone number must be 10 digits' };
     }
   }
   if (address && address.pinCode) {
@@ -88,10 +110,10 @@ router.get('/', optionalAuth, async (req, res) => {
     const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
     let query = {};
 
-    if (status === 'pending') {
-      query.registrationStatus = 'pending';
+    if (status === 'pending' || status === 'rejected') {
+      query.registrationStatus = status;
     } else if (status !== 'all') {
-      query.registrationStatus = { $ne: 'pending' };
+      query.registrationStatus = { $nin: ['pending', 'rejected'] };
     }
 
     if (lifecycle === 'alumni' || lifecycle === 'tc') {
@@ -164,6 +186,181 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// @route   GET /api/students/public-submit-meta
+// @desc    Public metadata for standalone student details submission page (classes, school name, auto roll map)
+router.get('/public-submit-meta', async (req, res) => {
+  try {
+    const [settings, classes, activeStudents] = await Promise.all([
+      AppSettings.findOne().lean(),
+      Class.find({ isPrivate: { $ne: true } }).sort({ order: 1, name: 1 }).select('name order').lean(),
+      Student.find({
+        isPrivate: { $ne: true },
+        registrationStatus: { $nin: ['pending', 'rejected'] },
+        lifecycleStatus: { $nin: ['alumni', 'tc'] }
+      }, 'class roll').lean()
+    ]);
+
+    const nextRollByClass = {};
+    for (const c of classes) {
+      const clsLower = String(c.name || '').trim().toLowerCase();
+      let maxRoll = 0;
+      for (const s of activeStudents) {
+        if (String(s.class || '').trim().toLowerCase() === clsLower) {
+          const r = Number(s.roll);
+          if (Number.isFinite(r) && r > maxRoll) maxRoll = r;
+        }
+      }
+      nextRollByClass[c.name] = maxRoll + 1;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        appName: (settings && settings.appName) ? settings.appName : 'REGISTERLY',
+        schoolName: (settings && settings.schoolName) ? settings.schoolName : '',
+        currentAcademicYear: (settings && settings.currentAcademicYear) ? settings.currentAcademicYear : '2026-27',
+        classes: classes.map(c => c.name),
+        nextRollByClass
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/students/public-submit
+// @desc    Public student self-registration submission (goes to Teachers' Outcomers as pending)
+router.post('/public-submit', async (req, res) => {
+  try {
+    const {
+      name,
+      class: studentClass,
+      photoUrl,
+      personalDetails,
+      address,
+      familyDetails,
+      academicStatus
+    } = req.body || {};
+
+    if (!name || !String(name).trim() || !studentClass || !String(studentClass).trim()) {
+      return res.status(400).json({ success: false, message: 'Full Name and Class are required.' });
+    }
+
+    const validation = validateStudentOptionalFields({ personalDetails, address, familyDetails });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, field: validation.field, message: validation.message });
+    }
+
+    const cleanClass = String(studentClass).trim();
+    const autoRoll = await getNextRollForClass(cleanClass, { isPrivate: { $ne: true } });
+    const nextId = await Student.getNextStudentId();
+
+    const isGuardianOther = familyDetails && familyDetails.guardian === 'Other';
+    const newStudent = await Student.create({
+      studentId: nextId,
+      name: String(name).trim(),
+      class: cleanClass,
+      roll: autoRoll,
+      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face',
+      personalDetails: {
+        dob: personalDetails?.dob ? String(personalDetails.dob).trim() : '',
+        gender: personalDetails?.gender ? String(personalDetails.gender).trim() : '',
+        bloodGroup: personalDetails?.bloodGroup ? String(personalDetails.bloodGroup).trim() : '',
+        studentEmail: personalDetails?.studentEmail ? String(personalDetails.studentEmail).trim().toLowerCase() : '',
+        studentPhone: personalDetails?.studentPhone ? String(personalDetails.studentPhone).replace(/\D/g, '').slice(-10) : ''
+      },
+      address: {
+        fullAddress: address?.fullAddress ? String(address.fullAddress).trim() : '',
+        place: address?.place ? String(address.place).trim() : '',
+        district: address?.district ? String(address.district).trim() : '',
+        state: address?.state ? String(address.state).trim() : '',
+        pinCode: address?.pinCode ? String(address.pinCode).trim() : ''
+      },
+      familyDetails: {
+        fatherName: familyDetails?.fatherName ? String(familyDetails.fatherName).trim() : '',
+        motherName: familyDetails?.motherName ? String(familyDetails.motherName).trim() : '',
+        fatherMobile: familyDetails?.fatherMobile ? String(familyDetails.fatherMobile).trim() : '',
+        fatherWhatsapp: familyDetails?.fatherWhatsapp ? String(familyDetails.fatherWhatsapp).trim() : '',
+        motherNumber: familyDetails?.motherNumber ? String(familyDetails.motherNumber).trim() : '',
+        guardian: familyDetails?.guardian ? String(familyDetails.guardian).trim() : '',
+        guardianName: isGuardianOther && familyDetails?.guardianName ? String(familyDetails.guardianName).trim() : '',
+        guardianNumber: isGuardianOther && familyDetails?.guardianNumber ? String(familyDetails.guardianNumber).trim() : '',
+        guardianRelation: isGuardianOther && familyDetails?.guardianRelation ? String(familyDetails.guardianRelation).trim() : '',
+        guardianOccupation: familyDetails?.guardianOccupation ? String(familyDetails.guardianOccupation).trim() : ''
+      },
+      academicStatus: {
+        admissionNo: academicStatus?.admissionNo ? String(academicStatus.admissionNo).trim() : '',
+        admissionDate: academicStatus?.admissionDate ? String(academicStatus.admissionDate).trim() : '',
+        yearJoined: academicStatus?.yearJoined ? String(academicStatus.yearJoined).trim() : '',
+        admissionStatus: 'Pending Verification',
+        rank: academicStatus?.rank ? String(academicStatus.rank).trim() : '',
+        previousCollege: academicStatus?.previousCollege ? String(academicStatus.previousCollege).trim() : '',
+        stream: academicStatus?.stream ? String(academicStatus.stream).trim() : '',
+        degreeYear: academicStatus?.degreeYear ? String(academicStatus.degreeYear).trim() : ''
+      },
+      isPrivate: false,
+      registrationStatus: 'pending',
+      lifecycleStatus: 'active'
+    });
+
+    await ActivityLog.create({
+      action: `New Student Submission: ${newStudent.name}`,
+      details: `Requested Class: ${cleanClass} • Pending teacher verification`,
+      performedBy: newStudent.name,
+      role: 'student',
+      entityType: 'student',
+      entityId: newStudent._id.toString(),
+      canUndo: false
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        submissionId: newStudent._id,
+        status: 'pending',
+        name: newStudent.name,
+        class: newStudent.class,
+        roll: newStudent.roll,
+        studentId: newStudent.studentId
+      },
+      message: 'Submission received. Your details are pending teacher verification.'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/students/public-submit-status/:id
+// @desc    Public status check for a submitted student registration
+router.get('/public-submit-status/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+      return res.status(404).json({ success: false, message: 'Submission not found' });
+    }
+    const student = await Student.findById(id, 'name class roll studentId registrationStatus createdAt').lean();
+    if (!student) {
+      return res.json({
+        success: true,
+        data: { status: 'rejected', name: '', class: '', roll: null, studentId: null }
+      });
+    }
+    res.json({
+      success: true,
+      data: {
+        submissionId: student._id,
+        status: student.registrationStatus || 'pending',
+        name: student.name,
+        class: student.class,
+        roll: student.roll,
+        studentId: student.studentId
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   GET /api/students/outcomers
 // @desc    Get all students who self-registered via link and are pending verification
 router.get('/outcomers', authMiddleware, async (req, res) => {
@@ -197,11 +394,16 @@ router.put('/outcomers/:id/approve', authMiddleware, async (req, res) => {
     }
 
     const { class: assignedClass, roll, studentId } = req.body;
+    const isAdmin = req.user && req.user.role === 'admin';
     if (assignedClass) student.class = String(assignedClass).trim();
-    if (roll !== undefined && roll !== null && String(roll).trim() !== '') {
+
+    if (isAdmin && roll !== undefined && roll !== null && String(roll).trim() !== '') {
       student.roll = Number(roll);
+    } else {
+      student.roll = await getNextRollForClass(student.class, { isPrivate: { $ne: true } });
     }
-    if (studentId) {
+
+    if (isAdmin && studentId) {
       student.studentId = studentId;
     } else if (!student.studentId || isNaN(Number(student.studentId))) {
       student.studentId = await Student.getNextStudentId();
@@ -236,7 +438,7 @@ router.put('/outcomers/:id/approve', authMiddleware, async (req, res) => {
 });
 
 // @route   DELETE /api/students/outcomers/:id/reject
-// @desc    Teacher rejects/cancels an outcomer submission
+// @desc    Teacher rejects an outcomer submission (marks as rejected so student sees status; ?permanent=true deletes permanently)
 router.delete('/outcomers/:id/reject', authMiddleware, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -246,16 +448,26 @@ router.delete('/outcomers/:id/reject', authMiddleware, async (req, res) => {
 
     const studentName = student.name;
     const studentEmail = student.personalDetails?.studentEmail || '';
+    const permanent = req.query.permanent === 'true';
 
     // If user account is linked to this student, reset studentRef
     if (student.userId) {
       await User.findByIdAndUpdate(student.userId, { studentRef: null });
     }
 
-    await Student.findByIdAndDelete(req.params.id);
+    if (permanent) {
+      await Student.findByIdAndDelete(req.params.id);
+    } else {
+      student.registrationStatus = 'rejected';
+      student.academicStatus = {
+        ...(student.academicStatus || {}),
+        admissionStatus: 'Not Approved'
+      };
+      await student.save();
+    }
 
     await ActivityLog.create({
-      action: `Outcomer Submission Cancelled: ${studentName}`,
+      action: permanent ? `Rejected Submission Removed: ${studentName}` : `Outcomer Submission Not Approved: ${studentName}`,
       details: `Email: ${studentEmail}`,
       performedBy: req.user ? req.user.name : 'Teacher',
       performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
@@ -266,7 +478,9 @@ router.delete('/outcomers/:id/reject', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      message: `Outcomer submission for ${studentName} has been cancelled.`
+      message: permanent
+        ? `Submission for ${studentName} permanently removed.`
+        : `Submission for ${studentName} has been marked as Not Approved.`
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -335,8 +549,8 @@ router.post('/', authMiddleware, async (req, res) => {
       studentId: customStudentId
     } = req.body;
 
-    if (!name || !String(name).trim() || !studentClass || !String(studentClass).trim() || roll === undefined || roll === null || String(roll).trim() === '') {
-      return res.status(400).json({ success: false, message: 'Full Name, Student ID, Roll No., and Class are required' });
+    if (!name || !String(name).trim() || !studentClass || !String(studentClass).trim()) {
+      return res.status(400).json({ success: false, message: 'Full Name and Class are required' });
     }
 
     const validation = validateStudentOptionalFields({ personalDetails, address, familyDetails });
@@ -391,7 +605,8 @@ router.post('/', authMiddleware, async (req, res) => {
       dob: personalDetails?.dob ? String(personalDetails.dob).trim() : '',
       gender: personalDetails?.gender ? String(personalDetails.gender).trim() : '',
       bloodGroup: personalDetails?.bloodGroup ? String(personalDetails.bloodGroup).trim() : '',
-      studentEmail: personalDetails?.studentEmail ? String(personalDetails.studentEmail).trim().toLowerCase() : ''
+      studentEmail: personalDetails?.studentEmail ? String(personalDetails.studentEmail).trim().toLowerCase() : '',
+      studentPhone: personalDetails?.studentPhone ? String(personalDetails.studentPhone).replace(/\D/g, '').slice(-10) : ''
     };
 
     const whitelistedAddress = {
@@ -452,11 +667,19 @@ router.post('/', authMiddleware, async (req, res) => {
       });
     }
 
+    const canOverrideRoll = isPrivateBool || (req.user && req.user.role === 'admin');
+    const rollScopeFilter = isPrivateBool
+      ? { isPrivate: true, ownerEmail: userEmail }
+      : { isPrivate: { $ne: true } };
+    const finalRoll = (canOverrideRoll && roll !== undefined && roll !== null && String(roll).trim() !== '' && !isNaN(Number(roll)))
+      ? Number(roll)
+      : await getNextRollForClass(String(studentClass).trim(), rollScopeFilter);
+
     const newStudent = await Student.create({
       studentId,
       name: String(name).trim(),
       class: String(studentClass).trim(),
-      roll: Number(roll),
+      roll: finalRoll,
       photoUrl: photoUrl || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face',
       personalDetails: whitelistedPersonal,
       address: whitelistedAddress,
@@ -472,7 +695,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     await ActivityLog.create({
       action: `${isPrivateBool ? 'Private Student Enrolled' : 'Student Enrolled'}: ${name} (ID: ${studentId})`,
-      details: `Class: ${studentClass} • Roll: #${roll}`,
+      details: `Class: ${studentClass} • Roll: #${finalRoll}`,
       performedBy: userName,
       performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
       role: userRole,
@@ -529,7 +752,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
       dob: personalDetails.dob !== undefined ? String(personalDetails.dob).trim() : (oldPersonal.dob || ''),
       gender: personalDetails.gender !== undefined ? String(personalDetails.gender).trim() : (oldPersonal.gender || ''),
       bloodGroup: personalDetails.bloodGroup !== undefined ? String(personalDetails.bloodGroup).trim() : (oldPersonal.bloodGroup || ''),
-      studentEmail: personalDetails.studentEmail !== undefined ? String(personalDetails.studentEmail).trim().toLowerCase() : (oldPersonal.studentEmail || '')
+      studentEmail: personalDetails.studentEmail !== undefined ? String(personalDetails.studentEmail).trim().toLowerCase() : (oldPersonal.studentEmail || ''),
+      studentPhone: personalDetails.studentPhone !== undefined ? String(personalDetails.studentPhone).replace(/\D/g, '').slice(-10) : (oldPersonal.studentPhone || '')
     } : oldPersonal;
 
     const oldAddress = oldStudent.address || {};
@@ -571,10 +795,21 @@ router.put('/:id', authMiddleware, async (req, res) => {
       degreeYear: academicStatus.degreeYear !== undefined ? String(academicStatus.degreeYear).trim() : (oldAcademic.degreeYear || '')
     } : oldAcademic;
 
+    const nextClass = studentClass ? String(studentClass).trim() : oldStudent.class;
+    const classChanged = nextClass.toLowerCase() !== String(oldStudent.class || '').trim().toLowerCase();
+    let finalEditRoll = oldStudent.roll;
+    if (isAdmin || oldStudent.isPrivate) {
+      if (roll !== undefined && String(roll).trim() !== '' && !isNaN(Number(roll))) {
+        finalEditRoll = Number(roll);
+      }
+    } else if (classChanged) {
+      finalEditRoll = await getNextRollForClass(nextClass, { isPrivate: { $ne: true } });
+    }
+
     const updatePayload = {
       name: name ? String(name).trim() : oldStudent.name,
-      class: studentClass ? String(studentClass).trim() : oldStudent.class,
-      roll: roll !== undefined && String(roll).trim() !== '' ? Number(roll) : oldStudent.roll,
+      class: nextClass,
+      roll: finalEditRoll,
       photoUrl: photoUrl || oldStudent.photoUrl,
       personalDetails: mergedPersonal,
       address: mergedAddress,

@@ -230,7 +230,7 @@ function renderWorkspaceHub() {
           <line x1="40" y1="44" x2="40" y2="50" stroke="#be185d" stroke-width="2" stroke-linecap="round"/>
         </svg>
         <div>
-          <p class="text-sm font-black text-pink-700 dark:text-pink-300">Hey ${escapeHtml(userName)}! 👋</p>
+          <p class="text-sm font-black text-pink-700 dark:text-pink-300 inline-flex items-center gap-1.5"><span>Hey ${escapeHtml(userName)}!</span><svg class="w-4 h-4 text-pink-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path></svg></p>
           <p class="text-[11px] text-pink-500 dark:text-pink-400 mt-1 leading-relaxed">This is your private corner.<br>Your data stays safe, always.</p>
         </div>
       </div>
