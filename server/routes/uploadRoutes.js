@@ -4,9 +4,22 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const uploadService = require('../services/uploadService');
 
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const ALLOWED_FOLDERS = new Set(['students', 'avatars', 'logos', 'general']);
+const ALLOWED_REMOTE_IMAGE_HOSTS = new Set([
+  'res.cloudinary.com',
+  'images.unsplash.com',
+  'lh3.googleusercontent.com'
+]);
+
+const publicPhotoRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Too many photo uploads from this device. Please wait a few minutes and try again.'
+});
 
 // In-memory Multer storage for streaming to Cloudinary or writing to local disk
 const storage = multer.memoryStorage();
@@ -47,7 +60,8 @@ router.get('/status', (req, res) => {
  */
 router.post('/photo', authMiddleware, upload.single('photo'), async (req, res) => {
   try {
-    const folder = req.body.folder || 'students';
+    const rawFolder = String(req.body.folder || 'students').trim().toLowerCase();
+    const folder = ALLOWED_FOLDERS.has(rawFolder) ? rawFolder : 'students';
     let fileSource = null;
     let ext = '.jpg';
 
@@ -93,7 +107,7 @@ router.post('/photo', authMiddleware, upload.single('photo'), async (req, res) =
  * Streams local or remote image files as an attachment with high clarity
  * Avoids browser CORS / cross-origin blocking when saving to device gallery/downloads
  */
-router.get('/download-proxy', async (req, res) => {
+router.get('/download-proxy', authMiddleware, async (req, res) => {
   try {
     const rawUrl = req.query.url;
     let fileName = req.query.name || 'student_photo.jpg';
@@ -103,7 +117,7 @@ router.get('/download-proxy', async (req, res) => {
     }
 
     // Sanitize filename to prevent header injection or directory traversal
-    fileName = fileName.replace(/[/\\?%*:|"<>]/g, '_').trim();
+    fileName = String(fileName).replace(/[\r\n/\\?%*:|"<>]/g, '_').trim() || 'student_photo.jpg';
     if (!/\.(jpe?g|png|webp|svg)$/i.test(fileName)) {
       fileName += '.jpg';
     }
@@ -115,7 +129,7 @@ router.get('/download-proxy', async (req, res) => {
 
       const uploadsDir = path.resolve(__dirname, '../../public/uploads');
       const resolvedPath = path.resolve(localFilePath);
-      if (!resolvedPath.startsWith(uploadsDir) || !fs.existsSync(resolvedPath)) {
+      if (!resolvedPath.startsWith(uploadsDir + path.sep) || !fs.existsSync(resolvedPath)) {
         return res.status(404).send('Photo file not found');
       }
 
@@ -123,19 +137,29 @@ router.get('/download-proxy', async (req, res) => {
       return res.sendFile(resolvedPath);
     }
 
-    // 2. Handle remote URLs (Cloudinary, Unsplash, etc.)
-    if (/^https?:\/\//i.test(rawUrl)) {
-      let fetchUrl = rawUrl;
+    // 2. Handle trusted remote HTTPS image URLs only (prevents SSRF)
+    if (/^https:\/\//i.test(rawUrl)) {
+      let parsedUrl;
+      try {
+        parsedUrl = new URL(rawUrl);
+      } catch (_) {
+        return res.status(400).send('Invalid url format');
+      }
+
+      const host = parsedUrl.hostname.toLowerCase();
+      const isAllowedHost = ALLOWED_REMOTE_IMAGE_HOSTS.has(host) || host.endsWith('.cloudinary.com');
+      if (!isAllowedHost || parsedUrl.protocol !== 'https:') {
+        return res.status(403).send('Remote image host is not permitted');
+      }
+
+      let fetchUrl = parsedUrl.toString();
       // Strip Cloudinary transformations to get original camera-quality master image
-      if (fetchUrl.includes('cloudinary.com') && fetchUrl.includes('/image/upload/')) {
+      if (host.endsWith('cloudinary.com') && fetchUrl.includes('/image/upload/')) {
         fetchUrl = fetchUrl.replace(/\/image\/upload\/(?:c_[^/]+,)*w_\d+[^/]*\//i, '/image/upload/');
-      } else if (fetchUrl.includes('images.unsplash.com')) {
-        try {
-          const u = new URL(fetchUrl);
-          u.searchParams.set('w', '1600');
-          u.searchParams.set('q', '95');
-          fetchUrl = u.toString();
-        } catch (_) {}
+      } else if (host === 'images.unsplash.com') {
+        parsedUrl.searchParams.set('w', '1600');
+        parsedUrl.searchParams.set('q', '95');
+        fetchUrl = parsedUrl.toString();
       }
 
       const remoteRes = await fetch(fetchUrl);
@@ -143,7 +167,10 @@ router.get('/download-proxy', async (req, res) => {
         return res.status(remoteRes.status).send('Failed to fetch remote image');
       }
 
-      const contentType = remoteRes.headers.get('content-type') || 'image/jpeg';
+      const contentType = (remoteRes.headers.get('content-type') || '').toLowerCase();
+      if (!contentType.startsWith('image/')) {
+        return res.status(400).send('Remote resource is not a valid image');
+      }
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
@@ -173,18 +200,19 @@ const publicPhotoUpload = multer({
   }
 });
 
-router.post('/public-student-photo', publicPhotoUpload.single('photo'), async (req, res) => {
+router.post('/public-student-photo', publicPhotoRateLimit, publicPhotoUpload.single('photo'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No photo file provided.' });
     }
     const rawExt = (path.extname(req.file.originalname) || '').toLowerCase();
     const ext = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : '.jpg';
-    const result = await uploadService.uploadPhoto(req.file.buffer, 'students', ext);
+    const url = await uploadService.uploadImage(req.file.buffer, 'students', ext);
+    const provider = uploadService.isCloudinaryConfigured() ? 'cloudinary' : 'local';
     res.json({
       success: true,
-      url: result.url,
-      provider: result.provider
+      url,
+      provider
     });
   } catch (error) {
     console.error('[Public Photo Upload Error]', error);

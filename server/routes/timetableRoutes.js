@@ -4,11 +4,14 @@ const Timetable = require('../models/Timetable');
 const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const staffMiddleware = require('../middleware/staff');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+
+router.use(authMiddleware, staffMiddleware);
 
 // @route   GET /api/timetable
 // @desc    Get timetable slots, solely filtered by class, day, teacherEmail, or mine
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { class: className, day, teacherEmail, email, mine } = req.query;
     const andConditions = [];
@@ -18,11 +21,12 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 
     if (day && day !== 'all') {
+      const escapedDay = String(day).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       andConditions.push({
         $or: [
           { day: day },
           { day: 'All Days' },
-          { day: { $regex: new RegExp('\\b' + day + '\\b', 'i') } },
+          { day: { $regex: new RegExp('\\b' + escapedDay + '\\b', 'i') } },
           { days: day },
           { days: 'All Days' }
         ]

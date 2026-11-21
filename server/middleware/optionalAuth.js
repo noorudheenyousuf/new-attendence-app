@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { getJwtSecret } = require('../config/jwt');
 
 const optionalAuth = async (req, res, next) => {
   try {
@@ -12,7 +13,7 @@ const optionalAuth = async (req, res, next) => {
     }
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'registerly_super_secure_jwt_secret_key_2026');
+      const decoded = jwt.verify(token, getJwtSecret());
       const user = await User.findById(decoded.id).select('-password');
       if (user) {
         req.user = user;

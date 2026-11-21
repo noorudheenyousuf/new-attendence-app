@@ -4,7 +4,10 @@ const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const authMiddleware = require('../middleware/auth');
+const staffMiddleware = require('../middleware/staff');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+
+router.use(authMiddleware, staffMiddleware);
 
 // @route   GET /api/reports/class
 // @desc    Whole class students report with roll, sessions, present, absent, late, percent (case-insensitive)

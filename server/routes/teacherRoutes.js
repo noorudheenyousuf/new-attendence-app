@@ -10,7 +10,10 @@ const Timetable = require('../models/Timetable');
 const Subject = require('../models/Subject');
 const Class = require('../models/Class');
 const authMiddleware = require('../middleware/auth');
+const staffMiddleware = require('../middleware/staff');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+
+router.use(authMiddleware, staffMiddleware);
 
 const canUserManage = async (user) => {
   if (user && user.role === 'admin') return true;

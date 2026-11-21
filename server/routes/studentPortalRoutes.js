@@ -371,11 +371,12 @@ router.get('/timetable', authMiddleware, async (req, res) => {
     const andConditions = [{ class: caseInsensitiveRegex(student.class) }];
 
     if (day && day !== 'all') {
+      const escapedDay = String(day).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       andConditions.push({
         $or: [
           { day: day },
           { day: 'All Days' },
-          { day: { $regex: new RegExp('\\b' + day + '\\b', 'i') } },
+          { day: { $regex: new RegExp('\\b' + escapedDay + '\\b', 'i') } },
           { days: day },
           { days: 'All Days' }
         ]

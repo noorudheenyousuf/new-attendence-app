@@ -4,12 +4,14 @@ const Attendance = require('../models/Attendance');
 const Class = require('../models/Class');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
-const optionalAuth = require('../middleware/optionalAuth');
+const staffMiddleware = require('../middleware/staff');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+
+router.use(authMiddleware, staffMiddleware);
 
 // @route   GET /api/attendance
 // @desc    Get attendance for date, class, and subject (or all records for date if class not specified)
-router.get('/', optionalAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { date, class: className, subject, scope } = req.query;
     if (!date) {

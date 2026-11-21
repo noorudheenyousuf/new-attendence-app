@@ -91,7 +91,15 @@ async function sendOtpSms(phoneNumber, otp, purpose = 'Password Reset') {
   }
 
   // 3. Development / Unconfigured SMS Gateway Fallback
-  console.log(`[OTP FALLBACK] Phone: ${digits} | Purpose: ${purpose} | OTP: ${otp}`);
+  if (process.env.NODE_ENV === 'production') {
+    console.warn(`[OTP FALLBACK] SMS provider not configured in production for ${maskPhone(digits)}.`);
+    return {
+      delivered: false,
+      provider: 'unconfigured',
+      maskedPhone: maskPhone(digits)
+    };
+  }
+  console.log(`[OTP FALLBACK DEV] Phone: ${maskPhone(digits)} | Purpose: ${purpose} | OTP: ${otp}`);
   return {
     delivered: false,
     provider: 'fallback',

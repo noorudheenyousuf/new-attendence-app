@@ -9,6 +9,9 @@ const Class = require('../models/Class');
 const Timetable = require('../models/Timetable');
 const AppSettings = require('../models/AppSettings');
 const authMiddleware = require('../middleware/auth');
+const staffMiddleware = require('../middleware/staff');
+
+router.use(authMiddleware, staffMiddleware);
 
 // @route   GET /api/logs
 // @desc    Get activity logs

@@ -8,8 +8,15 @@ const Subject = require('../models/Subject');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
-const optionalAuth = require('../middleware/optionalAuth');
+const staffMiddleware = require('../middleware/staff');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+
+const publicSubmitRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: 'Too many registration submissions from this device. Please wait a few minutes and try again.'
+});
 
 // Helper: Compute next sequential roll number for a class (1..N)
 async function getNextRollForClass(className, scopeFilter = { isPrivate: { $ne: true } }) {
@@ -108,7 +115,7 @@ async function attachAttendanceStatsToStudents(studentsList) {
 
 // @route   GET /api/students
 // @desc    Get all students (with class filter, search, and scope: 'all' | 'private' | 'public')
-router.get('/', optionalAuth, async (req, res) => {
+router.get('/', authMiddleware, staffMiddleware, async (req, res) => {
   try {
     const { class: classFilter, search, scope, status, lifecycle } = req.query;
     const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
@@ -249,7 +256,7 @@ router.get('/public-next-roll', async (req, res) => {
 
 // @route   POST /api/students/public-submit
 // @desc    Public student self-registration submission (goes to Teachers' Outcomers as pending)
-router.post('/public-submit', async (req, res) => {
+router.post('/public-submit', publicSubmitRateLimit, async (req, res) => {
   try {
     const {
       name,
@@ -379,6 +386,9 @@ router.get('/public-submit-status/:id', async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// All routes below require authenticated Staff (Teacher or Admin)
+router.use(authMiddleware, staffMiddleware);
 
 // @route   GET /api/students/outcomers
 // @desc    Get all students who self-registered via link and are pending verification
@@ -524,7 +534,7 @@ router.get('/next-id', authMiddleware, async (req, res) => {
 
 // @route   GET /api/students/:id
 // @desc    Get single student with server-calculated attendance % and remarks sorted newest first
-router.get('/:id', optionalAuth, async (req, res) => {
+router.get('/:id', authMiddleware, staffMiddleware, async (req, res) => {
   try {
     const paramId = req.params.id;
     let student = null;
@@ -538,6 +548,14 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+    // Prevent cross-teacher IDOR on private workspace students
+    if (student.isPrivate) {
+      const userEmail = (req.user && req.user.email) ? req.user.email.toLowerCase().trim() : '';
+      const isAdmin = req.user && req.user.role === 'admin';
+      if (!isAdmin && (student.ownerEmail || '').toLowerCase().trim() !== userEmail) {
+        return res.status(403).json({ success: false, message: 'Access denied to this private student record' });
+      }
     }
     const [enriched] = await attachAttendanceStatsToStudents([student]);
     if (Array.isArray(enriched.remarks)) {

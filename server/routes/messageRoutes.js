@@ -4,6 +4,9 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const AppSettings = require('../models/AppSettings');
 const authMiddleware = require('../middleware/auth');
+const staffMiddleware = require('../middleware/staff');
+
+router.use(authMiddleware, staffMiddleware);
 
 // @route   GET /api/messages
 // @desc    Get all messages (last 100) sorted by newest first

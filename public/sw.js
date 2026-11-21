@@ -1,4 +1,4 @@
-const CACHE_NAME = 'registerly-cache-v9';
+const CACHE_NAME = 'registerly-cache-v10';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -41,11 +41,17 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
-  // Network-first for both API and static assets, fallback to cache when offline
+  const url = new URL(event.request.url);
+  // Never cache authenticated API responses or user uploads (prevents PII leakage on shared devices)
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) {
+    return;
+  }
+
+  // Network-first for static assets, fallback to cache when offline
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+        if (networkResponse && networkResponse.status === 200 && url.origin === self.location.origin) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);

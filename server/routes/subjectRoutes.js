@@ -5,6 +5,7 @@ const Class = require('../models/Class');
 const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const staffMiddleware = require('../middleware/staff');
 const optionalAuth = require('../middleware/optionalAuth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 
@@ -38,6 +39,9 @@ router.get('/', optionalAuth, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// All write operations on subjects require authenticated Staff (Teacher or Admin)
+router.use(authMiddleware, staffMiddleware);
 
 // @route   PUT /api/subjects/reorder
 // @desc    Update subjects display order via drag-and-drop

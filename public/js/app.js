@@ -585,7 +585,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setAuthPortalRole('student');
         openAuthModal();
       } else {
-        await loadHomeDashboard();
+        updateWelcomeGreeting();
         setAuthPortalRole('staff');
         openAuthModal();
       }
@@ -5812,15 +5812,23 @@ async function downloadCurrentEnlargedPhoto() {
     console.log('[Direct Download Fallback to Server Proxy]', fetchErr);
   }
 
-  // 3. Robust Server Download Proxy (bypasses browser CORS restrictions completely)
+  // 3. Robust Server Download Proxy (authenticated, bypasses browser CORS restrictions)
   try {
     const proxyUrl = `/api/upload/download-proxy?url=${encodeURIComponent(photoUrl)}&name=${encodeURIComponent(filename)}`;
+    const token = API.getToken ? API.getToken() : localStorage.getItem('registerly_token');
+    const resp = await fetch(proxyUrl, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!resp.ok) throw new Error('Proxy download failed');
+    const blob = await resp.blob();
+    const objUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = proxyUrl;
+    a.href = objUrl;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(objUrl), 3000);
     showToast(successMsg);
   } catch (proxyErr) {
     console.error('[Download Proxy Failed]', proxyErr);

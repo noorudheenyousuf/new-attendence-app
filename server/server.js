@@ -21,10 +21,31 @@ connectDB().then(async () => {
   // ensureSubjectsPerClass removed — subjects now use one-class-per-entry model
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Security & Body Middleware
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  next();
+});
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  }
+}));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 // Serve static frontend files and uploaded media
 app.use('/uploads', express.static(uploadsDir));
@@ -37,12 +58,13 @@ app.get(['/manifest-icon-192.png', '/manifest-icon-512.png', '/api/app-icon', '/
     if (settings && settings.appLogo) {
       const logo = settings.appLogo.trim();
       if (logo.startsWith('/uploads/')) {
-        const localPath = path.join(__dirname, '..', 'public', logo);
-        if (fs.existsSync(localPath)) {
+        const resolvedUploads = path.resolve(uploadsDir);
+        const localPath = path.resolve(path.join(__dirname, '..', 'public', logo));
+        if (localPath.startsWith(resolvedUploads + path.sep) && fs.existsSync(localPath)) {
           res.setHeader('Cache-Control', 'public, max-age=60');
           return res.sendFile(localPath);
         }
-      } else if (logo.startsWith('http://') || logo.startsWith('https://')) {
+      } else if (logo.startsWith('https://')) {
         return res.redirect(logo);
       }
     }

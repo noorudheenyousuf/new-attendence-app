@@ -11,8 +11,26 @@ const Timetable = require('../models/Timetable');
 const ActivityLog = require('../models/ActivityLog');
 const Student = require('../models/Student');
 const authMiddleware = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
+const { getJwtSecret } = require('../config/jwt');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 const { generateOtp, maskPhone, sendOtpSms } = require('../services/otpService');
+
+const authRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Too many authentication attempts. Please wait 15 minutes and try again.'
+});
+const otpRequestRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Too many OTP requests. Please wait 15 minutes before requesting another code.'
+});
+const otpResetRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many password reset attempts. Please wait 15 minutes and try again.'
+});
 
 const getGoogleClientId = () => {
   try {
@@ -25,7 +43,7 @@ const getGoogleClientId = () => {
 const generateToken = (user) => {
   return jwt.sign(
     { id: user._id, role: user.role, email: user.email },
-    process.env.JWT_SECRET || 'registerly_super_secure_jwt_secret_key_2026',
+    getJwtSecret(),
     { expiresIn: '30d' }
   );
 };
@@ -40,7 +58,7 @@ router.get('/google-client-id', (req, res) => {
 
 // @route   POST /api/auth/register
 // @desc    Register a new user (Supports admin, teacher, and student registration via email or username)
-router.post('/register', async (req, res) => {
+router.post('/register', authRateLimit, async (req, res) => {
   try {
     const { name, email, username, phone, password, role: requestedRole, portal } = req.body;
     const isStudentPortal = portal === 'student' || requestedRole === 'student';
@@ -151,7 +169,7 @@ router.post('/register', async (req, res) => {
 
 // @route   POST /api/auth/login
 // @desc    Login with Email / Username & Password
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimit, async (req, res) => {
   try {
     const { email, password, portal } = req.body;
     if (!email || !password) {
@@ -651,7 +669,7 @@ async function findUserForOtpReset(phone, identifier) {
 
 // @route   POST /api/auth/forgot-password/request-otp
 // @desc    Send a 6-digit OTP to registered parent/student phone number
-router.post('/forgot-password/request-otp', async (req, res) => {
+router.post('/forgot-password/request-otp', otpRequestRateLimit, async (req, res) => {
   try {
     const { phone, identifier } = req.body;
     const lookup = await findUserForOtpReset(phone, identifier);
@@ -668,6 +686,14 @@ router.post('/forgot-password/request-otp', async (req, res) => {
     await user.save();
 
     const smsResult = await sendOtpSms(digits, otp, 'Password Reset');
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (!smsResult.delivered && isProduction) {
+      return res.status(503).json({
+        success: false,
+        message: 'SMS OTP service is not configured on the server. Please contact your school administrator to reset your password.'
+      });
+    }
 
     const responsePayload = {
       success: true,
@@ -676,9 +702,9 @@ router.post('/forgot-password/request-otp', async (req, res) => {
       delivered: smsResult.delivered,
       message: smsResult.delivered
         ? `A 6-digit OTP has been sent to ${smsResult.maskedPhone}.`
-        : `OTP generated for ${smsResult.maskedPhone}.`
+        : `OTP generated for ${smsResult.maskedPhone} (dev mode).`
     };
-    if (!smsResult.delivered && smsResult.devOtp) {
+    if (!smsResult.delivered && !isProduction && smsResult.devOtp) {
       responsePayload.devOtp = smsResult.devOtp;
     }
 
@@ -691,7 +717,7 @@ router.post('/forgot-password/request-otp', async (req, res) => {
 
 // @route   POST /api/auth/forgot-password/reset-password
 // @desc    Verify OTP and reset user password
-router.post('/forgot-password/reset-password', async (req, res) => {
+router.post('/forgot-password/reset-password', otpResetRateLimit, async (req, res) => {
   try {
     const { phone, identifier, otp, newPassword } = req.body;
     if (!otp || !/^\d{6}$/.test(String(otp).trim())) {

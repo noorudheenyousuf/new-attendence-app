@@ -8,10 +8,11 @@ const Enrollment = require('../models/Enrollment');
 const PromotionBatch = require('../models/PromotionBatch');
 const ActivityLog = require('../models/ActivityLog');
 const authMiddleware = require('../middleware/auth');
+const staffMiddleware = require('../middleware/staff');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
 const { parseRank, computeNextAcademicYear, assignRollNumbers } = require('../utils/promotionHelper');
 
-router.use(authMiddleware);
+router.use(authMiddleware, staffMiddleware);
 
 function resolveScope(req, bodyOrQuery = {}) {
   const scope = bodyOrQuery.scope === 'private' ? 'private' : 'public';
