@@ -49,6 +49,39 @@
     if (statusSec) statusSec.classList.remove('hidden');
 
     const status = (data && data.status) || 'pending';
+    const stepperEl = document.getElementById('pub-status-stepper');
+    if (stepperEl) {
+      const checkSvg = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      const clockSvg = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+      const xSvg = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+      const s2Dot = status === 'approved'
+        ? `<div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">${checkSvg}</div>`
+        : (status === 'rejected'
+            ? `<div class="w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-xs">${xSvg}</div>`
+            : `<div class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs ring-4 ring-amber-500/20 animate-pulse">${clockSvg}</div>`);
+      const s3Dot = status === 'approved'
+        ? `<div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">${checkSvg}</div>`
+        : `<div class="w-7 h-7 rounded-full bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[11px] font-black">3</div>`;
+
+      stepperEl.innerHTML = `
+        <div class="grid grid-cols-3 gap-2">
+          <div class="flex flex-col items-center text-center gap-1.5">
+            <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">${checkSvg}</div>
+            <span class="text-[10px] font-extrabold text-[var(--text-main)] leading-tight">1. Submitted</span>
+          </div>
+          <div class="flex flex-col items-center text-center gap-1.5">
+            ${s2Dot}
+            <span class="text-[10px] font-extrabold text-[var(--text-main)] leading-tight">${status === 'rejected' ? '2. Not Approved' : (status === 'approved' ? '2. Verified' : '2. Teacher Review')}</span>
+          </div>
+          <div class="flex flex-col items-center text-center gap-1.5 ${status === 'approved' ? '' : 'opacity-45'}">
+            ${s3Dot}
+            <span class="text-[10px] font-extrabold text-[var(--text-main)] leading-tight">3. Enrolled</span>
+          </div>
+        </div>
+      `;
+    }
+
     const nameEl = document.getElementById('pub-sum-name');
     const clsEl = document.getElementById('pub-sum-class');
     const rollEl = document.getElementById('pub-sum-roll');

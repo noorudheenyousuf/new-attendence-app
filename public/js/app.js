@@ -6122,6 +6122,16 @@ function isAttendanceMarkedByCurrentUser(att, user) {
   return false;
 }
 
+let currentLiveSlotMatch = null;
+
+function handleLiveSlotClick() {
+  if (isActiveAppDateToday() && currentLiveSlotMatch && currentLiveSlotMatch.class) {
+    jumpToTakeAttendance(currentLiveSlotMatch.class, currentLiveSlotMatch.subject || '');
+  } else {
+    openTodayScheduleModal();
+  }
+}
+
 async function updateProfileDashboardKPIs() {
   if (!currentUser) return;
 
@@ -6164,6 +6174,18 @@ async function updateProfileDashboardKPIs() {
     todayClassesEls.forEach(el => el.textContent = String(todaySlots.length));
 
     const isMl = (typeof currentAppLanguage !== 'undefined' ? currentAppLanguage : localStorage.getItem('app_language')) === 'ml';
+    const backTodayBtn = document.getElementById('dash-back-to-today-btn');
+    const liveActionPill = document.getElementById('dash-status-live-action-pill');
+    const headerPillText = document.getElementById('dash-status-header-pill-text');
+    const liveLabelEl = document.getElementById('dash-status-live-label');
+    const nextLabelEl = document.getElementById('dash-status-next-label');
+
+    if (backTodayBtn) backTodayBtn.classList.toggle('hidden', isToday);
+    if (headerPillText) headerPillText.textContent = isToday ? 'Live Schedule' : 'Selected Date';
+    if (liveLabelEl) liveLabelEl.textContent = isToday ? 'Live In' : 'Selected Date';
+    if (nextLabelEl) nextLabelEl.textContent = isToday ? 'Next Subject' : 'Attendance';
+
+    currentLiveSlotMatch = null;
 
     if (!isToday) {
       const formattedSelected = activeDt.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
@@ -6171,6 +6193,11 @@ async function updateProfileDashboardKPIs() {
       liveMetaEls.forEach(el => el.textContent = `${todaySlots.length} scheduled class${todaySlots.length === 1 ? '' : 'es'}`);
       nextSubEls.forEach(el => el.textContent = todaySlots.length > 0 ? 'Tap Classes' : 'No Classes');
       nextMetaEls.forEach(el => el.textContent = todaySlots.length > 0 ? 'Open timetable to mark fast' : 'No schedule on this date');
+      if (liveActionPill) {
+        liveActionPill.classList.toggle('hidden', todaySlots.length === 0);
+        const span = liveActionPill.querySelector('span');
+        if (span) span.textContent = 'Slots';
+      }
     } else {
       // Calculate Live and Next Subject for Today
       const currentMin = activeDt.getHours() * 60 + activeDt.getMinutes();
@@ -6197,6 +6224,19 @@ async function updateProfileDashboardKPIs() {
         if (item.startMin === null) return false;
         return item.startMin > currentMin;
       });
+
+      if (liveMatch && liveMatch.slot) {
+        currentLiveSlotMatch = {
+          class: liveMatch.slot.class || '',
+          subject: liveMatch.slot.subject || ''
+        };
+      }
+
+      if (liveActionPill) {
+        liveActionPill.classList.toggle('hidden', !currentLiveSlotMatch);
+        const span = liveActionPill.querySelector('span');
+        if (span) span.textContent = 'Mark';
+      }
 
       if (liveSubEls.length > 0) {
         if (liveMatch) {
@@ -13139,20 +13179,83 @@ async function initStudentPortal() {
       populateProfileOrganizedSections(student);
 
       const unregBanner = document.getElementById('sp-unregistered-banner');
-      if (student.registrationStatus === 'pending') {
-        if (unregBanner) {
-          unregBanner.className = "p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1";
+      if (unregBanner) {
+        const regStatus = student.registrationStatus || 'approved';
+        const isPending = regStatus === 'pending';
+        const isRejected = regStatus === 'rejected';
+        const checkSvg = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        const clockSvg = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+        const xSvg = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+        if (isPending || isRejected) {
+          unregBanner.className = isRejected
+            ? "p-4 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 space-y-3 shadow-xs"
+            : "p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-100 space-y-3 shadow-xs";
+
+          const step2Dot = isRejected
+            ? `<div class="w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-xs">${xSvg}</div>`
+            : `<div class="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs ring-4 ring-amber-500/20 animate-pulse">${clockSvg}</div>`;
+
           unregBanner.innerHTML = `
-            <div class="font-black text-sm flex items-center gap-2">
-              <svg class="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              <span>Registration Submitted — Pending Teacher Verification</span>
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="font-black text-xs sm:text-sm flex items-center gap-1.5">
+                  <span>${isRejected ? 'Registration Not Approved' : 'Enrollment Progress — Pending Verification'}</span>
+                </div>
+                <p class="text-[11px] leading-relaxed opacity-85 mt-0.5">
+                  ${isRejected
+                    ? 'Your details were not approved. Please check your information with your teacher.'
+                    : 'Your details are with your teacher for verification. Once approved, you will be enrolled in your class automatically.'}
+                </p>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex-shrink-0 ${isRejected ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'}">${isRejected ? 'Action Needed' : 'Step 2 of 3'}</span>
             </div>
-            <p class="text-xs leading-relaxed opacity-90">Your student registration has been received and queued for teacher verification. Official records will be synchronized automatically.</p>
+
+            <!-- 3-Step Visual Progress Bar -->
+            <div class="grid grid-cols-3 gap-2 pt-1 relative">
+              <div class="flex flex-col items-center text-center gap-1.5">
+                <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">${checkSvg}</div>
+                <span class="text-[10px] font-extrabold leading-tight">1. Submitted</span>
+              </div>
+              <div class="flex flex-col items-center text-center gap-1.5">
+                ${step2Dot}
+                <span class="text-[10px] font-extrabold leading-tight">${isRejected ? '2. Not Approved' : '2. Teacher Review'}</span>
+              </div>
+              <div class="flex flex-col items-center text-center gap-1.5 opacity-45">
+                <div class="w-7 h-7 rounded-full bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[11px] font-black">3</div>
+                <span class="text-[10px] font-bold leading-tight">3. Enrolled</span>
+              </div>
+            </div>
           `;
+          unregBanner.dataset.hasProgress = 'true';
           unregBanner.classList.remove('hidden');
+        } else {
+          // Clean compact Enrolled confirmation progress bar for newly verified students (within 14 days of registration)
+          const createdTs = student.createdAt ? new Date(student.createdAt).getTime() : 0;
+          const isRecentEnrollment = createdTs > 0 && (Date.now() - createdTs) < (14 * 24 * 60 * 60 * 1000);
+          if (isRecentEnrollment) {
+            unregBanner.className = "p-3.5 rounded-3xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-950 dark:text-emerald-100 space-y-2.5 shadow-xs";
+            unregBanner.innerHTML = `
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 text-xs font-black text-emerald-700 dark:text-emerald-300">
+                  <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0">${checkSvg}</span>
+                  <span>Enrolled in ${escapeHtml(student.class || 'Class')} (Roll #${student.roll ?? '-'})</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider">Verified</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">${checkSvg}<span>Submitted</span></div>
+                <div class="flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">${checkSvg}<span>Verified</span></div>
+                <div class="flex items-center justify-center gap-1 text-[10px] font-black text-emerald-700 dark:text-emerald-300">${checkSvg}<span>Enrolled</span></div>
+              </div>
+            `;
+            unregBanner.dataset.hasProgress = 'true';
+            unregBanner.classList.remove('hidden');
+          } else {
+            unregBanner.dataset.hasProgress = 'false';
+            unregBanner.classList.add('hidden');
+          }
         }
-      } else {
-        if (unregBanner) unregBanner.classList.add('hidden');
       }
 
       // Default to Home Dashboard
@@ -13582,10 +13685,19 @@ function switchStudentPortalTab(tab, subTab) {
   currentStudentPortalTab = tab;
   const tabs = ['home', 'classes', 'attendance', 'updates', 'profile'];
 
-  // Show Student Portal greeting card ONLY on the Home tab
+  // Show Student Portal greeting card & enrollment progress banner ONLY on the Home tab
   const greetingCard = document.getElementById('sp-home-greeting-card');
   if (greetingCard) {
     greetingCard.classList.toggle('hidden', tab !== 'home');
+  }
+  const progressBanner = document.getElementById('sp-unregistered-banner');
+  if (progressBanner) {
+    const shouldShowBanner = progressBanner.dataset.hasProgress === 'true';
+    if (tab !== 'home') {
+      progressBanner.classList.add('hidden');
+    } else if (shouldShowBanner) {
+      progressBanner.classList.remove('hidden');
+    }
   }
 
   const activeBottomTab = (tab === 'classes' || tab === 'attendance') ? 'home' : tab;
