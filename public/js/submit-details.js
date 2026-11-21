@@ -251,7 +251,8 @@
         dob: document.getElementById('pub-dob')?.value || '',
         gender: genderEl ? genderEl.value : 'Male',
         bloodGroup: document.getElementById('pub-bloodGroup')?.value || '',
-        studentEmail: document.getElementById('pub-studentEmail')?.value?.trim() || ''
+        studentEmail: document.getElementById('pub-studentEmail')?.value?.trim() || '',
+        studentPhone: (document.getElementById('pub-studentPhone')?.value || '').replace(/\D/g, '').slice(-10)
       },
       address: {
         fullAddress: document.getElementById('pub-fullAddress')?.value?.trim() || '',

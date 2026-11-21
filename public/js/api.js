@@ -576,6 +576,42 @@ const API = {
     });
   },
 
+  async linkExistingStudentProfile(data) {
+    return this.request('/student-portal/link-existing', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getStudentAppAccess(studentId) {
+    return this.request(`/students/${encodeURIComponent(studentId)}/app-access`);
+  },
+
+  async generateStudentConnectCode(studentObjId) {
+    return this.request(`/students/${encodeURIComponent(studentObjId)}/generate-connect-code`, {
+      method: 'POST'
+    });
+  },
+
+  async linkStudentToUser(studentObjId, userId) {
+    return this.request(`/students/${encodeURIComponent(studentObjId)}/link-user`, {
+      method: 'POST',
+      body: JSON.stringify({ userId })
+    });
+  },
+
+  async unlinkStudentFromUser(studentObjId) {
+    return this.request(`/students/${encodeURIComponent(studentObjId)}/unlink-user`, {
+      method: 'POST'
+    });
+  },
+
+  async mergeOutcomerIntoStudent(outcomerId, targetStudentId) {
+    return this.request(`/students/outcomers/${encodeURIComponent(outcomerId)}/merge-into/${encodeURIComponent(targetStudentId)}`, {
+      method: 'POST'
+    });
+  },
+
   async updateStudentDetails(data) {
     return this.request('/student-portal/update-details', {
       method: 'PUT',

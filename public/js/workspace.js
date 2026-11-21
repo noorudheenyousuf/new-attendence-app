@@ -732,7 +732,7 @@ function pwResetStudentModal() {
   if (preview) preview.src = DEFAULT_PW_AVATAR;
   const fileInput = document.getElementById('pw-student-photo-file');
   if (fileInput) fileInput.value = '';
-  ['pw-input-student-id','pw-input-student-name','pw-input-student-roll',
+  ['pw-input-student-id','pw-input-student-name','pw-input-student-roll','pw-input-student-studentPhone',
    'pw-input-student-stream','pw-input-student-degreeYear',
    'pw-input-student-address','pw-input-student-place','pw-input-student-district','pw-input-student-state',
    'pw-input-student-fatherName','pw-input-student-motherName',
@@ -777,6 +777,8 @@ async function pwEditStudent(id) {
   document.getElementById('pw-input-student-id').readOnly = false;
   document.getElementById('pw-input-student-name').value = st.name || '';
   document.getElementById('pw-input-student-roll').value = st.roll || '';
+  const pwPhoneEl = document.getElementById('pw-input-student-studentPhone');
+  if (pwPhoneEl) pwPhoneEl.value = st.personalDetails?.studentPhone || '';
   const streamEl = document.getElementById('pw-input-student-stream');
   if (streamEl) streamEl.value = st.stream || st.academicStatus?.stream || '';
   const yrEl = document.getElementById('pw-input-student-degreeYear');
@@ -827,6 +829,7 @@ async function pwSaveStudent(e) {
   const studentId   = document.getElementById('pw-input-student-id').value.trim();
   const name        = document.getElementById('pw-input-student-name').value.trim();
   const roll        = document.getElementById('pw-input-student-roll').value.trim();
+  const studentPhone = (document.getElementById('pw-input-student-studentPhone')?.value || '').replace(/\D/g, '').slice(-10);
   const cls         = document.getElementById('pw-input-student-class').value;
   const stream      = (document.getElementById('pw-input-student-stream')?.value || '').trim();
   const degreeYear  = (document.getElementById('pw-input-student-degreeYear')?.value || '').trim();
@@ -856,6 +859,9 @@ async function pwSaveStudent(e) {
   const payload = {
     name, class: cls, roll, studentId, stream, degreeYear,
     photoUrl: pwStudentPhotoUrl || undefined,
+    personalDetails: {
+      studentPhone
+    },
     address, place, district, state,
     fatherName, motherName, fatherMobile, fatherWhatsapp,
     yearJoined, rank, previousCollege,

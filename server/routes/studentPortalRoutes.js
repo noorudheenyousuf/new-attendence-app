@@ -13,7 +13,22 @@ const LeaveRequest = require('../models/LeaveRequest');
 const AppSettings = require('../models/AppSettings');
 const bcrypt = require('bcryptjs');
 const authMiddleware = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+
+const linkExistingRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many verification attempts. Please wait 15 minutes and try again.'
+});
+
+// Higher / college classes (BS1-BS5, Degree, PG) verify via Phone Number;
+// School classes (1 to Plus Two / +2) verify via Date of Birth.
+function isHigherClassForPhone(className) {
+  const clean = String(className || '').trim().toLowerCase();
+  if (!clean) return false;
+  return /\bbs\s*[1-9]\b|\bbs[1-9]\b|\b(degree|ba|bsc|bcom|bba|bca|pg|ma|msc|mcom|mba|mca|higher)\b/i.test(clean);
+}
 
 // Helper: Validate optional fields only when filled
 function validateStudentOptionalFields({ personalDetails, address, familyDetails }) {
@@ -123,11 +138,190 @@ async function findLinkedStudent(user) {
   if (!student && userEmail) {
     student = await Student.findOne({
       'personalDetails.studentEmail': userEmail,
-      isPrivate: { $ne: true }
+      isPrivate: { $ne: true },
+      userId: { $in: [null, user._id] }
     });
   }
   return student;
 }
+
+// @route   POST /api/student-portal/link-existing
+// @desc    Connect a newly logged-in student User account to an already-enrolled Student profile
+router.post('/link-existing', authMiddleware, linkExistingRateLimit, async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user || user.role !== 'student') {
+      return res.status(403).json({ success: false, message: 'Only student accounts can link to a student profile.' });
+    }
+
+    const alreadyLinked = await findLinkedStudent(user);
+    if (alreadyLinked) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your account is already connected to a student profile.'
+      });
+    }
+
+    const { connectCode, studentId, class: studentClass, roll, verifyDob, verifyPhone } = req.body || {};
+    let targetStudent = null;
+
+    // MODE 1: 6-character Teacher Connect Code
+    if (connectCode && String(connectCode).trim()) {
+      const cleanCode = String(connectCode).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (cleanCode.length < 4) {
+        return res.status(400).json({ success: false, message: 'Please enter a valid Connect Code.' });
+      }
+      targetStudent = await Student.findOne({
+        connectCode: cleanCode,
+        isPrivate: { $ne: true },
+        lifecycleStatus: { $nin: ['alumni', 'tc'] }
+      });
+      if (!targetStudent) {
+        return res.status(404).json({ success: false, message: 'Invalid Connect Code. Please check with your teacher.' });
+      }
+      if (targetStudent.connectCodeExpires && new Date() > new Date(targetStudent.connectCodeExpires)) {
+        return res.status(400).json({ success: false, message: 'This Connect Code has expired. Please ask your teacher for a new code.' });
+      }
+      if (targetStudent.userId && String(targetStudent.userId) !== String(user._id)) {
+        return res.status(409).json({ success: false, message: 'This student profile is already connected to another login account.' });
+      }
+    } else {
+      // MODE 2: Self-connect via (Student ID OR Class + Roll) + Class-based Proof (DOB for 1..+2, Phone for BS1..BS5+)
+      const hasStudentId = studentId !== undefined && studentId !== null && String(studentId).trim() !== '';
+      const hasClassRoll = studentClass && String(studentClass).trim() && roll !== undefined && roll !== null && String(roll).trim() !== '';
+
+      if (!hasStudentId && !hasClassRoll) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter your Student ID or select your Class and Roll Number.'
+        });
+      }
+
+      const baseQuery = {
+        isPrivate: { $ne: true },
+        registrationStatus: { $nin: ['pending', 'rejected'] },
+        lifecycleStatus: { $nin: ['alumni', 'tc'] }
+      };
+
+      if (hasStudentId) {
+        const cleanId = String(studentId).trim();
+        const numId = Number(cleanId);
+        baseQuery.studentId = !isNaN(numId) ? { $in: [cleanId, numId] } : cleanId;
+      } else {
+        baseQuery.class = caseInsensitiveRegex(String(studentClass).trim());
+        baseQuery.roll = Number(roll);
+      }
+
+      targetStudent = await Student.findOne(baseQuery);
+      if (!targetStudent) {
+        return res.status(404).json({
+          success: false,
+          message: 'No matching enrolled student profile found. Please check your details or ask your teacher for a Connect Code.'
+        });
+      }
+
+      if (targetStudent.userId && String(targetStudent.userId) !== String(user._id)) {
+        return res.status(409).json({
+          success: false,
+          message: 'This student profile is already linked to another login. Contact your teacher to unlink the old account.'
+        });
+      }
+
+      const requiresPhone = isHigherClassForPhone(targetStudent.class);
+      const cleanDob = String(verifyDob || '').trim();
+      const cleanPhone = String(verifyPhone || '').replace(/\D/g, '').slice(-10);
+
+      const storedDob = String(targetStudent.personalDetails?.dob || '').trim();
+      const storedPhones = [
+        targetStudent.personalDetails?.studentPhone,
+        targetStudent.familyDetails?.fatherMobile,
+        targetStudent.familyDetails?.fatherWhatsapp,
+        targetStudent.familyDetails?.motherNumber,
+        targetStudent.familyDetails?.guardianNumber
+      ]
+        .map(v => String(v || '').replace(/\D/g, '').slice(-10))
+        .filter(v => v.length === 10);
+
+      const dobMatches = Boolean(cleanDob && storedDob && cleanDob === storedDob);
+      const phoneMatches = Boolean(cleanPhone.length === 10 && storedPhones.includes(cleanPhone));
+
+      if (requiresPhone) {
+        if (!cleanPhone || cleanPhone.length !== 10) {
+          return res.status(400).json({
+            success: false,
+            message: 'For BS1–BS5 and higher classes, please enter your registered 10-digit mobile number to verify.'
+          });
+        }
+        if (!phoneMatches) {
+          return res.status(401).json({
+            success: false,
+            message: 'Verification failed. Mobile number does not match our records. Please ask your teacher for a Connect Code.'
+          });
+        }
+      } else {
+        // Classes 1 to Plus Two: DOB primary (fallback to phone only if DOB is not recorded)
+        if (storedDob) {
+          if (!cleanDob) {
+            return res.status(400).json({
+              success: false,
+              message: 'Please enter your Date of Birth to verify your profile.'
+            });
+          }
+          if (!dobMatches) {
+            return res.status(401).json({
+              success: false,
+              message: 'Verification failed. Date of Birth does not match our records. Please check or ask your teacher for a Connect Code.'
+            });
+          }
+        } else if (storedPhones.length > 0 && phoneMatches) {
+          // Allowed fallback when DOB wasn't recorded by teacher
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: 'Your Date of Birth is not saved on your profile yet. Please ask your teacher for a 6-digit Connect Code.'
+          });
+        }
+      }
+    }
+
+    // Link User <-> Student atomically
+    targetStudent.userId = user._id;
+    targetStudent.connectCode = '';
+    targetStudent.connectCodeExpires = null;
+    if (user.email && !targetStudent.personalDetails?.studentEmail) {
+      targetStudent.personalDetails = {
+        ...(targetStudent.personalDetails || {}),
+        studentEmail: user.email.toLowerCase().trim()
+      };
+    }
+    await targetStudent.save();
+
+    await User.findByIdAndUpdate(user._id, {
+      studentRef: targetStudent._id,
+      ...(targetStudent.name ? { name: targetStudent.name } : {})
+    });
+
+    await ActivityLog.create({
+      action: `Student App Connected: ${targetStudent.name}`,
+      details: `Class: ${targetStudent.class}, Roll: ${targetStudent.roll} • Linked login: ${user.email || user.username || user.name}`,
+      performedBy: targetStudent.name,
+      performedByEmail: (user.email || '').toLowerCase(),
+      role: 'student',
+      entityType: 'student',
+      entityId: targetStudent._id.toString(),
+      canUndo: false
+    });
+
+    res.json({
+      success: true,
+      data: targetStudent,
+      message: `Connected to ${targetStudent.name} (${targetStudent.class})!`
+    });
+  } catch (error) {
+    console.error('[StudentPortal Link Existing Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // @route   GET /api/student-portal/me
 // @desc    Get current student's linked profile and attendance

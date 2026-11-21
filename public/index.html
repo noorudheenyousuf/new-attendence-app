@@ -2886,19 +2886,119 @@
         <div class="space-y-2 relative">
           <h3 class="text-xl font-black text-[var(--text-main)] tracking-tight">Welcome to Student App!</h3>
           <p class="text-xs text-[var(--text-sub)] leading-relaxed">
-            Let's add your student details first. Once submitted, your digital ID card, weekly timetable, and attendance portal will open automatically.
+            Already added by your teacher? Connect your existing profile in seconds. New student? Submit your details below.
           </p>
         </div>
 
-        <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] text-[11px] text-[var(--text-sub)] flex items-center gap-2 text-left">
-          <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-          <span>Please enter accurate details. Student records cannot be edited after submission.</span>
+        <div class="space-y-2.5">
+          <button type="button" onclick="openStudentLinkExistingModal()" class="touch-btn w-full py-3.5 px-4 rounded-2xl custom-gradient-btn text-white font-black text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2 active:scale-98 transition">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>Already Enrolled? Connect Profile</span>
+          </button>
+
+          <button type="button" id="btn-sp-welcome-ok" onclick="proceedFromWelcomeToOnboardingForm()" class="touch-btn w-full py-3 px-4 rounded-2xl bg-[var(--bg-page)] hover:bg-[#245b70]/10 border border-[var(--border-color)] text-[var(--text-main)] font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 active:scale-98 transition">
+            <svg class="w-4 h-4 text-[#245b70] dark:text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+            <span>New Student? Submit Details</span>
+          </button>
         </div>
 
-        <button type="button" id="btn-sp-welcome-ok" onclick="proceedFromWelcomeToOnboardingForm()" class="touch-btn w-full py-3.5 rounded-2xl custom-gradient-btn text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 active:scale-98 transition">
-          <span>OK, Add My Details</span>
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        <button type="button" onclick="handleStudentLogout()" class="text-[11px] font-bold text-[var(--text-sub)] hover:text-rose-500 transition">
+          Sign Out
         </button>
+      </div>
+    </div>
+
+    <!-- ================= MODAL 2B: CONNECT EXISTING ENROLLED STUDENT PROFILE ================= -->
+    <div id="modal-sp-link-existing" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[66] flex items-center justify-center p-3 sm:p-4 overflow-y-auto hidden no-print">
+      <div class="sp-modal-pop bg-[var(--card-bg)] w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border border-[var(--border-color)] my-auto space-y-4">
+        <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-[#245b70]/12 text-[#245b70] dark:text-cyan-400 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            </div>
+            <div>
+              <h3 class="text-sm sm:text-base font-black text-[var(--text-main)]">Connect Existing Profile</h3>
+              <p class="text-[11px] text-[var(--text-sub)]">Link your new login to your enrolled class record</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeStudentLinkExistingModal()" class="w-8 h-8 rounded-full bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] flex items-center justify-center font-bold text-sm">✕</button>
+        </div>
+
+        <!-- Mode Tabs: By Class/ID vs By Teacher Connect Code -->
+        <div class="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+          <button type="button" id="sp-link-tab-details" onclick="switchStudentLinkMode('details')" class="py-2 rounded-xl text-xs font-black bg-[#245b70] text-white shadow-xs transition">Verify My Details</button>
+          <button type="button" id="sp-link-tab-code" onclick="switchStudentLinkMode('code')" class="py-2 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition">Teacher Code</button>
+        </div>
+
+        <!-- Error Box -->
+        <div id="sp-link-error" class="hidden p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold"></div>
+
+        <form id="form-sp-link-existing" onsubmit="handleStudentLinkExistingSubmit(event)" class="space-y-3">
+          <!-- MODE 1: VERIFY MY DETAILS -->
+          <div id="sp-link-panel-details" class="space-y-3">
+            <!-- Lookup By: Class+Roll OR Student ID -->
+            <div class="flex items-center gap-2 text-[11px] font-bold">
+              <label class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] cursor-pointer">
+                <input type="radio" name="sp-link-lookup" value="classRoll" checked onchange="toggleStudentLinkLookupMode()" class="accent-[#245b70]">
+                <span>Class & Roll No.</span>
+              </label>
+              <label class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-page)] cursor-pointer">
+                <input type="radio" name="sp-link-lookup" value="studentId" onchange="toggleStudentLinkLookupMode()" class="accent-[#245b70]">
+                <span>Student ID</span>
+              </label>
+            </div>
+
+            <!-- Class + Roll Inputs -->
+            <div id="sp-link-wrap-classRoll" class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Class *</label>
+                <select id="sp-link-class" onchange="handleStudentLinkClassChange()" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-2.5 text-xs font-bold text-[var(--text-main)]">
+                  <option value="">Select Class</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Roll No. *</label>
+                <input type="number" id="sp-link-roll" min="1" placeholder="e.g. 12" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+              </div>
+            </div>
+
+            <!-- Student ID Input -->
+            <div id="sp-link-wrap-studentId" class="hidden">
+              <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">Student ID *</label>
+              <input type="text" id="sp-link-student-id" placeholder="e.g. 2005" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            </div>
+
+            <!-- Verification Field: Auto-switches DOB (1..+2) vs Phone (BS1..BS5+) -->
+            <div id="sp-link-wrap-dob" class="space-y-1">
+              <label class="block text-[11px] font-bold text-[var(--text-main)]">Date of Birth * <span class="text-[10px] font-semibold text-[#245b70] dark:text-cyan-400">(Class 1 – Plus Two)</span></label>
+              <input type="date" id="sp-link-dob" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            </div>
+
+            <div id="sp-link-wrap-phone" class="hidden space-y-1">
+              <label class="block text-[11px] font-bold text-[var(--text-main)]">Registered Mobile Number * <span class="text-[10px] font-semibold text-[#245b70] dark:text-cyan-400">(BS1 – BS5 & Higher)</span></label>
+              <input type="tel" id="sp-link-phone" maxlength="10" inputmode="numeric" placeholder="10-digit student or parent mobile" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-xs font-bold text-[var(--text-main)]">
+            </div>
+
+            <p id="sp-link-rule-hint" class="text-[10px] text-[var(--text-sub)] leading-relaxed">
+              Classes 1–Plus Two verify using Date of Birth. BS1–BS5 & higher classes verify using Registered Mobile Number.
+            </p>
+          </div>
+
+          <!-- MODE 2: TEACHER CONNECT CODE -->
+          <div id="sp-link-panel-code" class="hidden space-y-2.5">
+            <div>
+              <label class="block text-[11px] font-bold text-[var(--text-main)] mb-1">6-Character Connect Code *</label>
+              <input type="text" id="sp-link-code" maxlength="8" placeholder="e.g. A7K9M2" class="touch-input w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl px-3 text-center text-base font-black tracking-widest uppercase text-[#245b70] dark:text-cyan-300">
+            </div>
+            <p class="text-[11px] text-[var(--text-sub)] leading-relaxed">
+              Ask your class teacher to open your Student Profile and tap <b>Generate Connect Code</b>.
+            </p>
+          </div>
+
+          <button type="submit" id="sp-link-submit-btn" class="touch-btn w-full py-3 rounded-2xl custom-gradient-btn text-white font-black text-xs sm:text-sm shadow-md active:scale-98 transition">
+            Verify & Connect My Profile
+          </button>
+        </form>
       </div>
     </div>
 
@@ -4128,6 +4228,20 @@
         <div class="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex flex-col items-center justify-center">
           <div class="text-[9px] font-black uppercase text-[#245b70] dark:text-cyan-400 truncate">Rate %</div>
           <div id="details-stat-percent" class="text-xs sm:text-sm font-black text-[#245b70] dark:text-cyan-400">0%</div>
+        </div>
+      </div>
+
+      <!-- Student App Login Access Card (Teacher/Admin Link, Connect Code & Unlink) -->
+      <div id="details-app-access-card" class="bg-[var(--bg-page)] p-3.5 rounded-2xl border border-[var(--border-color)] space-y-2.5 text-xs">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 font-black text-[11px] uppercase tracking-wider text-[#245b70] dark:text-cyan-400">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>Student App Access</span>
+          </div>
+          <span id="details-app-access-badge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)]">Checking...</span>
+        </div>
+        <div id="details-app-access-body" class="space-y-2">
+          <p class="text-[11px] text-[var(--text-sub)]">Loading connection status...</p>
         </div>
       </div>
 
@@ -5906,6 +6020,13 @@
                  class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-3 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
         </div>
 
+        <!-- Student Mobile Number -->
+        <div>
+          <label class="block text-[10px] font-bold text-pink-700 dark:text-pink-300 mb-0.5">Student Phone Number</label>
+          <input type="tel" id="pw-input-student-studentPhone" maxlength="10" inputmode="numeric" placeholder="10-digit student mobile (Optional)"
+                 class="touch-input w-full bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-700 rounded-xl px-3 text-xs font-semibold text-pink-800 dark:text-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder-pink-300">
+        </div>
+
         <!-- Address Details -->
         <div class="bg-pink-50 dark:bg-pink-950/30 p-3 rounded-2xl border border-pink-200 dark:border-pink-800 space-y-2 text-xs">
           <div class="text-[10px] font-black text-pink-600 uppercase tracking-wider">Address Details</div>
@@ -6667,6 +6788,20 @@
 
         <div class="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-[11px] text-teal-800 dark:text-teal-200 font-medium">
           Once approved, this student will be officially enrolled into the assigned class and will appear in daily attendance rosters.
+        </div>
+
+        <!-- Duplicate Protection: Link this login to an already-enrolled student instead -->
+        <div id="aom-merge-existing-box" class="hidden p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+          <div class="text-[11px] font-black text-amber-800 dark:text-amber-300">Already Enrolled? Link Login to Existing Student</div>
+          <p class="text-[10px] text-[var(--text-sub)] leading-snug">If this student is already in your roster, link their new Student App login to their existing profile instead of creating a duplicate.</p>
+          <div class="flex items-center gap-2">
+            <select id="aom-merge-target-select" class="touch-input flex-1 rounded-xl px-2.5 text-xs font-bold bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)]">
+              <option value="">-- Select Existing Student --</option>
+            </select>
+            <button type="button" onclick="handleMergeOutcomerToExisting()" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs whitespace-nowrap active:scale-95 transition">
+              Link Instead
+            </button>
+          </div>
         </div>
 
         <div class="flex items-center gap-2 pt-2">

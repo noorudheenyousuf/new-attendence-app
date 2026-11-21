@@ -106,11 +106,12 @@ router.post('/register', authRateLimit, async (req, res) => {
       }
     }
 
-    // Check if existing student profile matches this email
+    // Check if existing unlinked student profile matches this email
     const existingStudent = normalizedEmail
       ? await Student.findOne({
           'personalDetails.studentEmail': normalizedEmail,
-          isPrivate: { $ne: true }
+          isPrivate: { $ne: true },
+          $or: [{ userId: null }, { userId: { $exists: false } }]
         })
       : null;
 
@@ -313,7 +314,8 @@ router.post('/google', async (req, res) => {
       const isStudentPortal = portal === 'student' || requestedRole === 'student';
       const existingStudent = await Student.findOne({
         'personalDetails.studentEmail': normalizedEmail,
-        isPrivate: { $ne: true }
+        isPrivate: { $ne: true },
+        $or: [{ userId: null }, { userId: { $exists: false } }]
       });
 
       let role;

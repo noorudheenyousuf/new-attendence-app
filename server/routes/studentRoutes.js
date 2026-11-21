@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const Student = require('../models/Student');
 const Class = require('../models/Class');
@@ -510,6 +511,250 @@ router.delete('/outcomers/:id/reject', authMiddleware, async (req, res) => {
       message: permanent
         ? `Submission for ${studentName} permanently removed.`
         : `Submission for ${studentName} has been marked as Not Approved.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Helper: Generate readable 6-char Connect Code (no ambiguous 0/O/1/I)
+function generateReadableConnectCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[crypto.randomInt(0, chars.length)];
+  }
+  return code;
+}
+
+// @route   POST /api/students/outcomers/:id/merge-into/:targetStudentId
+// @desc    Link a pending outcomer's login User account to an already-enrolled Student & remove duplicate pending entry
+router.post('/outcomers/:id/merge-into/:targetStudentId', authMiddleware, async (req, res) => {
+  try {
+    const [outcomer, target] = await Promise.all([
+      Student.findById(req.params.id),
+      Student.findById(req.params.targetStudentId)
+    ]);
+    if (!outcomer) return res.status(404).json({ success: false, message: 'Outcomer submission not found' });
+    if (!target) return res.status(404).json({ success: false, message: 'Target enrolled student not found' });
+    if (!outcomer.userId) {
+      return res.status(400).json({ success: false, message: 'This submission has no Student App login account to link.' });
+    }
+    if (target.userId && String(target.userId) !== String(outcomer.userId)) {
+      return res.status(409).json({ success: false, message: 'Target student is already linked to another login. Unlink it first.' });
+    }
+
+    const loginUser = await User.findById(outcomer.userId);
+    if (!loginUser) {
+      return res.status(404).json({ success: false, message: 'Associated student login account not found.' });
+    }
+
+    target.userId = loginUser._id;
+    target.connectCode = '';
+    target.connectCodeExpires = null;
+    if (loginUser.email && !target.personalDetails?.studentEmail) {
+      target.personalDetails = {
+        ...(target.personalDetails || {}),
+        studentEmail: loginUser.email.toLowerCase().trim()
+      };
+    }
+    await target.save();
+
+    loginUser.studentRef = target._id;
+    loginUser.name = target.name;
+    await loginUser.save();
+
+    await Student.findByIdAndDelete(outcomer._id);
+
+    await ActivityLog.create({
+      action: `Outcomer Linked to Existing Student: ${target.name}`,
+      details: `Linked login (${loginUser.email || loginUser.username || loginUser.name}) to ${target.name} (${target.class}, Roll #${target.roll}) and removed duplicate pending entry`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'student',
+      entityId: target._id.toString(),
+      canUndo: false
+    });
+
+    res.json({
+      success: true,
+      data: target,
+      message: `Login connected to existing student ${target.name} (${target.class}) and duplicate removed!`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/students/:id/app-access
+// @desc    Get Student App login link status, active connect code, and unlinked student User accounts
+router.get('/:id/app-access', authMiddleware, async (req, res) => {
+  try {
+    let student = null;
+    if (/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+      student = await Student.findById(req.params.id).lean();
+    }
+    if (!student) {
+      const numId = Number(req.params.id);
+      student = await Student.findOne({ studentId: !isNaN(numId) ? { $in: [req.params.id, numId] } : req.params.id }).lean();
+    }
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    let linkedUser = null;
+    if (student.userId) {
+      const u = await User.findById(student.userId).select('name email username phone createdAt').lean();
+      if (u) linkedUser = { id: u._id, name: u.name, email: u.email || '', username: u.username || '', phone: u.phone || '' };
+    }
+
+    const hasActiveCode = Boolean(
+      student.connectCode &&
+      (!student.connectCodeExpires || new Date(student.connectCodeExpires) > new Date())
+    );
+
+    // Fetch unlinked student login accounts for 1-click manual linking
+    const unlinkedUsers = await User.find({
+      role: 'student',
+      $or: [{ studentRef: null }, { studentRef: { $exists: false } }]
+    }).select('name email username phone createdAt').sort({ createdAt: -1 }).limit(50).lean();
+
+    res.json({
+      success: true,
+      data: {
+        studentObjId: student._id,
+        linked: Boolean(linkedUser),
+        linkedUser,
+        connectCode: hasActiveCode ? student.connectCode : '',
+        connectCodeExpires: hasActiveCode ? student.connectCodeExpires : null,
+        unlinkedUsers: unlinkedUsers.map(u => ({
+          id: u._id,
+          name: u.name || 'Student',
+          email: u.email || '',
+          username: u.username || '',
+          phone: u.phone || ''
+        }))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/students/:id/generate-connect-code
+// @desc    Generate a 6-character one-time Connect Code (valid 7 days) for an enrolled student
+router.post('/:id/generate-connect-code', authMiddleware, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+    if (student.isPrivate) {
+      return res.status(400).json({ success: false, message: 'Connect codes are only available for school roster students.' });
+    }
+
+    let code = generateReadableConnectCode();
+    // Ensure uniqueness
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const exists = await Student.findOne({ connectCode: code }).select('_id').lean();
+      if (!exists) break;
+      code = generateReadableConnectCode();
+    }
+
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    student.connectCode = code;
+    student.connectCodeExpires = expiresAt;
+    await student.save();
+
+    res.json({
+      success: true,
+      data: {
+        code,
+        expiresAt
+      },
+      message: `Connect code ${code} generated (valid for 7 days).`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/students/:id/link-user
+// @desc    Teacher/Admin manually links an unlinked student User account to this Student profile
+router.post('/:id/link-user', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.body || {};
+    if (!userId) return res.status(400).json({ success: false, message: 'User ID is required.' });
+
+    const [student, targetUser] = await Promise.all([
+      Student.findById(req.params.id),
+      User.findById(userId)
+    ]);
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found.' });
+    if (!targetUser || targetUser.role !== 'student') {
+      return res.status(404).json({ success: false, message: 'Student login account not found.' });
+    }
+    if (student.userId && String(student.userId) !== String(targetUser._id)) {
+      return res.status(409).json({ success: false, message: 'This student is already connected to another login. Unlink it first.' });
+    }
+    if (targetUser.studentRef && String(targetUser.studentRef) !== String(student._id)) {
+      return res.status(409).json({ success: false, message: 'This login account is already linked to another student.' });
+    }
+
+    student.userId = targetUser._id;
+    student.connectCode = '';
+    student.connectCodeExpires = null;
+    if (targetUser.email && !student.personalDetails?.studentEmail) {
+      student.personalDetails = {
+        ...(student.personalDetails || {}),
+        studentEmail: targetUser.email.toLowerCase().trim()
+      };
+    }
+    await student.save();
+
+    targetUser.studentRef = student._id;
+    targetUser.name = student.name;
+    await targetUser.save();
+
+    res.json({
+      success: true,
+      message: `Connected ${targetUser.email || targetUser.username || targetUser.name} to ${student.name}.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/students/:id/unlink-user
+// @desc    Teacher/Admin unlinks a student's Student App login so they can reconnect a new login
+router.post('/:id/unlink-user', authMiddleware, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found.' });
+
+    const oldUserId = student.userId;
+    student.userId = null;
+    await student.save();
+
+    if (oldUserId) {
+      await User.findByIdAndUpdate(oldUserId, { studentRef: null });
+    }
+
+    await ActivityLog.create({
+      action: `Student App Unlinked: ${student.name}`,
+      details: `Class: ${student.class}, Roll: ${student.roll}`,
+      performedBy: req.user ? req.user.name : 'Teacher',
+      performedByEmail: req.user ? (req.user.email || '').toLowerCase() : '',
+      role: req.user ? req.user.role : 'teacher',
+      entityType: 'student',
+      entityId: student._id.toString(),
+      canUndo: false
+    });
+
+    res.json({
+      success: true,
+      message: `Login account unlinked from ${student.name}. They can now connect a new login.`
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

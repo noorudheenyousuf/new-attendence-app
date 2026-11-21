@@ -516,6 +516,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const urlParams = new URLSearchParams(window.location.search);
   const portalParam = (urlParams.get('portal') || '').toLowerCase().trim();
+  const connectParam = (urlParams.get('connect') || '').trim().toUpperCase();
+  if (connectParam) {
+    sessionStorage.setItem('registerly_pending_connect_code', connectParam);
+    sessionStorage.setItem('registerly_active_portal', 'student');
+  }
   if (portalParam === 'student' || window.location.pathname.endsWith('/student')) {
     sessionStorage.setItem('registerly_active_portal', 'student');
   } else if (portalParam === 'teacher' || window.location.pathname.endsWith('/teacher')) {
@@ -4299,6 +4304,7 @@ function renderDynamicStudentInputs(prefix = 'new', student = null) {
   container.innerHTML = html;
 }
 
+
 // Opens the Add Student modal directly in Layout Customizer Mode from Admin Panel
 function openStudentFormLayoutEditor() {
   closeAdminPanel();
@@ -5557,6 +5563,10 @@ async function openStudentDetailsModal(studentId) {
     } else {
       personalSec.classList.add('hidden');
     }
+  }
+
+  if (typeof loadStudentAppAccessCard === 'function') {
+    loadStudentAppAccessCard(student);
   }
 
   // Address Details
@@ -13067,20 +13077,30 @@ async function initStudentPortal() {
     if (btnGuide) btnGuide.classList.add('hidden');
     if (btnNotif) btnNotif.classList.add('hidden');
 
-    // Populate class options in the registration form
+    // Populate class options in both the registration form and the connect-existing modal
     const classSelect = document.getElementById('spf-class');
-    if (classSelect) {
-      classSelect.innerHTML = '<option value="">Select your class</option>';
+    const linkClassSelect = document.getElementById('sp-link-class');
+    if (classSelect || linkClassSelect) {
+      if (classSelect) classSelect.innerHTML = '<option value="">Select your class</option>';
+      if (linkClassSelect) linkClassSelect.innerHTML = '<option value="">Select Class</option>';
       let classes = [];
       try {
         const clsRes = await API.getClasses();
         classes = clsRes.data || [];
       } catch (_) {}
       classes.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.name;
-        opt.textContent = c.name;
-        classSelect.appendChild(opt);
+        if (classSelect) {
+          const opt = document.createElement('option');
+          opt.value = c.name;
+          opt.textContent = c.name;
+          classSelect.appendChild(opt);
+        }
+        if (linkClassSelect) {
+          const opt2 = document.createElement('option');
+          opt2.value = c.name;
+          opt2.textContent = c.name;
+          linkClassSelect.appendChild(opt2);
+        }
       });
     }
 
@@ -13281,6 +13301,24 @@ async function initStudentPortal() {
       if (photoUrlInput) photoUrlInput.value = '';
       const admDateInput = document.getElementById('spf-admission-date');
       if (admDateInput && !admDateInput.value) admDateInput.value = new Date().toISOString().split('T')[0];
+
+      // Auto-claim pending ?connect=CODE if student opened a teacher's 1-tap connect link
+      const pendingCode = sessionStorage.getItem('registerly_pending_connect_code');
+      if (pendingCode && user && user.role === 'student') {
+        sessionStorage.removeItem('registerly_pending_connect_code');
+        try {
+          const linkRes = await API.linkExistingStudentProfile({ connectCode: pendingCode });
+          if (linkRes && linkRes.success) {
+            showToast(linkRes.message || 'Connected to your enrolled student profile!');
+            await initStudentPortal();
+            return;
+          } else {
+            showToast(linkRes?.message || 'Connect code could not be applied.', true);
+          }
+        } catch (linkErr) {
+          showToast(linkErr.message || 'Connect code invalid or expired.', true);
+        }
+      }
 
       openStudentWelcomeOnboarding();
     }
@@ -14528,6 +14566,7 @@ function renderFilteredStudentUpdates() {
   container.innerHTML = html;
 }
 
+
 function openStudentNoticeModal(id, type) {
   const modal = document.getElementById('modal-student-notice-detail');
   if (!modal) return;
@@ -15271,6 +15310,32 @@ function openApproveOutcomerModal(id) {
     applyRollInputPermission('aom-roll');
   }
 
+  // Show "Link Login to Existing Student" merge option if outcomer has a Student App login
+  const mergeBox = document.getElementById('aom-merge-existing-box');
+  const mergeSelect = document.getElementById('aom-merge-target-select');
+  if (mergeBox && mergeSelect) {
+    if (student.userId) {
+      mergeBox.classList.remove('hidden');
+      mergeSelect.innerHTML = '<option value="">Loading enrolled students...</option>';
+      API.getStudents('all', '', 'public').then(stRes => {
+        const enrolled = ((stRes && stRes.data) ? stRes.data : []).filter(st => !st.userId && String(st._id) !== String(student._id));
+        const qName = (student.name || '').toLowerCase();
+        enrolled.sort((a, b) => {
+          const aMatch = (a.name || '').toLowerCase().includes(qName) || qName.includes((a.name || '').toLowerCase()) ? 0 : 1;
+          const bMatch = (b.name || '').toLowerCase().includes(qName) || qName.includes((b.name || '').toLowerCase()) ? 0 : 1;
+          if (aMatch !== bMatch) return aMatch - bMatch;
+          return String(a.class || '').localeCompare(String(b.class || '')) || (Number(a.roll) - Number(b.roll));
+        });
+        mergeSelect.innerHTML = '<option value="">-- Select Existing Student --</option>' +
+          enrolled.map(st => `<option value="${st._id}">${escapeHtml(st.name)} (${escapeHtml(st.class || '-')} • Roll #${st.roll ?? '-'} • ID: ${st.studentId})</option>`).join('');
+      }).catch(() => {
+        mergeSelect.innerHTML = '<option value="">-- Could not load students --</option>';
+      });
+    } else {
+      mergeBox.classList.add('hidden');
+    }
+  }
+
   modal.classList.remove('hidden');
 }
 
@@ -15824,6 +15889,338 @@ function renderTeacherAnnouncementsBoard() {
   }
 
   container.innerHTML = html;
+}
+
+// =========================================================================
+// ========== STUDENT ACCOUNT LINKING & TEACHER APP ACCESS =================
+// =========================================================================
+let currentStudentLinkMode = 'details';
+
+function isHigherClassNameForPhone(className) {
+  const clean = String(className || '').trim().toLowerCase();
+  if (!clean) return false;
+  return /\bbs\s*[1-9]\b|\bbs[1-9]\b|\b(degree|ba|bsc|bcom|bba|bca|pg|ma|msc|mcom|mba|mca|higher)\b/i.test(clean);
+}
+
+function openStudentLinkExistingModal() {
+  const welcomeModal = document.getElementById('modal-sp-welcome-onboarding');
+  const linkModal = document.getElementById('modal-sp-link-existing');
+  if (welcomeModal) welcomeModal.classList.add('hidden');
+  if (linkModal) linkModal.classList.remove('hidden');
+  const errEl = document.getElementById('sp-link-error');
+  if (errEl) { errEl.classList.add('hidden'); errEl.textContent = ''; }
+  switchStudentLinkMode('details');
+  toggleStudentLinkLookupMode();
+  handleStudentLinkClassChange();
+}
+
+function closeStudentLinkExistingModal() {
+  const linkModal = document.getElementById('modal-sp-link-existing');
+  const welcomeModal = document.getElementById('modal-sp-welcome-onboarding');
+  if (linkModal) linkModal.classList.add('hidden');
+  if (welcomeModal) welcomeModal.classList.remove('hidden');
+}
+
+function switchStudentLinkMode(mode) {
+  currentStudentLinkMode = mode === 'code' ? 'code' : 'details';
+  const tabDet = document.getElementById('sp-link-tab-details');
+  const tabCode = document.getElementById('sp-link-tab-code');
+  const panelDet = document.getElementById('sp-link-panel-details');
+  const panelCode = document.getElementById('sp-link-panel-code');
+  const errEl = document.getElementById('sp-link-error');
+  if (errEl) { errEl.classList.add('hidden'); errEl.textContent = ''; }
+
+  if (tabDet) {
+    tabDet.className = currentStudentLinkMode === 'details'
+      ? 'py-2 rounded-xl text-xs font-black bg-[#245b70] text-white shadow-xs transition'
+      : 'py-2 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition';
+  }
+  if (tabCode) {
+    tabCode.className = currentStudentLinkMode === 'code'
+      ? 'py-2 rounded-xl text-xs font-black bg-[#245b70] text-white shadow-xs transition'
+      : 'py-2 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition';
+  }
+  if (panelDet) panelDet.classList.toggle('hidden', currentStudentLinkMode !== 'details');
+  if (panelCode) panelCode.classList.toggle('hidden', currentStudentLinkMode !== 'code');
+}
+
+function toggleStudentLinkLookupMode() {
+  const lookup = document.querySelector('input[name="sp-link-lookup"]:checked')?.value || 'classRoll';
+  const wrapCR = document.getElementById('sp-link-wrap-classRoll');
+  const wrapId = document.getElementById('sp-link-wrap-studentId');
+  if (wrapCR) wrapCR.classList.toggle('hidden', lookup !== 'classRoll');
+  if (wrapId) wrapId.classList.toggle('hidden', lookup !== 'studentId');
+
+  // When looking up by Student ID (class unknown upfront), show both DOB & Phone inputs so either class rule works smoothly
+  if (lookup === 'studentId') {
+    document.getElementById('sp-link-wrap-dob')?.classList.remove('hidden');
+    document.getElementById('sp-link-wrap-phone')?.classList.remove('hidden');
+  } else {
+    handleStudentLinkClassChange();
+  }
+}
+
+function handleStudentLinkClassChange() {
+  const lookup = document.querySelector('input[name="sp-link-lookup"]:checked')?.value || 'classRoll';
+  if (lookup === 'studentId') return;
+
+  const cls = document.getElementById('sp-link-class')?.value || '';
+  const isHigher = isHigherClassNameForPhone(cls);
+  const dobWrap = document.getElementById('sp-link-wrap-dob');
+  const phoneWrap = document.getElementById('sp-link-wrap-phone');
+  if (dobWrap) dobWrap.classList.toggle('hidden', isHigher);
+  if (phoneWrap) phoneWrap.classList.toggle('hidden', !isHigher);
+}
+
+async function handleStudentLinkExistingSubmit(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('sp-link-error');
+  const showErr = (msg) => {
+    if (!errEl) return showToast(msg, true);
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  };
+  if (errEl) { errEl.classList.add('hidden'); errEl.textContent = ''; }
+
+  const payload = {};
+  if (currentStudentLinkMode === 'code') {
+    const code = (document.getElementById('sp-link-code')?.value || '').trim().toUpperCase();
+    if (!code || code.length < 4) return showErr('Please enter the 6-character Connect Code from your teacher.');
+    payload.connectCode = code;
+  } else {
+    const lookup = document.querySelector('input[name="sp-link-lookup"]:checked')?.value || 'classRoll';
+    if (lookup === 'studentId') {
+      const sid = (document.getElementById('sp-link-student-id')?.value || '').trim();
+      if (!sid) return showErr('Please enter your Student ID.');
+      payload.studentId = sid;
+    } else {
+      const cls = (document.getElementById('sp-link-class')?.value || '').trim();
+      const roll = (document.getElementById('sp-link-roll')?.value || '').trim();
+      if (!cls || !roll) return showErr('Please select your Class and enter your Roll Number.');
+      payload.class = cls;
+      payload.roll = Number(roll);
+    }
+
+    const dobVal = (document.getElementById('sp-link-dob')?.value || '').trim();
+    const phoneVal = (document.getElementById('sp-link-phone')?.value || '').replace(/\D/g, '').slice(-10);
+    if (dobVal) payload.verifyDob = dobVal;
+    if (phoneVal) payload.verifyPhone = phoneVal;
+
+    if (!payload.verifyDob && !payload.verifyPhone) {
+      return showErr('Please enter your Date of Birth (Class 1–Plus Two) or Registered Mobile Number (BS1–BS5+).');
+    }
+  }
+
+  const btn = document.getElementById('sp-link-submit-btn');
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+
+  try {
+    const res = await API.linkExistingStudentProfile(payload);
+    if (res && res.success) {
+      document.getElementById('modal-sp-link-existing')?.classList.add('hidden');
+      showToast(res.message || 'Profile connected successfully!');
+      await initStudentPortal();
+    } else {
+      showErr(res?.message || 'Could not verify your profile. Please check your details.');
+    }
+  } catch (err) {
+    showErr(err.message || 'Verification failed. Please check your details or ask your teacher for a Connect Code.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+  }
+}
+
+async function loadStudentAppAccessCard(student) {
+  const card = document.getElementById('details-app-access-card');
+  const badge = document.getElementById('details-app-access-badge');
+  const body = document.getElementById('details-app-access-body');
+  if (!card || !badge || !body || !student) return;
+
+  // Hide for private workspace students (not in public Student App)
+  if (student.isPrivate) {
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+  badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 dark:bg-slate-700 text-[var(--text-sub)]';
+  badge.textContent = 'Loading...';
+  body.innerHTML = '<p class="text-[11px] text-[var(--text-sub)]">Checking Student App link...</p>';
+
+  try {
+    const idParam = student._id || student.studentId;
+    const res = await API.getStudentAppAccess(idParam);
+    if (!res || !res.success || !res.data) {
+      body.innerHTML = '<p class="text-[11px] text-rose-500">Unable to load Student App status.</p>';
+      return;
+    }
+
+    const d = res.data;
+    const sObjId = d.studentObjId || student._id;
+    const sName = escapeQuotes(student.name || 'Student');
+
+    if (d.linked && d.linkedUser) {
+      const loginId = d.linkedUser.email || d.linkedUser.username || d.linkedUser.name;
+      badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
+      badge.textContent = 'Connected';
+      body.innerHTML = `
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="min-w-0">
+            <div class="text-[11px] font-bold text-[var(--text-main)] truncate">Login: ${escapeHtml(loginId)}</div>
+            <div class="text-[10px] text-[var(--text-sub)]">Student can access their ID card, timetable & attendance</div>
+          </div>
+          <button type="button" onclick="handleUnlinkStudentUser('${sObjId}', '${sName}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-[11px] transition active:scale-95 whitespace-nowrap">
+            Unlink Login
+          </button>
+        </div>
+      `;
+    } else {
+      badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-700 dark:text-amber-300';
+      badge.textContent = 'Not Connected';
+
+      const codeHtml = d.connectCode
+        ? `
+          <div class="p-2.5 rounded-xl bg-[var(--card-bg)] border border-[#245b70]/25 flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <div class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Active Connect Code</div>
+              <div class="text-sm font-black tracking-widest text-[#245b70] dark:text-cyan-300">${escapeHtml(d.connectCode)}</div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="copyStudentConnectLink('${escapeQuotes(d.connectCode)}', '${sName}')" class="px-2.5 py-1.5 rounded-lg bg-[#245b70] hover:bg-[#1a4454] text-white font-bold text-[10px] transition active:scale-95">Copy Link</button>
+              <button type="button" onclick="shareStudentConnectWhatsApp('${escapeQuotes(d.connectCode)}', '${sName}')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition active:scale-95">WhatsApp</button>
+            </div>
+          </div>
+        `
+        : '';
+
+      const unlinkedOpts = (d.unlinkedUsers || []).length > 0
+        ? `
+          <div class="pt-1.5 border-t border-[var(--border-color)] space-y-1.5">
+            <div class="text-[10px] font-bold text-[var(--text-sub)]">Or connect an unlinked Student App login directly:</div>
+            <div class="flex items-center gap-1.5">
+              <select id="details-manual-link-user-select" class="flex-1 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-2 py-1.5 text-[11px] font-bold text-[var(--text-main)]">
+                <option value="">-- Select Student Login --</option>
+                ${d.unlinkedUsers.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email || u.username || u.phone || 'Student')})</option>`).join('')}
+              </select>
+              <button type="button" onclick="handleManualLinkStudentUser('${sObjId}')" class="px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] whitespace-nowrap active:scale-95 transition">Link</button>
+            </div>
+          </div>
+        `
+        : '';
+
+      body.innerHTML = `
+        <p class="text-[11px] text-[var(--text-sub)] leading-snug">Generate a 1-tap Connect Link/Code so this student can attach their Student App login without creating a duplicate.</p>
+        ${codeHtml}
+        <button type="button" onclick="handleGenerateConnectCode('${sObjId}', '${sName}')" class="w-full py-2 rounded-xl bg-[#245b70]/12 hover:bg-[#245b70]/20 text-[#245b70] dark:text-cyan-300 font-black text-[11px] transition active:scale-98">
+          ${d.connectCode ? 'Generate New Connect Code' : 'Generate Connect Code & 1-Tap Link'}
+        </button>
+        ${unlinkedOpts}
+      `;
+    }
+  } catch (err) {
+    badge.textContent = 'Error';
+    body.innerHTML = `<p class="text-[11px] text-rose-500">${escapeHtml(err.message || 'Failed to check access')}</p>`;
+  }
+}
+
+async function handleGenerateConnectCode(studentObjId, studentName) {
+  try {
+    const res = await API.generateStudentConnectCode(studentObjId);
+    if (res && res.success) {
+      showToast(res.message || 'Connect code generated!');
+      const cur = (typeof currentDetailsStudent !== 'undefined' && currentDetailsStudent)
+        ? currentDetailsStudent
+        : { _id: studentObjId, name: studentName };
+      await loadStudentAppAccessCard(cur);
+    } else {
+      showToast(res?.message || 'Could not generate code', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error generating connect code', true);
+  }
+}
+
+function copyStudentConnectLink(code, studentName) {
+  const url = `${window.location.origin}/?portal=student&connect=${encodeURIComponent(code)}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast(`Connect link copied for ${studentName} (Code: ${code})`);
+  }).catch(() => {
+    showToast(`Connect Code: ${code}`);
+  });
+}
+
+function shareStudentConnectWhatsApp(code, studentName) {
+  const url = `${window.location.origin}/?portal=student&connect=${encodeURIComponent(code)}`;
+  const text = encodeURIComponent(
+    `Assalamu Alaikum ${studentName}! Tap this link to open your REGISTERLY Student App and connect your enrolled profile automatically:\n${url}\n\nConnect Code: ${code}`
+  );
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+async function handleManualLinkStudentUser(studentObjId) {
+  const userId = document.getElementById('details-manual-link-user-select')?.value || '';
+  if (!userId) return showToast('Please select a student login first', true);
+  try {
+    const res = await API.linkStudentToUser(studentObjId, userId);
+    if (res && res.success) {
+      showToast(res.message || 'Student login connected!');
+      const cur = (typeof currentDetailsStudent !== 'undefined' && currentDetailsStudent)
+        ? currentDetailsStudent
+        : { _id: studentObjId };
+      await loadStudentAppAccessCard(cur);
+    } else {
+      showToast(res?.message || 'Failed to link account', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error linking account', true);
+  }
+}
+
+async function handleUnlinkStudentUser(studentObjId, studentName) {
+  if (!confirm(`Unlink the Student App login from ${studentName}? They will be able to connect a new login while keeping all attendance records.`)) {
+    return;
+  }
+  try {
+    const res = await API.unlinkStudentFromUser(studentObjId);
+    if (res && res.success) {
+      showToast(res.message || 'Student login unlinked');
+      const cur = (typeof currentDetailsStudent !== 'undefined' && currentDetailsStudent)
+        ? currentDetailsStudent
+        : { _id: studentObjId, name: studentName };
+      await loadStudentAppAccessCard(cur);
+    } else {
+      showToast(res?.message || 'Failed to unlink account', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error unlinking account', true);
+  }
+}
+
+async function handleMergeOutcomerToExisting() {
+  if (!currentApproveOutcomerId) return;
+  const targetId = document.getElementById('aom-merge-target-select')?.value || '';
+  if (!targetId) {
+    showToast('Please select an existing enrolled student first', true);
+    return;
+  }
+  if (!confirm('Link this Student App login to the selected existing student and remove this duplicate pending submission?')) {
+    return;
+  }
+  try {
+    const res = await API.mergeOutcomerIntoStudent(currentApproveOutcomerId, targetId);
+    if (res && res.success) {
+      showToast(res.message || 'Linked login to existing student!');
+      closeApproveOutcomerModal();
+      await loadOutcomers();
+      if (currentActiveTab === 'outcomer-details') {
+        goBackToOutcomersFromDetails();
+      }
+    } else {
+      showToast(res?.message || 'Failed to link to existing student', true);
+    }
+  } catch (err) {
+    showToast(err.message || 'Error linking to existing student', true);
+  }
 }
 
 
