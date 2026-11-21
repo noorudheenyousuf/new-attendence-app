@@ -15,6 +15,15 @@ const userSchema = new mongoose.Schema({
     trim: true,
     default: undefined
   },
+  username: {
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true,
+    lowercase: true,
+    trim: true,
+    default: undefined
+  },
   password: {
     type: String,
     required: false,
@@ -58,6 +67,18 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     default: ''
+  },
+  resetOtpHash: {
+    type: String,
+    default: ''
+  },
+  resetOtpExpires: {
+    type: Date,
+    default: null
+  },
+  resetOtpAttempts: {
+    type: Number,
+    default: 0
   },
   order: {
     type: Number,

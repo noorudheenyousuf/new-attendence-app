@@ -1,10 +1,11 @@
-const CACHE_NAME = 'registerly-cache-v8';
+const CACHE_NAME = 'registerly-cache-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/css/style.css',
   '/js/api.js',
   '/js/app.js',
+  '/js/guide-pdf.js',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

@@ -76,6 +76,13 @@ function isStudentPortalActive() {
   return getRequestedPortal() === 'student';
 }
 
+function isTeacherPortalContext() {
+  if (isStudentPortalActive()) return false;
+  if (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'student') return false;
+  if (typeof currentActiveTab !== 'undefined' && currentActiveTab === 'student-portal') return false;
+  return true;
+}
+
 function switchPortal(portal) {
   if (portal === 'teacher') {
     sessionStorage.setItem('registerly_active_portal', 'teacher');
@@ -91,15 +98,24 @@ function updateAuthModalPortalUI() {
   const titleEl = document.getElementById('auth-modal-title');
   const subEl = document.getElementById('auth-modal-subtitle');
   const regNoteEl = document.getElementById('auth-modal-reg-note');
+  const regEmailLabel = document.getElementById('register-email-label');
+  const regEmailInput = document.getElementById('register-email');
+  const regPhoneWrap = document.getElementById('register-phone-wrap');
   if (isStudent) {
     if (titleEl) titleEl.textContent = 'Student Portal';
-    if (subEl) subEl.textContent = 'Sign in to access your timetable, attendance & notices';
+    if (subEl) subEl.textContent = 'Sign in with Gmail or your Username & Password';
+    if (regEmailLabel) regEmailLabel.textContent = 'Username or Email Address';
+    if (regEmailInput) regEmailInput.placeholder = 'e.g. ahmad123 or student@gmail.com';
+    if (regPhoneWrap) regPhoneWrap.classList.remove('hidden');
     if (regNoteEl) {
-      regNoteEl.innerHTML = '<svg class="w-4 h-4 text-teal-600 inline-block mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg><span>Enter with your student email or Gmail to self-register your details.</span>';
+      regNoteEl.innerHTML = '<svg class="w-4 h-4 text-teal-600 inline-block mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg><span>Create an account using a username or Gmail to register your student profile.</span>';
     }
   } else {
     if (titleEl) titleEl.textContent = 'REGISTERLY';
     if (subEl) subEl.textContent = 'Teacher Portal & Attendance Management';
+    if (regEmailLabel) regEmailLabel.textContent = 'Email Address';
+    if (regEmailInput) regEmailInput.placeholder = 'teacher@school.edu';
+    if (regPhoneWrap) regPhoneWrap.classList.add('hidden');
     if (regNoteEl) {
       regNoteEl.innerHTML = '<svg class="w-4 h-4 text-amber-500 inline-block mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg><span>First registered account is granted full <b>Admin</b> privileges automatically.</span>';
     }
@@ -587,7 +603,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ================= APP ONBOARDING & SEQUENCED WORKFLOW =================
 function proceedAppWorkflowSequence() {
-  if (!currentUser) {
+  if (!currentUser || !isTeacherPortalContext()) {
     hideSplashLoader();
     return;
   }
@@ -621,6 +637,7 @@ function checkInitialOnboarding() {
 }
 
 function openInitialLanguageModal() {
+  if (!isTeacherPortalContext()) return;
   const modal = document.getElementById('modal-first-language-select');
   if (modal) modal.classList.remove('hidden');
 }
@@ -652,7 +669,10 @@ function selectInitialLanguage(lang) {
   }
 }
 
+window.currentGuideLanguage = localStorage.getItem('app_language') || 'en';
+
 function openAppGuideModal() {
+  if (!isTeacherPortalContext()) return;
   const modal = document.getElementById('modal-app-guide');
   if (!modal) return;
   const currentLang = localStorage.getItem('app_language') || 'en';
@@ -666,9 +686,11 @@ function closeAppGuideModal() {
   localStorage.setItem('registerly_guide_seen', 'true');
 
   // Step 3: Transition to Morning Timetable Modal -> Dashboard
-  setTimeout(() => {
-    checkAndTriggerTimetableNotifications();
-  }, 350);
+  if (isTeacherPortalContext()) {
+    setTimeout(() => {
+      checkAndTriggerTimetableNotifications();
+    }, 350);
+  }
 }
 
 function switchGuideLanguage(lang) {
@@ -678,12 +700,14 @@ function switchGuideLanguage(lang) {
 
 function renderGuideLanguage(lang) {
   const isMl = lang === 'ml';
+  window.currentGuideLanguage = isMl ? 'ml' : 'en';
   const mlContent = document.getElementById('guide-content-ml');
   const enContent = document.getElementById('guide-content-en');
   const btnEn = document.getElementById('guide-btn-en');
   const btnMl = document.getElementById('guide-btn-ml');
   const titleEl = document.getElementById('guide-modal-title');
   const btnLabel = document.getElementById('guide-modal-btn-label');
+  const pdfBtn = document.getElementById('guide-more-pdf-btn');
 
   if (isMl) {
     if (mlContent) mlContent.classList.remove('hidden');
@@ -692,6 +716,7 @@ function renderGuideLanguage(lang) {
     if (btnEn) btnEn.className = "px-2 py-0.5 rounded-md text-white/70 hover:text-white font-semibold transition";
     if (titleEl) titleEl.innerText = "ആപ്പ് നിർദ്ദേശങ്ങൾ (Guide)";
     if (btnLabel) btnLabel.innerText = "ശരി, ആരംഭിക്കാം!";
+    if (pdfBtn) pdfBtn.title = "മുഴുവൻ ആപ്പ് ഗൈഡ് PDF ഡൗൺലോഡ് ചെയ്യുക (മലയാളം)";
   } else {
     if (enContent) enContent.classList.remove('hidden');
     if (mlContent) mlContent.classList.add('hidden');
@@ -699,6 +724,7 @@ function renderGuideLanguage(lang) {
     if (btnMl) btnMl.className = "px-2 py-0.5 rounded-md text-white/70 hover:text-white font-semibold transition";
     if (titleEl) titleEl.innerText = "App Guide & Instructions";
     if (btnLabel) btnLabel.innerText = "Got it / Let's Start!";
+    if (pdfBtn) pdfBtn.title = "Download Complete A-Z App Guide PDF (English)";
   }
 }
 
@@ -4823,7 +4849,7 @@ async function openStudentModal() {
   const clearIds = [
     'new-student-name', 'new-student-roll',
     'new-student-stream', 'new-student-degreeYear',
-    'new-student-dob', 'new-student-age', 'new-student-bloodGroup', 'new-student-studentEmail',
+    'new-student-dob', 'new-student-age', 'new-student-bloodGroup', 'new-student-studentEmail', 'new-student-studentPhone',
     'new-student-address', 'new-student-place', 'new-student-district', 'new-student-state', 'new-student-pinCode',
     'new-student-fatherName', 'new-student-motherName', 'new-student-fatherMobile', 'new-student-motherNumber',
     'new-student-guardian', 'new-student-guardianName', 'new-student-guardianNumber', 'new-student-guardianRelation', 'new-student-guardianOccupation',
@@ -4921,6 +4947,7 @@ async function handleSaveNewStudent(e) {
   const gender = getSelectedStudentGender('new');
   const bloodGroup = getStudentInputValue('new', 'bloodGroup');
   const studentEmail = getStudentInputValue('new', 'studentEmail');
+  const studentPhone = getStudentInputValue('new', 'studentPhone');
 
   const fullAddress = getStudentInputValue('new', 'address');
   const place = getStudentInputValue('new', 'place');
@@ -4955,7 +4982,7 @@ async function handleSaveNewStudent(e) {
     stream,
     degreeYear,
     photoUrl,
-    personalDetails: { dob, gender, bloodGroup, studentEmail },
+    personalDetails: { dob, gender, bloodGroup, studentEmail, studentPhone },
     address: { fullAddress, place, district, state, pinCode },
     familyDetails: {
       fatherName,
@@ -5109,6 +5136,7 @@ async function openEditStudentModal(id) {
     setSelectedStudentGender('edit', student.personalDetails?.gender || '');
     setVal('edit-student-bloodGroup', student.personalDetails?.bloodGroup || '');
     setVal('edit-student-studentEmail', student.personalDetails?.studentEmail || '');
+    setVal('edit-student-studentPhone', student.personalDetails?.studentPhone || '');
 
     // Address Details
     setVal('edit-student-address', student.address?.fullAddress);
@@ -5190,6 +5218,7 @@ async function handleSaveEditedStudent(e) {
   const gender = getSelectedStudentGender('edit');
   const bloodGroup = getStudentInputValue('edit', 'bloodGroup');
   const studentEmail = getStudentInputValue('edit', 'studentEmail');
+  const studentPhone = getStudentInputValue('edit', 'studentPhone');
 
   const fullAddress = getStudentInputValue('edit', 'address');
   const place = getStudentInputValue('edit', 'place');
@@ -5221,7 +5250,7 @@ async function handleSaveEditedStudent(e) {
     stream,
     degreeYear,
     photoUrl: editStudentPhotoUrl || editStudentBase64Photo,
-    personalDetails: { dob, gender, bloodGroup, studentEmail },
+    personalDetails: { dob, gender, bloodGroup, studentEmail, studentPhone },
     address: { fullAddress, place, district, state, pinCode },
     familyDetails: {
       fatherName,
@@ -5520,9 +5549,10 @@ async function openStudentDetailsModal(studentId) {
   const hasGender = setDetailsFieldVisibility('details-wrap-gender', 'details-student-gender', student.personalDetails?.gender);
   const hasBlood = setDetailsFieldVisibility('details-wrap-blood', 'details-student-blood', student.personalDetails?.bloodGroup);
   const hasEmail = setDetailsFieldVisibility('details-wrap-email', 'details-student-email', student.personalDetails?.studentEmail);
+  const hasStudentPhone = setDetailsFieldVisibility('details-wrap-studentPhone', 'details-student-studentPhone', student.personalDetails?.studentPhone);
   const personalSec = document.getElementById('details-personal-section');
   if (personalSec) {
-    if (hasDob || hasAge || hasGender || hasBlood || hasEmail) {
+    if (hasDob || hasAge || hasGender || hasBlood || hasEmail || hasStudentPhone) {
       personalSec.classList.remove('hidden');
     } else {
       personalSec.classList.add('hidden');
@@ -6796,17 +6826,20 @@ async function selectTab(tab) {
   }
 
   const isStudent = (currentUser && currentUser.role === 'student') || tab === 'student-portal' || isStudentPortalActive();
+  const mainHeader = document.getElementById('app-main-header');
   const bottomNav = document.getElementById('app-bottom-nav');
   const studentBottomNav = document.getElementById('student-bottom-nav');
   const headerGuideBtn = document.getElementById('header-guide-btn');
   const headerNotifBtn = document.getElementById('header-notif-btn');
 
   if (isStudent) {
+    if (mainHeader) mainHeader.classList.add('hidden');
     if (bottomNav) bottomNav.classList.add('hidden');
     if (studentBottomNav) studentBottomNav.classList.remove('hidden');
     if (headerGuideBtn) headerGuideBtn.classList.add('hidden');
     if (headerNotifBtn) headerNotifBtn.classList.add('hidden');
   } else {
+    if (mainHeader) mainHeader.classList.remove('hidden');
     if (bottomNav) bottomNav.classList.remove('hidden');
     if (studentBottomNav) studentBottomNav.classList.add('hidden');
     if (typeof applyHeaderButtonPreference === 'function') {
@@ -7859,7 +7892,9 @@ async function handleEmailRegister(e) {
   }
 
   try {
-    const res = await API.register(name, email, password, { portal: authPortalRole, role: authPortalRole });
+    const phoneInput = document.getElementById('register-phone');
+    const regPhone = phoneInput ? phoneInput.value.replace(/\D/g, '').slice(-10) : '';
+    const res = await API.register(name, email, password, { portal: authPortalRole, role: authPortalRole, phone: regPhone || undefined });
     if (res.success && res.user) {
       currentUser = res.user;
       currentRole = res.user.role;
@@ -12266,7 +12301,7 @@ function dismissPreClassAlert() {
 
 async function checkAndTriggerTimetableNotifications() {
   try {
-    if (!currentUser) return; // Must have an authenticated user account
+    if (!currentUser || !isTeacherPortalContext()) return; // Teacher portal only
 
     const now = new Date();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -12416,6 +12451,7 @@ async function checkAndTriggerTimetableNotifications() {
 }
 
 function initTimetableNotificationScheduler() {
+  if (!isTeacherPortalContext()) return;
   if ('Notification' in window && Notification.permission === 'default') {
     setTimeout(() => {
       try { Notification.requestPermission(); } catch(_) {}
@@ -12865,6 +12901,13 @@ currentStudentTimetableDay = 'all';
 // Initialize Student Portal View
 async function initStudentPortal() {
   try {
+    // Hide top main header and show bottom nav only in Student App
+    const mainHeader = document.getElementById('app-main-header');
+    if (mainHeader) mainHeader.classList.add('hidden');
+
+    // Prompt PWA Install when student enters from browser (not yet standalone)
+    maybeShowStudentPwaInstallPrompt();
+
     // Hide guide and messages button from header in student link / portal
     const btnGuide = document.getElementById('header-guide-btn');
     const btnNotif = document.getElementById('header-notif-btn');
@@ -12966,9 +13009,14 @@ async function initStudentPortal() {
         subtitleEl.textContent = `Roll: #${student.roll ?? '-'} • Student ID: ${student.studentId || '-'} • Year: ${yearStr}`;
       }
 
-      // Populate Digital ID Card & Details
+      // Hide onboarding modals if open
+      const welcomeModal = document.getElementById('modal-sp-welcome-onboarding');
+      const formModal = document.getElementById('modal-sp-onboarding-form');
+      if (welcomeModal) welcomeModal.classList.add('hidden');
+      if (formModal) formModal.classList.add('hidden');
+
+      // Populate White PVC ID Card & Read-Only Full Details Page
       renderStudentIdCard(student);
-      populateStudentFormFields(student);
       populateProfileOrganizedSections(student);
 
       const unregBanner = document.getElementById('sp-unregistered-banner');
@@ -12977,10 +13025,10 @@ async function initStudentPortal() {
           unregBanner.className = "p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1";
           unregBanner.innerHTML = `
             <div class="font-black text-sm flex items-center gap-2">
-              <svg class="w-4 h-4 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <svg class="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               <span>Registration Submitted — Pending Teacher Verification</span>
             </div>
-            <p class="text-xs leading-relaxed opacity-90">Your student registration has been received and queued in your teacher's Outcomers directory. Once verified, official records will be fully synchronized.</p>
+            <p class="text-xs leading-relaxed opacity-90">Your student registration has been received and queued for teacher verification. Official records will be synchronized automatically.</p>
           `;
           unregBanner.classList.remove('hidden');
         }
@@ -12988,35 +13036,31 @@ async function initStudentPortal() {
         if (unregBanner) unregBanner.classList.add('hidden');
       }
 
-      const formCard = document.getElementById('sp-form-card');
-      if (formCard) formCard.classList.add('hidden');
-      const toggleBtnText = document.getElementById('sp-toggle-edit-btn-text');
-      if (toggleBtnText) toggleBtnText.textContent = 'Edit My Details';
-      const formTitle = document.getElementById('sp-form-title');
-      if (formTitle) formTitle.textContent = 'Edit My Details';
-      const submitBtnText = document.getElementById('spf-submit-btn-text');
-      if (submitBtnText) submitBtnText.textContent = 'Update Profile';
-
       // Default to Home Dashboard
       switchStudentPortalTab('home');
     } else {
-      // First time self-registration
+      // First-time student: show stylish Welcome Modal -> Full Registration Form
       if (classBadgeEl) classBadgeEl.classList.add('hidden');
-      if (subtitleEl) subtitleEl.textContent = 'Profile registration pending';
+      if (subtitleEl) subtitleEl.textContent = 'Profile registration required';
 
       const unregBanner = document.getElementById('sp-unregistered-banner');
       if (unregBanner) unregBanner.classList.remove('hidden');
-      const formCard = document.getElementById('sp-form-card');
-      if (formCard) formCard.classList.remove('hidden');
 
+      // Pre-fill known values in onboarding form
       const nameInput = document.getElementById('spf-name');
       if (nameInput && user && user.name) nameInput.value = user.name;
+      const emailInput = document.getElementById('spf-student-email');
+      if (emailInput && user && user.email) emailInput.value = user.email;
+      const phoneInput = document.getElementById('spf-father-mobile');
+      if (phoneInput && user && user.phone && !phoneInput.value) phoneInput.value = user.phone;
       const previewEl = document.getElementById('spf-photo-preview');
-      if (previewEl && user && user.avatarUrl) previewEl.src = user.avatarUrl;
+      if (previewEl) previewEl.src = 'default_avatar.jpg';
       const photoUrlInput = document.getElementById('spf-photo-url');
-      if (photoUrlInput && user && user.avatarUrl) photoUrlInput.value = user.avatarUrl;
+      if (photoUrlInput) photoUrlInput.value = '';
+      const admDateInput = document.getElementById('spf-admission-date');
+      if (admDateInput && !admDateInput.value) admDateInput.value = new Date().toISOString().split('T')[0];
 
-      switchStudentPortalTab('profile');
+      openStudentWelcomeOnboarding();
     }
   } catch (err) {
     console.error('[StudentPortal Init Error]', err);
@@ -13024,7 +13068,17 @@ async function initStudentPortal() {
   }
 }
 
-// Render PVC Digital Student ID Card
+// Format YYYY-MM-DD to DD/MM/YYYY for White PVC ID Card
+function formatIdCardDate(dateStr, fallback = '--/--/----') {
+  if (!dateStr) return fallback;
+  const parts = String(dateStr).split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return String(dateStr);
+}
+
+// Render Authentic White PVC Student ID Card
 function renderStudentIdCard(student) {
   if (!student) return;
   const p = student.personalDetails || {};
@@ -13032,43 +13086,35 @@ function renderStudentIdCard(student) {
   const f = student.familyDetails || {};
   const ac = student.academicStatus || {};
 
-  const nameEl = document.getElementById('sp-card-name');
-  if (nameEl) nameEl.textContent = student.name || 'Student';
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+
+  setText('sp-card-name', (student.name || 'STUDENT').toUpperCase());
+  setText('sp-card-class-badge', student.class || 'STUDENT');
+  setText('sp-card-place', a.place || '-');
+  setText('sp-card-post', a.fullAddress || a.place || '-');
+  setText('sp-card-dist', a.district || '-');
+  setText('sp-card-state', a.state || 'KERALA');
+  setText('sp-card-dob', p.dob ? formatIdCardDate(p.dob, '-') : '-');
+  setText('sp-card-id', String(ac.admissionNo || student.studentId || '-'));
+  setText('sp-card-contact', f.fatherMobile || p.studentPhone || f.motherNumber || f.guardianNumber || '-');
 
   const photoEl = document.getElementById('sp-card-photo');
-  if (photoEl) photoEl.src = student.photoUrl || DEFAULT_AVATAR;
-
-  const classEl = document.getElementById('sp-card-class');
-  if (classEl) classEl.textContent = student.class || '-';
-
-  const rollEl = document.getElementById('sp-card-roll');
-  if (rollEl) rollEl.textContent = `#${student.roll ?? '-'}`;
-
-  const idEl = document.getElementById('sp-card-id');
-  if (idEl) idEl.textContent = String(student.studentId || '-');
-
-  const yearEl = document.getElementById('sp-card-year');
-  if (yearEl) {
-    yearEl.textContent = ac.yearJoined ? `${ac.yearJoined}-${Number(ac.yearJoined) + 1}` : '2026-2027';
+  if (photoEl) {
+    photoEl.src = (student.photoUrl && student.photoUrl.trim()) ? student.photoUrl : 'default_avatar.jpg';
+    photoEl.onerror = () => { photoEl.src = 'default_avatar.jpg'; };
   }
 
-  const contactEl = document.getElementById('sp-card-contact');
-  if (contactEl) {
-    contactEl.textContent = f.fatherMobile || f.motherNumber || f.guardianNumber || 'Institution Verified';
-  }
+  const issueStr = ac.admissionDate ? formatIdCardDate(ac.admissionDate) : formatIdCardDate(new Date().toISOString().split('T')[0]);
+  setText('sp-card-issue-date', `Issue date: ${issueStr}`);
 
-  const verCodeEl = document.getElementById('sp-card-verification-code');
-  if (verCodeEl) {
-    verCodeEl.textContent = `ID-${student.studentId || '2000'}`;
-  }
-
-  const instNameEl = document.getElementById('sp-card-inst-name');
-  if (instNameEl && appSettings && appSettings.schoolName) {
-    instNameEl.textContent = appSettings.schoolName;
-  }
+  const joinYear = parseInt(ac.yearJoined, 10) || new Date().getFullYear();
+  setText('sp-card-valid-upto', `Valid upto: 31/03/${joinYear + 1}`);
 }
 
-// Populate the organized profile sections (Personal, Academic, Contact, Family)
+// Populate the Dedicated Read-Only Full Student Details Page
 function populateProfileOrganizedSections(student) {
   if (!student) return;
   const p = student.personalDetails || {};
@@ -13076,108 +13122,216 @@ function populateProfileOrganizedSections(student) {
   const f = student.familyDetails || {};
   const ac = student.academicStatus || {};
 
-  const pName = document.getElementById('sp-prof-name');
-  if (pName) pName.textContent = student.name || '-';
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (val !== undefined && val !== null && String(val).trim() !== '') ? String(val) : '-';
+  };
 
-  const pDob = document.getElementById('sp-prof-dob');
-  if (pDob) pDob.textContent = p.dob || 'Not specified';
+  const fdPhoto = document.getElementById('sp-fd-photo');
+  if (fdPhoto) {
+    fdPhoto.src = (student.photoUrl && student.photoUrl.trim()) ? student.photoUrl : 'default_avatar.jpg';
+    fdPhoto.onerror = () => { fdPhoto.src = 'default_avatar.jpg'; };
+  }
+  setText('sp-fd-name', student.name || '-');
+  setText('sp-fd-class-roll', `Class ${student.class || '-'} • Roll #${student.roll ?? '-'}`);
+  setText('sp-fd-id-badge', `Student ID: ${student.studentId || '-'}`);
 
-  const pGender = document.getElementById('sp-prof-gender');
-  if (pGender) pGender.textContent = p.gender || 'Not specified';
+  setText('sp-prof-dob', p.dob || '-');
+  setText('sp-prof-age', p.dob ? calculateAgeFromDob(p.dob) : '-');
+  setText('sp-prof-gender', p.gender || '-');
+  setText('sp-prof-blood', p.bloodGroup || '-');
+  setText('sp-prof-student-phone', p.studentPhone || '-');
+  setText('sp-prof-email', p.studentEmail || (currentUser && currentUser.email) || '-');
 
-  const pBlood = document.getElementById('sp-prof-blood');
-  if (pBlood) pBlood.textContent = p.bloodGroup || 'Not specified';
+  setText('sp-prof-id', student.studentId || '-');
+  setText('sp-prof-class-roll', `Class ${student.class || '-'} • Roll #${student.roll ?? '-'}`);
+  setText('sp-prof-admno', ac.admissionNo || `ADM-${student.studentId || '-'}`);
+  setText('sp-prof-admdate', ac.admissionDate || '-');
+  setText('sp-prof-rank', ac.rank || '-');
+  setText('sp-prof-prevcollege', ac.previousCollege || '-');
+  setText('sp-prof-admstatus', ac.admissionStatus || 'Confirmed');
 
-  const pId = document.getElementById('sp-prof-id');
-  if (pId) pId.textContent = String(student.studentId || '-');
-
-  const pAdmNo = document.getElementById('sp-prof-admno');
-  if (pAdmNo) pAdmNo.textContent = ac.admissionNo || `ADM-${student.studentId || '-'}`;
-
-  const pClassRoll = document.getElementById('sp-prof-class-roll');
-  if (pClassRoll) pClassRoll.textContent = `Class ${student.class || '-'} • Roll #${student.roll ?? '-'}`;
-
-  const pAdmStatus = document.getElementById('sp-prof-admstatus');
-  if (pAdmStatus) pAdmStatus.textContent = ac.admissionStatus || 'Confirmed';
-
-  const pEmail = document.getElementById('sp-prof-email');
-  if (pEmail) pEmail.textContent = p.studentEmail || (currentUser && currentUser.email) || '-';
-
-  const pAddress = document.getElementById('sp-prof-address');
-  if (pAddress) {
-    const parts = [a.fullAddress, a.place, a.district, a.state, a.pinCode ? `PIN: ${a.pinCode}` : ''].filter(Boolean);
-    pAddress.textContent = parts.length > 0 ? parts.join(', ') : 'Not specified';
+  const streamWrap = document.getElementById('sp-prof-stream-wrap');
+  if (streamWrap) {
+    if (ac.stream) {
+      streamWrap.classList.remove('hidden');
+      setText('sp-prof-stream', ac.stream);
+    } else {
+      streamWrap.classList.add('hidden');
+    }
+  }
+  const degWrap = document.getElementById('sp-prof-degreeyear-wrap');
+  if (degWrap) {
+    if (ac.degreeYear) {
+      degWrap.classList.remove('hidden');
+      setText('sp-prof-degreeyear', ac.degreeYear);
+    } else {
+      degWrap.classList.add('hidden');
+    }
   }
 
-  const pFather = document.getElementById('sp-prof-father');
-  if (pFather) pFather.textContent = f.fatherName ? `${f.fatherName} (${f.fatherMobile || 'No phone'})` : '-';
+  setText('sp-prof-address', a.fullAddress || '-');
+  setText('sp-prof-place', a.place || '-');
+  setText('sp-prof-district', a.district || '-');
+  setText('sp-prof-state', a.state || '-');
+  setText('sp-prof-pincode', a.pinCode || '-');
 
-  const pMother = document.getElementById('sp-prof-mother');
-  if (pMother) pMother.textContent = f.motherName ? `${f.motherName} (${f.motherNumber || 'No phone'})` : '-';
+  setText('sp-prof-father', f.fatherName ? `${f.fatherName}${f.fatherMobile ? ` (${f.fatherMobile})` : ''}` : (f.fatherMobile || '-'));
+  setText('sp-prof-mother', f.motherName ? `${f.motherName}${f.motherNumber ? ` (${f.motherNumber})` : ''}` : (f.motherNumber || '-'));
+
+  let guardianSummary = f.guardian || '-';
+  if (f.guardian === 'Other' && f.guardianName) {
+    guardianSummary = `${f.guardianName}${f.guardianRelation ? ` (${f.guardianRelation})` : ''}${f.guardianNumber ? ` • ${f.guardianNumber}` : ''}`;
+  }
+  setText('sp-prof-guardian', guardianSummary);
+  setText('sp-prof-guardian-occ', f.guardianOccupation || '-');
 }
 
-function populateStudentFormFields(student) {
-  const p = student.personalDetails || {};
-  const a = student.address || {};
-  const f = student.familyDetails || {};
-
-  const nameInput = document.getElementById('spf-name');
-  if (nameInput) nameInput.value = student.name || '';
-
-  const classSelect = document.getElementById('spf-class');
-  if (classSelect) classSelect.value = student.class || '';
-
-  const rollInput = document.getElementById('spf-roll');
-  if (rollInput) rollInput.value = student.roll ?? '';
-
-  const photoUrlInput = document.getElementById('spf-photo-url');
-  if (photoUrlInput) photoUrlInput.value = student.photoUrl || '';
-  const photoPreview = document.getElementById('spf-photo-preview');
-  if (photoPreview) photoPreview.src = student.photoUrl || DEFAULT_AVATAR;
-
-  const dobInput = document.getElementById('spf-dob');
-  if (dobInput) dobInput.value = p.dob || '';
-
-  const genderSelect = document.getElementById('spf-gender');
-  if (genderSelect) genderSelect.value = p.gender || '';
-
-  const bgSelect = document.getElementById('spf-blood-group');
-  if (bgSelect) bgSelect.value = p.bloodGroup || '';
-
-  const fullAddr = document.getElementById('spf-full-address');
-  if (fullAddr) fullAddr.value = a.fullAddress || '';
-  const place = document.getElementById('spf-place');
-  if (place) place.value = a.place || '';
-  const dist = document.getElementById('spf-district');
-  if (dist) dist.value = a.district || '';
-  const st = document.getElementById('spf-state');
-  if (st) st.value = a.state || '';
-  const pin = document.getElementById('spf-pincode');
-  if (pin) pin.value = a.pinCode || '';
-
-  const fName = document.getElementById('spf-father-name');
-  if (fName) fName.value = f.fatherName || '';
-  const fMob = document.getElementById('spf-father-mobile');
-  if (fMob) fMob.value = f.fatherMobile || '';
-  const mName = document.getElementById('spf-mother-name');
-  if (mName) mName.value = f.motherName || '';
-  const mMob = document.getElementById('spf-mother-mobile');
-  if (mMob) mMob.value = f.motherNumber || '';
+// Navigation between Profile Main (ID Card) and Separate Read-Only Full Details Page
+function openStudentFullDetailsPage() {
+  const mainView = document.getElementById('sp-profile-main-view');
+  const fullView = document.getElementById('sp-profile-full-details-view');
+  if (mainView) mainView.classList.add('hidden');
+  if (fullView) fullView.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function toggleStudentEditForm() {
-  const formCard = document.getElementById('sp-form-card');
-  const toggleBtnText = document.getElementById('sp-toggle-edit-btn-text');
-  if (!formCard) return;
-  const isHidden = formCard.classList.contains('hidden');
-  if (isHidden) {
-    formCard.classList.remove('hidden');
-    if (toggleBtnText) toggleBtnText.textContent = 'Hide Form';
-    formCard.scrollIntoView({ behavior: 'smooth' });
+function closeStudentFullDetailsPage() {
+  const mainView = document.getElementById('sp-profile-main-view');
+  const fullView = document.getElementById('sp-profile-full-details-view');
+  if (fullView) fullView.classList.add('hidden');
+  if (mainView) mainView.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// PWA Install Prompt for Students entering from Browser
+function maybeShowStudentPwaInstallPrompt() {
+  try {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) return;
+    if (sessionStorage.getItem('sp_pwa_prompt_dismissed') === '1') return;
+
+    const modal = document.getElementById('modal-sp-pwa-install');
+    if (!modal) return;
+
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+    const iosHint = document.getElementById('sp-pwa-ios-hint');
+    const installBtn = document.getElementById('btn-sp-pwa-install-now');
+    if (isIos) {
+      if (iosHint) iosHint.classList.remove('hidden');
+      if (installBtn) installBtn.classList.add('hidden');
+    } else {
+      if (iosHint) iosHint.classList.add('hidden');
+      if (installBtn) installBtn.classList.remove('hidden');
+    }
+
+    modal.classList.remove('hidden');
+  } catch (_) {}
+}
+
+async function handleStudentPwaInstallClick() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('Installing Student App...');
+      dismissStudentPwaInstallModal();
+    }
+    deferredPrompt = null;
   } else {
-    formCard.classList.add('hidden');
-    if (toggleBtnText) toggleBtnText.textContent = 'Edit My Details';
+    showToast('Open browser menu (⋮) and tap "Install app" or "Add to Home screen"');
+    dismissStudentPwaInstallModal();
   }
+}
+
+function dismissStudentPwaInstallModal() {
+  sessionStorage.setItem('sp_pwa_prompt_dismissed', '1');
+  const modal = document.getElementById('modal-sp-pwa-install');
+  if (modal) modal.classList.add('hidden');
+}
+
+// Stylish Welcome Onboarding Modal -> Full Student Details Form
+let _spWelcomeKeyHandler = null;
+function openStudentWelcomeOnboarding() {
+  const modal = document.getElementById('modal-sp-welcome-onboarding');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+
+  if (_spWelcomeKeyHandler) {
+    window.removeEventListener('keydown', _spWelcomeKeyHandler);
+  }
+  _spWelcomeKeyHandler = (ev) => {
+    if (ev.key === 'Enter' && !modal.classList.contains('hidden')) {
+      ev.preventDefault();
+      proceedFromWelcomeToOnboardingForm();
+    }
+  };
+  window.addEventListener('keydown', _spWelcomeKeyHandler);
+}
+
+function proceedFromWelcomeToOnboardingForm() {
+  const welcomeModal = document.getElementById('modal-sp-welcome-onboarding');
+  const formModal = document.getElementById('modal-sp-onboarding-form');
+  if (welcomeModal) welcomeModal.classList.add('hidden');
+  if (_spWelcomeKeyHandler) {
+    window.removeEventListener('keydown', _spWelcomeKeyHandler);
+    _spWelcomeKeyHandler = null;
+  }
+  if (formModal) formModal.classList.remove('hidden');
+}
+
+// Auto-fetch next Roll Number when student selects their Class
+async function handleStudentOnboardingClassChange() {
+  const classEl = document.getElementById('spf-class');
+  const rollEl = document.getElementById('spf-roll');
+  if (!classEl) return;
+  const selClass = classEl.value.trim();
+
+  // Dynamic Stream (Plus One / Plus Two) & Degree Year fields
+  const lower = selClass.toLowerCase();
+  const streamWrap = document.getElementById('spf-wrap-stream');
+  const degWrap = document.getElementById('spf-wrap-degreeYear');
+  if (streamWrap) {
+    const isPlus = /plus\s*(one|two|1|2)|\+1|\+2/i.test(lower);
+    streamWrap.classList.toggle('hidden', !isPlus);
+  }
+  if (degWrap) {
+    const isDeg = /degree|ba|bsc|bcom|bba|bca/i.test(lower);
+    degWrap.classList.toggle('hidden', !isDeg);
+  }
+
+  if (!selClass) {
+    if (rollEl) rollEl.value = '';
+    return;
+  }
+
+  if (rollEl) {
+    rollEl.value = '';
+    rollEl.placeholder = 'Calculating...';
+  }
+  try {
+    const res = await API.getNextStudentRoll(selClass);
+    if (res && res.success && rollEl) {
+      rollEl.value = res.nextRoll;
+    }
+  } catch (err) {
+    console.warn('[Next Roll Lookup Error]', err);
+    if (rollEl) rollEl.value = 1;
+  }
+}
+
+function handleOnboardingDobChange() {
+  const dobEl = document.getElementById('spf-dob');
+  const ageEl = document.getElementById('spf-age');
+  if (!dobEl || !ageEl) return;
+  ageEl.value = calculateAgeFromDob(dobEl.value);
+}
+
+function handleOnboardingGuardianChange() {
+  const sel = document.getElementById('spf-guardian');
+  const box = document.getElementById('spf-guardian-other-box');
+  if (!sel || !box) return;
+  box.classList.toggle('hidden', sel.value !== 'Other');
 }
 
 async function handleStudentPhotoSelect(e) {

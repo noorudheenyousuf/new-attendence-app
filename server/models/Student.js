@@ -27,7 +27,8 @@ const studentSchema = new mongoose.Schema({
     dob: { type: String, default: '' },
     gender: { type: String, default: '' },
     bloodGroup: { type: String, default: '' },
-    studentEmail: { type: String, default: '', trim: true, lowercase: true }
+    studentEmail: { type: String, default: '', trim: true, lowercase: true },
+    studentPhone: { type: String, default: '', trim: true }
   },
   address: {
     fullAddress: { type: String, default: '' },

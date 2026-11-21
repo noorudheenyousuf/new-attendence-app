@@ -12,6 +12,7 @@ const ActivityLog = require('../models/ActivityLog');
 const Student = require('../models/Student');
 const authMiddleware = require('../middleware/auth');
 const { caseInsensitiveRegex } = require('../utils/caseHelper');
+const { generateOtp, maskPhone, sendOtpSms } = require('../services/otpService');
 
 const getGoogleClientId = () => {
   try {
@@ -38,30 +39,62 @@ router.get('/google-client-id', (req, res) => {
 });
 
 // @route   POST /api/auth/register
-// @desc    Register a new user (Supports admin, teacher, and student registration)
+// @desc    Register a new user (Supports admin, teacher, and student registration via email or username)
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role: requestedRole, portal } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide full name, email, and password' });
+    const { name, email, username, phone, password, role: requestedRole, portal } = req.body;
+    const isStudentPortal = portal === 'student' || requestedRole === 'student';
+
+    const rawIdentifier = String(email || username || '').trim();
+    if (!name || !rawIdentifier || !password) {
+      return res.status(400).json({
+        success: false,
+        message: isStudentPortal
+          ? 'Please provide full name, username or email, and password'
+          : 'Please provide full name, email, and password'
+      });
     }
 
     if (password.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawIdentifier);
+    let normalizedEmail = undefined;
+    let normalizedUsername = undefined;
+
+    if (looksLikeEmail) {
+      normalizedEmail = rawIdentifier.toLowerCase();
+    } else if (isStudentPortal || username) {
+      normalizedUsername = rawIdentifier.toLowerCase().replace(/\s+/g, '');
+      if (normalizedUsername.length < 3) {
+        return res.status(400).json({ success: false, message: 'Username must be at least 3 characters long' });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
     }
 
-    // Check if student portal request or existing student profile matches this email
-    const isStudentPortal = portal === 'student' || requestedRole === 'student';
-    const existingStudent = await Student.findOne({
-      'personalDetails.studentEmail': normalizedEmail,
-      isPrivate: { $ne: true }
-    });
+    // Check if email or username already exists
+    const dupQuery = [];
+    if (normalizedEmail) dupQuery.push({ email: normalizedEmail });
+    if (normalizedUsername) dupQuery.push({ username: normalizedUsername });
+    if (dupQuery.length > 0) {
+      const existingUser = await User.findOne({ $or: dupQuery });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: normalizedEmail ? 'An account with this email already exists' : 'This username is already taken. Please choose another.'
+        });
+      }
+    }
+
+    // Check if existing student profile matches this email
+    const existingStudent = normalizedEmail
+      ? await Student.findOne({
+          'personalDetails.studentEmail': normalizedEmail,
+          isPrivate: { $ne: true }
+        })
+      : null;
 
     let role;
     if (isStudentPortal || existingStudent) {
@@ -75,14 +108,18 @@ router.post('/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await User.create({
+    const userPayload = {
       name: name.trim(),
-      email: normalizedEmail,
       password: hashedPassword,
       role,
       isFirstAccount: role === 'admin',
-      studentRef: existingStudent ? existingStudent._id : null
-    });
+      studentRef: existingStudent ? existingStudent._id : null,
+      phone: phone ? String(phone).replace(/\D/g, '').slice(-10) : ''
+    };
+    if (normalizedEmail) userPayload.email = normalizedEmail;
+    if (normalizedUsername) userPayload.username = normalizedUsername;
+
+    const user = await User.create(userPayload);
 
     if (existingStudent) {
       existingStudent.userId = user._id;
@@ -98,7 +135,9 @@ router.post('/register', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email,
+        email: user.email || '',
+        username: user.username || '',
+        phone: user.phone || '',
         role: user.role,
         avatarUrl: user.avatarUrl,
         isFirstAccount: user.isFirstAccount,
@@ -120,12 +159,14 @@ router.post('/login', async (req, res) => {
     }
 
     const trimmedInput = email.trim();
-    // Search by email, case-insensitive name, or 'admin' role
+    const lowerInput = trimmedInput.toLowerCase();
+    // Search by email, username, case-insensitive name, or 'admin' role
     const query = [
-      { email: trimmedInput.toLowerCase() },
+      { email: lowerInput },
+      { username: lowerInput },
       { name: new RegExp(`^${trimmedInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
     ];
-    if (trimmedInput.toLowerCase() === 'admin') {
+    if (lowerInput === 'admin') {
       query.push({ role: 'admin' });
     }
     const user = await User.findOne({ $or: query });
@@ -149,10 +190,13 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email,
+        email: user.email || '',
+        username: user.username || '',
+        phone: user.phone || '',
         role: user.role,
         avatarUrl: user.avatarUrl,
-        isFirstAccount: user.isFirstAccount
+        isFirstAccount: user.isFirstAccount,
+        studentRef: user.studentRef
       }
     });
   } catch (error) {
@@ -527,6 +571,179 @@ router.put('/change-password', authMiddleware, async (req, res) => {
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Helper: Locate user by 10-digit phone number (parent mobile, student phone, or user phone) and optional identifier
+async function findUserForOtpReset(phone, identifier) {
+  const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (!/^\d{10}$/.test(digits)) {
+    return { error: 'Please enter a valid 10-digit phone number' };
+  }
+
+  let targetUser = null;
+  const trimmedId = String(identifier || '').trim().toLowerCase();
+
+  if (trimmedId) {
+    targetUser = await User.findOne({
+      $or: [{ email: trimmedId }, { username: trimmedId }]
+    });
+    if (!targetUser) {
+      return { error: 'No account found with that username or email' };
+    }
+    // Verify phone belongs to this user or their linked student profile
+    const userPhoneDigits = String(targetUser.phone || '').replace(/\D/g, '').slice(-10);
+    let phoneMatches = userPhoneDigits === digits;
+    if (!phoneMatches) {
+      const student = targetUser.studentRef
+        ? await Student.findById(targetUser.studentRef).lean()
+        : await Student.findOne({ userId: targetUser._id }).lean();
+      if (student) {
+        const candidatePhones = [
+          student.familyDetails?.fatherMobile,
+          student.personalDetails?.studentPhone,
+          student.familyDetails?.motherNumber,
+          student.familyDetails?.guardianNumber
+        ].map(p => String(p || '').replace(/\D/g, '').slice(-10));
+        phoneMatches = candidatePhones.includes(digits);
+      }
+    }
+    if (!phoneMatches) {
+      return { error: 'This phone number does not match the registered parent or student number for this account' };
+    }
+    return { user: targetUser, digits };
+  }
+
+  // Lookup by phone number across Student records (parent/student phone) or User.phone
+  const matchingStudent = await Student.findOne({
+    isPrivate: { $ne: true },
+    $or: [
+      { 'familyDetails.fatherMobile': digits },
+      { 'personalDetails.studentPhone': digits },
+      { 'familyDetails.motherNumber': digits },
+      { 'familyDetails.guardianNumber': digits }
+    ]
+  }).sort({ createdAt: -1 }).lean();
+
+  if (matchingStudent) {
+    if (matchingStudent.userId) {
+      targetUser = await User.findById(matchingStudent.userId);
+    }
+    if (!targetUser && matchingStudent.personalDetails?.studentEmail) {
+      targetUser = await User.findOne({ email: matchingStudent.personalDetails.studentEmail.toLowerCase() });
+    }
+    if (!targetUser) {
+      targetUser = await User.findOne({ studentRef: matchingStudent._id });
+    }
+  }
+
+  if (!targetUser) {
+    targetUser = await User.findOne({ phone: digits });
+  }
+
+  if (!targetUser) {
+    return { error: 'No account found linked to this phone number. Please check your parent or student phone number.' };
+  }
+
+  return { user: targetUser, digits };
+}
+
+// @route   POST /api/auth/forgot-password/request-otp
+// @desc    Send a 6-digit OTP to registered parent/student phone number
+router.post('/forgot-password/request-otp', async (req, res) => {
+  try {
+    const { phone, identifier } = req.body;
+    const lookup = await findUserForOtpReset(phone, identifier);
+    if (lookup.error) {
+      return res.status(404).json({ success: false, message: lookup.error });
+    }
+
+    const { user, digits } = lookup;
+    const otp = generateOtp();
+    const salt = await bcrypt.genSalt(8);
+    user.resetOtpHash = await bcrypt.hash(otp, salt);
+    user.resetOtpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    user.resetOtpAttempts = 0;
+    await user.save();
+
+    const smsResult = await sendOtpSms(digits, otp, 'Password Reset');
+
+    const responsePayload = {
+      success: true,
+      maskedPhone: smsResult.maskedPhone || maskPhone(digits),
+      accountHint: user.username || user.email || user.name,
+      delivered: smsResult.delivered,
+      message: smsResult.delivered
+        ? `A 6-digit OTP has been sent to ${smsResult.maskedPhone}.`
+        : `OTP generated for ${smsResult.maskedPhone}.`
+    };
+    if (!smsResult.delivered && smsResult.devOtp) {
+      responsePayload.devOtp = smsResult.devOtp;
+    }
+
+    res.json(responsePayload);
+  } catch (error) {
+    console.error('[Forgot Password Request OTP Error]', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/auth/forgot-password/reset-password
+// @desc    Verify OTP and reset user password
+router.post('/forgot-password/reset-password', async (req, res) => {
+  try {
+    const { phone, identifier, otp, newPassword } = req.body;
+    if (!otp || !/^\d{6}$/.test(String(otp).trim())) {
+      return res.status(400).json({ success: false, message: 'Please enter the 6-digit OTP' });
+    }
+    if (!newPassword || String(newPassword).length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
+    }
+
+    const lookup = await findUserForOtpReset(phone, identifier);
+    if (lookup.error) {
+      return res.status(404).json({ success: false, message: lookup.error });
+    }
+
+    const { user } = lookup;
+    if (!user.resetOtpHash || !user.resetOtpExpires) {
+      return res.status(400).json({ success: false, message: 'No active OTP found. Please request a new OTP.' });
+    }
+    if (new Date() > new Date(user.resetOtpExpires)) {
+      user.resetOtpHash = '';
+      user.resetOtpExpires = null;
+      user.resetOtpAttempts = 0;
+      await user.save();
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+    if ((user.resetOtpAttempts || 0) >= 5) {
+      user.resetOtpHash = '';
+      user.resetOtpExpires = null;
+      await user.save();
+      return res.status(429).json({ success: false, message: 'Too many failed OTP attempts. Please request a new OTP.' });
+    }
+
+    const isOtpValid = await bcrypt.compare(String(otp).trim(), user.resetOtpHash);
+    if (!isOtpValid) {
+      user.resetOtpAttempts = (user.resetOtpAttempts || 0) + 1;
+      await user.save();
+      return res.status(400).json({ success: false, message: 'Invalid OTP. Please check and try again.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(String(newPassword), salt);
+    user.resetOtpHash = '';
+    user.resetOtpExpires = null;
+    user.resetOtpAttempts = 0;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully! You can now sign in with your new password.'
+    });
+  } catch (error) {
+    console.error('[Forgot Password Reset Error]', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
