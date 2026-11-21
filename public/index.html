@@ -1801,6 +1801,26 @@
 
       </section>
 
+      <!-- ================= OUTCOMER STUDENT DETAILS PAGE ================= -->
+      <section id="view-outcomer-details" class="hidden space-y-4 max-w-4xl mx-auto pb-16">
+        <div class="bg-[var(--card-bg)] p-4 sm:p-5 rounded-3xl border border-[var(--border-color)] shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <button type="button" onclick="goBackToOutcomersFromDetails()" class="w-9 h-9 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)] text-[var(--text-main)] hover:bg-[#245b70]/10 flex items-center justify-center transition active:scale-95 flex-shrink-0" title="Back to Outcomers">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div class="min-w-0">
+              <h2 class="text-base sm:text-lg font-black text-[var(--text-main)] truncate">Student Submission Details</h2>
+              <p class="text-xs text-[var(--text-sub)] font-medium">Complete registration information submitted by the student</p>
+            </div>
+          </div>
+          <div id="outcomer-details-actions" class="flex items-center gap-2 flex-wrap"></div>
+        </div>
+
+        <div id="outcomer-details-content" class="space-y-4">
+          <!-- Dynamically populated full student details -->
+        </div>
+      </section>
+
       <!-- ================= STUDENT PORTAL VIEW (PREMIUM REDESIGN) ================= -->
       <section id="view-student-portal" class="hidden space-y-4 max-w-4xl mx-auto pb-28 sm:pb-16 px-1 sm:px-0">
         
@@ -1908,104 +1928,42 @@
             </div>
           </div>
 
-          <!-- Today's Timetable Preview Card -->
-          <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-xs space-y-3">
-            <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
-              <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-xl bg-[#245b70]/10 text-[#245b70] dark:text-cyan-400 flex items-center justify-center">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                </div>
-                <div>
-                  <h3 class="text-xs sm:text-sm font-black text-[var(--text-main)]">Today's Class Schedule</h3>
-                  <span id="sp-home-today-dayname" class="text-[10px] text-[var(--text-sub)] font-semibold">Today</span>
-                </div>
+          <!-- 2 Main Action Cards: My Attendance & Classes -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <!-- My Attendance -->
+            <button type="button" onclick="switchStudentPortalTab('attendance')" class="touch-btn p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xs hover:border-[#245b70]/40 transition active:scale-98 text-left flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
               </div>
-              <button type="button" onclick="switchStudentPortalTab('classes')" class="text-xs font-bold text-[#245b70] dark:text-cyan-400 hover:underline flex items-center gap-1">
-                <span>Full Timetable</span>
-                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-              </button>
-            </div>
-
-            <div id="sp-home-today-slots" class="space-y-2">
-              <div class="p-4 text-center text-xs text-[var(--text-sub)] font-medium">Loading schedule...</div>
-            </div>
-          </div>
-
-          <!-- Quick Access Cards Grid -->
-          <div class="space-y-2">
-            <div class="text-[10px] font-black uppercase tracking-wider text-[var(--text-sub)] px-1">Quick Access</div>
-            <div class="grid grid-cols-2 gap-2.5">
-              
-              <!-- My Attendance -->
-              <button type="button" onclick="switchStudentPortalTab('attendance')" class="touch-btn p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xs hover:border-[#245b70]/40 transition active:scale-98 text-left flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                </div>
-                <div class="min-w-0">
-                  <div class="text-xs font-black text-[var(--text-main)] truncate">My Attendance</div>
-                  <div class="text-[10px] text-[var(--text-sub)] truncate">Calendar & Stats</div>
-                </div>
-              </button>
-
-              <!-- My Classes & Subjects -->
-              <button type="button" onclick="switchStudentPortalTab('classes')" class="touch-btn p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xs hover:border-[#245b70]/40 transition active:scale-98 text-left flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                </div>
-                <div class="min-w-0">
-                  <div class="text-xs font-black text-[var(--text-main)] truncate">Classes & Subjects</div>
-                  <div class="text-[10px] text-[var(--text-sub)] truncate">Timetable & Faculty</div>
-                </div>
-              </button>
-
-              <!-- Campus Updates -->
-              <button type="button" onclick="switchStudentPortalTab('updates')" class="touch-btn p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xs hover:border-[#245b70]/40 transition active:scale-98 text-left flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                </div>
-                <div class="min-w-0">
-                  <div class="text-xs font-black text-[var(--text-main)] truncate">Campus Updates</div>
-                  <div class="text-[10px] text-[var(--text-sub)] truncate">Notices & Events</div>
-                </div>
-              </button>
-
-              <!-- Student ID Card -->
-              <button type="button" onclick="switchStudentPortalTab('profile')" class="touch-btn p-3.5 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xs hover:border-[#245b70]/40 transition active:scale-98 text-left flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><line x1="15" y1="8" x2="17" y2="8"></line><line x1="15" y1="12" x2="17" y2="12"></line><line x1="7" y1="16" x2="17" y2="16"></line></svg>
-                </div>
-                <div class="min-w-0">
-                  <div class="text-xs font-black text-[var(--text-main)] truncate">Student ID Card</div>
-                  <div class="text-[10px] text-[var(--text-sub)] truncate">Official Profile & ID</div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <!-- Recent Announcements Card -->
-          <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-xs space-y-3">
-            <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
-              <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                </div>
-                <h3 class="text-xs sm:text-sm font-black text-[var(--text-main)]">Recent Announcements</h3>
+              <div class="min-w-0">
+                <div class="text-xs sm:text-sm font-black text-[var(--text-main)] truncate">My Attendance</div>
+                <div class="text-[10px] text-[var(--text-sub)] truncate">Calendar & Stats</div>
               </div>
-              <button type="button" onclick="switchStudentPortalTab('updates')" class="text-xs font-bold text-[#245b70] dark:text-cyan-400 hover:underline flex items-center gap-1">
-                <span>All Updates</span>
-                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-              </button>
-            </div>
+            </button>
 
-            <div id="sp-home-announcements-list" class="space-y-2.5">
-              <div class="p-4 text-center text-xs text-[var(--text-sub)] font-medium">Loading updates...</div>
-            </div>
+            <!-- Classes -->
+            <button type="button" onclick="switchStudentPortalTab('classes')" class="touch-btn p-4 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xs hover:border-[#245b70]/40 transition active:scale-98 text-left flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs sm:text-sm font-black text-[var(--text-main)] truncate">Classes</div>
+                <div class="text-[10px] text-[var(--text-sub)] truncate">Timetable & Subjects</div>
+              </div>
+            </button>
           </div>
 
         </div>
 
         <!-- ================= 2. TAB CONTENT: CLASSES & ACADEMICS ================= -->
         <div id="sp-content-classes" class="hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <button type="button" onclick="switchStudentPortalTab('home')" class="touch-btn px-3 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] font-extrabold text-xs flex items-center gap-1.5 shadow-2xs active:scale-95 transition">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Back to Home</span>
+            </button>
+            <span class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">Classes</span>
+          </div>
           
           <!-- Sub-navigation Pills (Weekly Timetable & Subjects) -->
           <div class="flex items-center gap-2 bg-[var(--card-bg)] p-1.5 rounded-2xl border border-[var(--border-color)] shadow-2xs">
@@ -2083,6 +2041,13 @@
 
         <!-- ================= 3. TAB CONTENT: ADVANCED ATTENDANCE PORTAL ================= -->
         <div id="sp-content-attendance" class="hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <button type="button" onclick="switchStudentPortalTab('home')" class="touch-btn px-3 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-main)] font-extrabold text-xs flex items-center gap-1.5 shadow-2xs active:scale-95 transition">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Back to Home</span>
+            </button>
+            <span class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">My Attendance</span>
+          </div>
           
           <!-- Attendance Overview KPI Cards -->
           <div class="bg-[var(--card-bg)] rounded-3xl p-5 sm:p-6 border border-[var(--border-color)] shadow-xs space-y-4">
@@ -2238,32 +2203,48 @@
 
         <!-- ================= 4. TAB CONTENT: UPDATES & ANNOUNCEMENTS ================= -->
         <div id="sp-content-updates" class="hidden space-y-4">
-          <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-xs space-y-4">
-            
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-color)] pb-3">
-              <div>
-                <h3 class="text-sm sm:text-base font-black text-[var(--text-main)]">Campus Notice Board & Updates</h3>
-                <p class="text-xs text-[var(--text-sub)]">School circulars, academic notices, event schedules & alerts</p>
-              </div>
+          <!-- Decorative Updates Hero Card -->
+          <div class="sp-update-hero rounded-3xl p-4 sm:p-5 shadow-xs relative overflow-hidden space-y-4">
+            <!-- Decorative soft glowing circles -->
+            <div class="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-indigo-400/15 blur-2xl pointer-events-none"></div>
+            <div class="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-pink-400/15 blur-2xl pointer-events-none"></div>
 
-              <!-- Filter Pills -->
+            <div class="relative flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-sky-500 to-teal-400 text-white flex items-center justify-center shadow-md flex-shrink-0">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                </div>
+                <div class="min-w-0">
+                  <span class="inline-block px-2 py-0.5 rounded-full bg-white/80 dark:bg-slate-800/80 text-indigo-700 dark:text-indigo-300 font-black text-[9px] uppercase tracking-wider shadow-2xs mb-0.5">Campus Feed</span>
+                  <h3 class="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-tight truncate">Announcements & Events</h3>
+                  <p class="text-[11px] text-slate-600 dark:text-slate-300 font-medium truncate">School circulars, notices & upcoming events</p>
+                </div>
+              </div>
+              <!-- Decorative Mini Illustration SVG -->
+              <svg class="w-12 h-12 text-indigo-500/25 dark:text-indigo-300/20 flex-shrink-0 hidden sm:block" viewBox="0 0 64 64" fill="none">
+                <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5 5"/>
+                <path d="M20 34l8 8 16-18" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+
+            <!-- Filter Pills & Search -->
+            <div class="relative space-y-2.5">
               <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                <button type="button" onclick="filterStudentUpdates('all')" id="sp-ufilt-all" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-[#245b70] text-white transition flex-shrink-0 shadow-2xs">All</button>
-                <button type="button" onclick="filterStudentUpdates('important')" id="sp-ufilt-important" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex-shrink-0">Important</button>
-                <button type="button" onclick="filterStudentUpdates('events')" id="sp-ufilt-events" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--bg-page)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex-shrink-0">Events</button>
+                <button type="button" onclick="filterStudentUpdates('all')" id="sp-ufilt-all" class="px-3 py-1.5 rounded-xl text-xs font-black bg-[#245b70] text-white transition flex-shrink-0 shadow-xs">All</button>
+                <button type="button" onclick="filterStudentUpdates('important')" id="sp-ufilt-important" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/80 dark:bg-slate-800/80 text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex-shrink-0">Important</button>
+                <button type="button" onclick="filterStudentUpdates('events')" id="sp-ufilt-events" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/80 dark:bg-slate-800/80 text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition flex-shrink-0">Events</button>
+              </div>
+
+              <div class="relative">
+                <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)] opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="sp-updates-search-input" oninput="handleStudentUpdatesSearch(this.value)" placeholder="Search announcements & events..." class="w-full bg-white/90 dark:bg-slate-900/80 border border-white/80 dark:border-slate-700 rounded-2xl pl-10 pr-3.5 text-xs font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-2xs h-10">
               </div>
             </div>
+          </div>
 
-            <!-- Search notices -->
-            <div class="relative">
-              <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)] opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" id="sp-updates-search-input" oninput="handleStudentUpdatesSearch(this.value)" placeholder="Search notices, circulars, events..." class="w-full bg-[var(--bg-page)] border border-[var(--border-color)] rounded-xl pl-10 pr-3.5 text-xs font-semibold text-[var(--text-main)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#245b70] shadow-2xs h-10">
-            </div>
-
-            <!-- Announcements list container -->
-            <div id="sp-announcements-list" class="space-y-3 pt-1">
-              <!-- Dynamically populated announcements -->
-            </div>
+          <!-- Announcements & Events list container -->
+          <div id="sp-announcements-list" class="space-y-3.5">
+            <!-- Dynamically populated decorative cards -->
           </div>
         </div>
 
@@ -2299,10 +2280,10 @@
                   <span id="sp-card-valid-upto">Valid upto: --/--/----</span>
                 </div>
 
-                <!-- Top Header Row: Arabic Calligraphy + Institution Info (Left) & MAMBA' Logo (Right) -->
-                <div class="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
+                <!-- Top Header Row: Wider Arabic Calligraphy + Institution Info (Left) & Larger MAMBA' Logo (Right) -->
+                <div class="px-3.5 sm:px-4 pt-3 pb-2 flex items-center justify-between gap-2">
                   <div class="flex-1 min-w-0">
-                    <img src="icons/mamba-calligraphy.jpg" alt="مركز منبع العلوم التعليمي" class="sp-pvc-calligraphy h-7 sm:h-8 w-auto object-contain object-left mb-0.5">
+                    <img src="icons/mamba-calligraphy.jpg" alt="مركز منبع العلوم التعليمي" class="sp-pvc-calligraphy w-full max-w-[265px] sm:max-w-[295px] h-9 sm:h-11 object-contain object-left mb-0.5">
                     <div class="text-[9.5px] sm:text-[10.5px] font-black tracking-tight text-[#b91c1c] leading-tight uppercase">
                       MAMBA UL ULOOM EDUCATIONAL CENTER
                     </div>
@@ -2310,8 +2291,8 @@
                       Karimughal, Peringala, Ernakulam-683565, Kerala
                     </div>
                   </div>
-                  <div class="flex-shrink-0 flex flex-col items-center justify-center pl-1">
-                    <img src="icons/mamba-logo.png" alt="MAMBA Logo" class="w-14 h-12 sm:w-16 sm:h-14 object-contain">
+                  <div class="flex-shrink-0 flex flex-col items-center justify-center">
+                    <img src="icons/mamba-logo.png" alt="MAMBA Logo" class="w-20 h-16 sm:w-24 sm:h-[74px] object-contain">
                   </div>
                 </div>
 
@@ -2615,26 +2596,16 @@
       </button>
     </footer>
 
-    <!-- ================= FIXED STUDENT BOTTOM FIVE TABS (Home, Classes, Attendance, Updates, Profile) ================= -->
+    <!-- ================= FIXED STUDENT BOTTOM THREE TABS (Home, Updates, Profile) ================= -->
     <footer id="student-bottom-nav" class="hidden flex-shrink-0 bg-[var(--card-bg)]/95 backdrop-blur-md border-t border-[var(--border-color)] px-2 py-1.5 flex items-center justify-around shadow-2xl z-30 no-print fixed bottom-0 left-0 right-0">
       <button onclick="switchStudentPortalTab('home')" id="sp-bnav-home" class="flex-1 flex flex-col items-center justify-center py-1 text-[#245b70] dark:text-cyan-400 font-black tab-transition">
         <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
         <span class="text-[10px] font-bold">Home</span>
       </button>
 
-      <button onclick="switchStudentPortalTab('classes')" id="sp-bnav-classes" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition">
-        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-        <span class="text-[10px] font-bold">Classes</span>
-      </button>
-
-      <button onclick="switchStudentPortalTab('attendance')" id="sp-bnav-attendance" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition">
-        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-        <span class="text-[10px] font-bold">Attendance</span>
-      </button>
-
       <button onclick="switchStudentPortalTab('updates')" id="sp-bnav-updates" class="flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition relative">
         <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-        <span id="sp-unread-updates-badge" class="hidden absolute top-0.5 right-1/4 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
+        <span id="sp-unread-updates-badge" class="hidden absolute top-0.5 right-1/3 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
         <span class="text-[10px] font-bold">Updates</span>
       </button>
 

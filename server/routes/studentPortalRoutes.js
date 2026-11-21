@@ -173,16 +173,19 @@ router.get('/me', authMiddleware, async (req, res) => {
 // Helper: Compute next sequential roll number for a class (includes approved + pending active students)
 async function getNextRollNumberForClass(className) {
   if (!className || !String(className).trim()) return 1;
-  const highest = await Student.findOne({
+  const studentsInClass = await Student.find({
     isPrivate: { $ne: true },
     class: caseInsensitiveRegex(className),
     registrationStatus: { $ne: 'rejected' },
     lifecycleStatus: { $nin: ['alumni', 'tc'] }
-  }).sort({ roll: -1 }).select('roll').lean();
+  }).select('roll').lean();
 
-  return highest && Number.isFinite(Number(highest.roll)) && Number(highest.roll) > 0
-    ? Number(highest.roll) + 1
-    : 1;
+  let maxRoll = 0;
+  for (const s of studentsInClass) {
+    const r = Number(s.roll);
+    if (Number.isFinite(r) && r > maxRoll) maxRoll = r;
+  }
+  return maxRoll + 1;
 }
 
 // @route   GET /api/student-portal/next-roll

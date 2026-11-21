@@ -6833,7 +6833,7 @@ async function selectTab(tab) {
   const headerNotifBtn = document.getElementById('header-notif-btn');
 
   if (isStudent) {
-    if (mainHeader) mainHeader.classList.add('hidden');
+    if (mainHeader) mainHeader.classList.remove('hidden');
     if (bottomNav) bottomNav.classList.add('hidden');
     if (studentBottomNav) studentBottomNav.classList.remove('hidden');
     if (headerGuideBtn) headerGuideBtn.classList.add('hidden');
@@ -6854,7 +6854,7 @@ async function selectTab(tab) {
     previousAppTab = currentActiveTab;
     currentActiveTab = tab;
   }
-  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace', 'student-portal', 'outcomers'];
+  const allViews = ['home', 'attendance', 'report', 'settings', 'classes', 'subjects', 'students', 'teachers', 'admin', 'edit-profile', 'teacher-log', 'timetable', 'messages', 'workspace', 'student-portal', 'outcomers', 'outcomer-details'];
   allViews.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) el.classList.add('hidden');
@@ -12901,9 +12901,9 @@ currentStudentTimetableDay = 'all';
 // Initialize Student Portal View
 async function initStudentPortal() {
   try {
-    // Hide top main header and show bottom nav only in Student App
+    // Keep main brand header visible; top tab strip stays removed
     const mainHeader = document.getElementById('app-main-header');
-    if (mainHeader) mainHeader.classList.add('hidden');
+    if (mainHeader) mainHeader.classList.remove('hidden');
 
     // Prompt PWA Install when student enters from browser (not yet standalone)
     maybeShowStudentPwaInstallPrompt();
@@ -13309,14 +13309,31 @@ async function handleStudentOnboardingClassChange() {
     rollEl.value = '';
     rollEl.placeholder = 'Calculating...';
   }
+  let resolvedRoll = null;
   try {
     const res = await API.getNextStudentRoll(selClass);
-    if (res && res.success && rollEl) {
-      rollEl.value = res.nextRoll;
+    if (res && res.success && Number.isFinite(Number(res.nextRoll))) {
+      resolvedRoll = Number(res.nextRoll);
     }
   } catch (err) {
     console.warn('[Next Roll Lookup Error]', err);
-    if (rollEl) rollEl.value = 1;
+  }
+
+  if (resolvedRoll === null) {
+    try {
+      const pubRes = await fetch(`/api/students/public-next-roll?class=${encodeURIComponent(selClass)}`);
+      const pubJson = await pubRes.json();
+      if (pubJson && pubJson.success && Number.isFinite(Number(pubJson.nextRoll))) {
+        resolvedRoll = Number(pubJson.nextRoll);
+      }
+    } catch (pubErr) {
+      console.warn('[Public Next Roll Fallback Error]', pubErr);
+    }
+  }
+
+  const latestClass = document.getElementById('spf-class')?.value?.trim() || '';
+  if (rollEl && latestClass === selClass) {
+    rollEl.value = resolvedRoll !== null ? resolvedRoll : 1;
   }
 }
 
@@ -13443,29 +13460,24 @@ function switchStudentPortalTab(tab, subTab) {
   currentStudentPortalTab = tab;
   const tabs = ['home', 'classes', 'attendance', 'updates', 'profile'];
 
+  const activeBottomTab = (tab === 'classes' || tab === 'attendance') ? 'home' : tab;
   tabs.forEach(t => {
-    // Desktop top tabs
-    const dBtn = document.getElementById(`sp-tab-${t}`);
-    // Mobile bottom bar tabs
+    // Mobile bottom bar tabs (Home, Updates, Profile)
     const bBtn = document.getElementById(`sp-bnav-${t}`);
     // Content containers
     const content = document.getElementById(`sp-content-${t}`);
 
-    if (t === tab) {
-      if (dBtn) {
-        dBtn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap custom-gradient-btn text-white shadow-sm";
-      }
-      if (bBtn) {
+    if (bBtn) {
+      if (t === activeBottomTab) {
         bBtn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[#245b70] dark:text-cyan-400 font-black tab-transition scale-105";
-      }
-      if (content) content.classList.remove('hidden');
-    } else {
-      if (dBtn) {
-        dBtn.className = "flex-1 py-2 px-3 rounded-xl text-xs font-bold text-[var(--text-sub)] hover:text-[var(--text-main)] transition flex items-center justify-center gap-1.5 whitespace-nowrap";
-      }
-      if (bBtn) {
+      } else {
         bBtn.className = "flex-1 flex flex-col items-center justify-center py-1 text-[var(--text-sub)] hover:text-[#245b70] font-medium tab-transition";
       }
+    }
+
+    if (t === tab) {
+      if (content) content.classList.remove('hidden');
+    } else {
       if (content) content.classList.add('hidden');
     }
   });
@@ -14175,21 +14187,47 @@ function renderFilteredStudentUpdates() {
   let html = '';
 
   if (events.length > 0) {
+    const eventThemes = [
+      { card: 'from-sky-50 via-cyan-50/70 to-white dark:from-sky-950/40 dark:via-slate-900 dark:to-slate-900 border-sky-200/80 dark:border-sky-800/60', badge: 'from-sky-500 to-teal-500', accent: 'text-sky-700 dark:text-sky-300' },
+      { card: 'from-violet-50 via-indigo-50/70 to-white dark:from-violet-950/40 dark:via-slate-900 dark:to-slate-900 border-violet-200/80 dark:border-violet-800/60', badge: 'from-violet-500 to-indigo-500', accent: 'text-violet-700 dark:text-violet-300' },
+      { card: 'from-rose-50 via-amber-50/60 to-white dark:from-rose-950/40 dark:via-slate-900 dark:to-slate-900 border-rose-200/80 dark:border-rose-800/60', badge: 'from-rose-500 to-amber-500', accent: 'text-rose-700 dark:text-rose-300' }
+    ];
     html += `
-      <div class="space-y-2 mb-3">
-        <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">Upcoming Events</h4>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          ${events.map(ev => `
-            <div onclick="openStudentNoticeModal('${ev._id}', 'event')" class="p-3.5 rounded-2xl bg-[var(--bg-page)] border border-cyan-500/30 hover:border-cyan-500 transition active:scale-98 cursor-pointer space-y-1.5 shadow-2xs">
-              <div class="flex items-center justify-between">
-                <span class="px-2 py-0.5 rounded-md bg-cyan-500 text-white font-black text-[9px] uppercase tracking-wider">${ev.status || 'Upcoming'}</span>
-                <span class="text-[10px] font-bold text-[var(--text-sub)]">${ev.date || ''}</span>
+      <div class="space-y-2.5 mb-4">
+        <div class="flex items-center gap-2 px-1">
+          <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center shadow-2xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </span>
+          <h4 class="text-xs font-black text-[var(--text-main)] uppercase tracking-wider">Upcoming Events</h4>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${events.map((ev, idx) => {
+            const theme = eventThemes[idx % eventThemes.length];
+            const dObj = ev.date ? new Date(ev.date) : null;
+            const validDate = dObj && !isNaN(dObj.getTime());
+            const dayNum = validDate ? dObj.getDate() : '--';
+            const monStr = validDate ? dObj.toLocaleDateString(undefined, { month: 'short' }).toUpperCase() : 'EVT';
+            return `
+            <div onclick="openStudentNoticeModal('${ev._id}', 'event')" class="relative overflow-hidden p-4 rounded-3xl bg-gradient-to-br ${theme.card} border hover:shadow-md transition active:scale-98 cursor-pointer shadow-xs">
+              <div class="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/50 dark:bg-white/5 pointer-events-none"></div>
+              <div class="relative flex items-start gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br ${theme.badge} text-white flex flex-col items-center justify-center shadow-sm flex-shrink-0">
+                  <span class="text-[9px] font-black tracking-wider opacity-90 leading-none">${monStr}</span>
+                  <span class="text-base font-black leading-tight">${dayNum}</span>
+                </div>
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="flex items-center justify-between gap-1.5">
+                    <span class="px-2 py-0.5 rounded-full bg-white/90 dark:bg-slate-800/90 ${theme.accent} font-black text-[9px] uppercase tracking-wider shadow-2xs">${ev.status || 'Upcoming'}</span>
+                    <span class="text-[10px] font-bold text-[var(--text-sub)]">${ev.date || ''}</span>
+                  </div>
+                  <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)] leading-snug">${escapeHtml(ev.name || '')}</h5>
+                  ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)] line-clamp-2 leading-relaxed">${escapeHtml(ev.description)}</p>` : ''}
+                  ${ev.location ? `<div class="inline-flex items-center gap-1 text-[10px] ${theme.accent} font-bold pt-0.5"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span>${escapeHtml(ev.location)}</span></div>` : ''}
+                </div>
               </div>
-              <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)]">${ev.name}</h5>
-              ${ev.description ? `<p class="text-[11px] text-[var(--text-sub)] line-clamp-2">${ev.description}</p>` : ''}
-              ${ev.location ? `<p class="text-[10px] text-cyan-700 dark:text-cyan-300 font-bold">Location: ${ev.location}</p>` : ''}
             </div>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -14198,23 +14236,47 @@ function renderFilteredStudentUpdates() {
   if (notices.length > 0) {
     html += `
       <div class="space-y-2.5">
-        <h4 class="text-xs font-black text-[var(--text-sub)] uppercase tracking-wider">School Circulars & Notices</h4>
-        ${notices.map(n => {
+        <div class="flex items-center gap-2 px-1">
+          <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-2xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </span>
+          <h4 class="text-xs font-black text-[var(--text-main)] uppercase tracking-wider">Announcements & Circulars</h4>
+        </div>
+        ${notices.map((n, idx) => {
           const isImp = n.priority === 'important';
           const dateStr = n.publishedAt ? new Date(n.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+          const cardBg = isImp
+            ? 'bg-gradient-to-br from-amber-50 via-orange-50/60 to-white dark:from-amber-950/35 dark:via-slate-900 dark:to-slate-900 border-amber-300/70 dark:border-amber-700/50'
+            : (idx % 2 === 0
+              ? 'bg-gradient-to-br from-teal-50/70 via-white to-sky-50/50 dark:from-teal-950/30 dark:via-slate-900 dark:to-slate-900 border-teal-200/70 dark:border-teal-800/50'
+              : 'bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border-indigo-200/70 dark:border-indigo-800/50');
+          const iconBg = isImp
+            ? 'from-amber-500 to-orange-500'
+            : (idx % 2 === 0 ? 'from-teal-500 to-cyan-500' : 'from-indigo-500 to-purple-500');
           return `
-            <div onclick="openStudentNoticeModal('${n._id}', 'announcement')" class="p-4 rounded-2xl ${isImp ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[var(--bg-page)] border-[var(--border-color)]'} border hover:border-[#245b70]/40 transition active:scale-98 cursor-pointer space-y-2 shadow-2xs">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                  ${isImp ? '<span class="px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] uppercase tracking-wider">Important</span>' : '<span class="px-2 py-0.5 rounded-md bg-slate-500/20 text-[var(--text-sub)] font-bold text-[9px]">Notice</span>'}
-                  <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)] truncate">${n.title}</h5>
+            <div onclick="openStudentNoticeModal('${n._id}', 'announcement')" class="relative overflow-hidden p-4 rounded-3xl ${cardBg} border hover:shadow-md transition active:scale-98 cursor-pointer space-y-2.5 shadow-xs">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-br ${iconBg} text-white flex items-center justify-center shadow-sm flex-shrink-0">
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                 </div>
-                <span class="text-[10px] text-[var(--text-sub)] font-medium flex-shrink-0">${dateStr}</span>
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="px-2 py-0.5 rounded-full ${isImp ? 'bg-amber-500 text-white' : 'bg-white/90 dark:bg-slate-800 text-[#245b70] dark:text-cyan-300 border border-slate-200/80 dark:border-slate-700'} font-black text-[9px] uppercase tracking-wider">${isImp ? 'Important' : 'Announcement'}</span>
+                    <span class="text-[10px] text-[var(--text-sub)] font-bold flex-shrink-0">${dateStr}</span>
+                  </div>
+                  <h5 class="text-xs sm:text-sm font-black text-[var(--text-main)] leading-snug">${escapeHtml(n.title || '')}</h5>
+                  <p class="text-xs text-[var(--text-main)] opacity-85 leading-relaxed whitespace-pre-line line-clamp-3">${escapeHtml(n.description || '')}</p>
+                </div>
               </div>
-              <p class="text-xs text-[var(--text-main)] opacity-90 leading-relaxed whitespace-pre-line line-clamp-3">${n.description}</p>
-              <div class="text-[10px] text-[var(--text-sub)] font-semibold pt-1 border-t border-[var(--border-color)]/50 flex items-center justify-between">
-                <span>Posted by: <b>${n.createdByName || 'Administration'}</b></span>
-                <span class="text-[#245b70] dark:text-cyan-400 font-bold">Read Full -></span>
+              <div class="text-[10px] text-[var(--text-sub)] font-semibold pt-2 border-t border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between">
+                <span class="inline-flex items-center gap-1">
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  <b>${escapeHtml(n.createdByName || 'Administration')}</b>
+                </span>
+                <span class="text-[#245b70] dark:text-cyan-400 font-black inline-flex items-center gap-1">
+                  <span>Read More</span>
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </span>
               </div>
             </div>
           `;
@@ -14483,7 +14545,36 @@ function showStudentExamResultsNotice() {
 }
 
 function printStudentIdCard() {
-  window.print();
+  const cardEl = document.getElementById('sp-printable-id-card');
+  if (!cardEl) {
+    window.print();
+    return;
+  }
+
+  let host = document.getElementById('sp-id-print-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'sp-id-print-host';
+    document.body.appendChild(host);
+  }
+  host.innerHTML = '';
+  const cloned = cardEl.cloneNode(true);
+  cloned.id = 'sp-printable-id-card-clone';
+  host.appendChild(cloned);
+
+  document.body.classList.add('printing-student-id-card');
+
+  const cleanup = () => {
+    document.body.classList.remove('printing-student-id-card');
+    if (host) host.innerHTML = '';
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
+  setTimeout(() => {
+    window.print();
+    setTimeout(cleanup, 1500);
+  }, 80);
 }
 
 function handleStudentLogout() {
@@ -14668,11 +14759,6 @@ function renderOutcomers(list) {
     const status = s.registrationStatus || 'pending';
     const isPending = status === 'pending';
     const isRejected = status === 'rejected';
-    const p = s.personalDetails || {};
-    const a = s.address || {};
-    const f = s.familyDetails || {};
-    const createdDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-    const fullAddr = [a.fullAddress, a.place, a.district, a.state, a.pinCode ? `PIN: ${a.pinCode}` : ''].filter(Boolean).join(', ') || 'No address provided';
 
     const borderClass = isPending
       ? 'border-amber-500/40'
@@ -14685,26 +14771,29 @@ function renderOutcomers(list) {
           : '<span class="px-2 py-0.5 rounded-lg bg-teal-600 text-white font-black text-[10px] uppercase tracking-wide whitespace-nowrap">Enrolled</span>');
 
     return `
-      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border ${borderClass} shadow-sm space-y-3.5 transition-all">
-        <!-- Top Row: Avatar, Info & Actions -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-color)] pb-3.5">
-          <div class="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border ${borderClass} shadow-sm transition-all">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
             <img src="${s.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(s.name)}" class="w-12 h-12 rounded-2xl object-cover border border-[var(--border-color)] bg-slate-200 flex-shrink-0">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <h4 class="font-black text-sm sm:text-base text-[var(--text-main)] truncate max-w-full">${escapeHtml(s.name)}</h4>
                 ${statusBadge}
               </div>
-              <div class="flex items-center gap-1.5 flex-wrap mt-1">
+              <div class="flex items-center gap-1.5 flex-wrap mt-1.5">
                 <span class="px-2 py-0.5 rounded-lg bg-[#245b70]/12 text-[#245b70] dark:text-cyan-300 font-extrabold text-[11px] whitespace-nowrap">Class: ${escapeHtml(s.class || 'Unassigned')}</span>
-                <span class="px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] font-bold text-[11px] whitespace-nowrap">Roll: #${s.roll ?? '-'}</span>
+                <span class="px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-main)] font-bold text-[11px] whitespace-nowrap">Roll: #${s.roll ?? '-'}</span>
+                <span class="px-2 py-0.5 rounded-lg bg-slate-500/10 text-[var(--text-sub)] font-bold text-[11px] whitespace-nowrap">ID: ${escapeHtml(String(s.studentId ?? '-'))}</span>
               </div>
-              <p class="text-[11px] text-[var(--text-sub)] font-medium mt-1 truncate">Submitted: ${createdDate}${p.studentEmail ? ` • ${escapeHtml(p.studentEmail)}` : ''}</p>
             </div>
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center gap-2 w-full sm:w-auto sm:flex-shrink-0 justify-end">
+          <div class="flex items-center gap-2 w-full sm:w-auto sm:flex-shrink-0 justify-end flex-wrap">
+            <button type="button" onclick="openOutcomerDetailsPage('${s._id}')" class="px-3.5 py-2 rounded-xl bg-[var(--bg-page)] hover:bg-[#245b70]/10 border border-[var(--border-color)] text-[var(--text-main)] font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 whitespace-nowrap">
+              <svg class="w-3.5 h-3.5 text-[#245b70] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              <span>Details</span>
+            </button>
             ${isPending ? `
               <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition whitespace-nowrap">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -14715,51 +14804,190 @@ function renderOutcomers(list) {
                 <span>Reject</span>
               </button>
             ` : (isRejected ? `
-              <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="px-3 py-1.5 rounded-xl bg-teal-600/15 hover:bg-teal-600/25 text-teal-700 dark:text-teal-300 font-bold text-xs flex items-center gap-1 transition whitespace-nowrap">
+              <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="px-3 py-2 rounded-xl bg-teal-600/15 hover:bg-teal-600/25 text-teal-700 dark:text-teal-300 font-bold text-xs flex items-center gap-1 transition whitespace-nowrap">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                 <span>Approve</span>
               </button>
-              <button type="button" onclick="triggerRejectOutcomer('${s._id}', true)" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1 transition whitespace-nowrap">
+              <button type="button" onclick="triggerRejectOutcomer('${s._id}', true)" class="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1 transition whitespace-nowrap">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 <span>Remove</span>
               </button>
-            ` : `
-              <span class="text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1.5 whitespace-nowrap">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>Active in Roster (ID: ${s.studentId || '-'})</span>
-              </span>
-            `)}
-          </div>
-        </div>
-
-        <!-- Details Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
-          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
-            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">DOB & Blood Group</span>
-            <p class="font-extrabold text-[var(--text-main)] mt-0.5">${p.dob || 'Not specified'} • ${p.bloodGroup || 'Blood: -'} (${p.gender || '-'})</p>
-          </div>
-          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
-            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Father's Contact</span>
-            <p class="font-extrabold text-[var(--text-main)] mt-0.5">
-              ${escapeHtml(f.fatherName || 'Not specified')} 
-              ${f.fatherMobile ? `<a href="tel:${f.fatherMobile}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${escapeHtml(f.fatherMobile)}</a>` : ''}
-            </p>
-          </div>
-          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)]">
-            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Mother's Contact</span>
-            <p class="font-extrabold text-[var(--text-main)] mt-0.5">
-              ${escapeHtml(f.motherName || 'Not specified')}
-              ${f.motherNumber ? `<a href="tel:${f.motherNumber}" class="text-[#245b70] dark:text-cyan-400 underline font-black ml-1 inline-flex items-center gap-1"><svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${escapeHtml(f.motherNumber)}</a>` : ''}
-            </p>
-          </div>
-          <div class="p-2.5 rounded-xl bg-[var(--bg-page)] border border-[var(--border-color)] sm:col-span-2 lg:col-span-3">
-            <span class="text-[10px] font-bold text-[var(--text-sub)] uppercase">Residential Address</span>
-            <p class="font-extrabold text-[var(--text-main)] mt-0.5">${escapeHtml(fullAddr)}</p>
+            ` : '')}
           </div>
         </div>
       </div>
     `;
   }).join('');
+}
+
+let currentOutcomerDetailsId = null;
+
+function openOutcomerDetailsPage(id) {
+  const s = currentOutcomersList.find(st => String(st._id) === String(id));
+  if (!s) {
+    showToast('Student submission not found');
+    return;
+  }
+  currentOutcomerDetailsId = s._id;
+
+  const status = s.registrationStatus || 'pending';
+  const isPending = status === 'pending';
+  const isRejected = status === 'rejected';
+  const p = s.personalDetails || {};
+  const a = s.address || {};
+  const f = s.familyDetails || {};
+  const ac = s.academicStatus || {};
+  const createdDate = s.createdAt
+    ? new Date(s.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '-';
+
+  const statusBadge = isPending
+    ? '<span class="px-2.5 py-1 rounded-full bg-amber-500 text-white font-black text-[10px] uppercase tracking-wider">Pending Verification</span>'
+    : (isRejected
+        ? '<span class="px-2.5 py-1 rounded-full bg-rose-600 text-white font-black text-[10px] uppercase tracking-wider">Not Approved</span>'
+        : '<span class="px-2.5 py-1 rounded-full bg-teal-600 text-white font-black text-[10px] uppercase tracking-wider">Enrolled</span>');
+
+  const actionsEl = document.getElementById('outcomer-details-actions');
+  if (actionsEl) {
+    if (isPending) {
+      actionsEl.innerHTML = `
+        <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition whitespace-nowrap">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Approve & Add</span>
+        </button>
+        <button type="button" onclick="triggerRejectOutcomer('${s._id}', false)" class="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1 transition active:scale-95 whitespace-nowrap">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <span>Reject</span>
+        </button>
+      `;
+    } else if (isRejected) {
+      actionsEl.innerHTML = `
+        <button type="button" onclick="openApproveOutcomerModal('${s._id}')" class="px-3.5 py-2 rounded-xl bg-teal-600/15 hover:bg-teal-600/25 text-teal-700 dark:text-teal-300 font-bold text-xs flex items-center gap-1.5 transition whitespace-nowrap">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Approve</span>
+        </button>
+        <button type="button" onclick="triggerRejectOutcomer('${s._id}', true)" class="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1.5 transition whitespace-nowrap">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <span>Remove</span>
+        </button>
+      `;
+    } else {
+      actionsEl.innerHTML = `
+        <span class="px-3 py-1.5 rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300 text-xs font-black flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Active in Roster</span>
+        </span>
+      `;
+    }
+  }
+
+  const fieldCard = (label, valueHtml) => `
+    <div class="p-3 rounded-2xl bg-[var(--bg-page)] border border-[var(--border-color)]">
+      <div class="text-[10px] font-bold text-[var(--text-sub)] uppercase tracking-wider">${label}</div>
+      <div class="text-xs font-extrabold text-[var(--text-main)] mt-1 break-words">${valueHtml || '-'}</div>
+    </div>
+  `;
+
+  const phoneLink = (num) => num
+    ? `<a href="tel:${escapeHtml(num)}" class="text-[#245b70] dark:text-cyan-400 underline font-black inline-flex items-center gap-1"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>${escapeHtml(num)}</a>`
+    : '-';
+
+  const contentEl = document.getElementById('outcomer-details-content');
+  if (contentEl) {
+    contentEl.innerHTML = `
+      <!-- Profile Hero Card -->
+      <div class="bg-[var(--card-bg)] rounded-3xl p-5 border border-[var(--border-color)] shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+        <img src="${s.photoUrl || DEFAULT_AVATAR}" alt="${escapeHtml(s.name)}" class="w-20 h-20 rounded-3xl object-cover border-2 border-[#245b70]/30 bg-slate-200 flex-shrink-0">
+        <div class="min-w-0 flex-1 space-y-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="text-lg sm:text-xl font-black text-[var(--text-main)]">${escapeHtml(s.name)}</h3>
+            ${statusBadge}
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2.5 py-1 rounded-xl bg-[#245b70]/12 text-[#245b70] dark:text-cyan-300 font-extrabold text-xs">Class: ${escapeHtml(s.class || 'Unassigned')}</span>
+            <span class="px-2.5 py-1 rounded-xl bg-slate-500/10 text-[var(--text-main)] font-bold text-xs">Roll: #${s.roll ?? '-'}</span>
+            <span class="px-2.5 py-1 rounded-xl bg-slate-500/10 text-[var(--text-sub)] font-bold text-xs">ID: ${escapeHtml(String(s.studentId ?? '-'))}</span>
+          </div>
+          <p class="text-[11px] text-[var(--text-sub)] font-semibold">Submitted on ${escapeHtml(createdDate)}</p>
+        </div>
+      </div>
+
+      <!-- Personal Details -->
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-sm space-y-3">
+        <div class="flex items-center gap-2 text-xs font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span>Personal Information</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          ${fieldCard('Date of Birth', escapeHtml(p.dob || '-'))}
+          ${fieldCard('Gender', escapeHtml(p.gender || '-'))}
+          ${fieldCard('Blood Group', escapeHtml(p.bloodGroup || '-'))}
+          ${fieldCard('Student Email', escapeHtml(p.studentEmail || '-'))}
+          ${fieldCard('Student Phone', phoneLink(p.studentPhone))}
+        </div>
+      </div>
+
+      <!-- Family & Guardian Details -->
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-sm space-y-3">
+        <div class="flex items-center gap-2 text-xs font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Family & Guardian Details</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          ${fieldCard("Father's Name", escapeHtml(f.fatherName || '-'))}
+          ${fieldCard("Father's Mobile", phoneLink(f.fatherMobile))}
+          ${fieldCard("Mother's Name", escapeHtml(f.motherName || '-'))}
+          ${fieldCard("Mother's Mobile", phoneLink(f.motherNumber))}
+          ${fieldCard('Guardian', escapeHtml(f.guardian || '-'))}
+          ${fieldCard('Guardian Occupation', escapeHtml(f.guardianOccupation || '-'))}
+          ${f.guardian === 'Other' ? fieldCard('Guardian Name', escapeHtml(f.guardianName || '-')) : ''}
+          ${f.guardian === 'Other' ? fieldCard('Guardian Number', phoneLink(f.guardianNumber)) : ''}
+          ${f.guardian === 'Other' ? fieldCard('Guardian Relation', escapeHtml(f.guardianRelation || '-')) : ''}
+        </div>
+      </div>
+
+      <!-- Residential Address -->
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-sm space-y-3">
+        <div class="flex items-center gap-2 text-xs font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+          <span>Residential Address</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          <div class="sm:col-span-2 lg:col-span-3">${fieldCard('Full Address', escapeHtml(a.fullAddress || '-'))}</div>
+          ${fieldCard('Place', escapeHtml(a.place || '-'))}
+          ${fieldCard('District', escapeHtml(a.district || '-'))}
+          ${fieldCard('State', escapeHtml(a.state || '-'))}
+          ${fieldCard('PIN Code', escapeHtml(a.pinCode || '-'))}
+        </div>
+      </div>
+
+      <!-- Academic Details -->
+      <div class="bg-[var(--card-bg)] rounded-3xl p-4 sm:p-5 border border-[var(--border-color)] shadow-sm space-y-3">
+        <div class="flex items-center gap-2 text-xs font-black text-[#245b70] dark:text-cyan-400 uppercase tracking-wider">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+          <span>Academic Details</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          ${fieldCard('Admission No.', escapeHtml(ac.admissionNo || '-'))}
+          ${fieldCard('Admission Date', escapeHtml(ac.admissionDate || '-'))}
+          ${fieldCard('Year Joined', escapeHtml(ac.yearJoined || '-'))}
+          ${fieldCard('Admission Status', escapeHtml(ac.admissionStatus || '-'))}
+          ${ac.stream ? fieldCard('Stream', escapeHtml(ac.stream)) : ''}
+          ${ac.degreeYear ? fieldCard('Degree Year', escapeHtml(ac.degreeYear)) : ''}
+          ${fieldCard('Previous School / College', escapeHtml(ac.previousCollege || '-'))}
+          ${fieldCard('Rank / Merit', escapeHtml(ac.rank || '-'))}
+        </div>
+      </div>
+    `;
+  }
+
+  selectTab('outcomer-details');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goBackToOutcomersFromDetails() {
+  currentOutcomerDetailsId = null;
+  selectTab('outcomers');
 }
 
 function openApproveOutcomerModal(id) {
@@ -14846,6 +15074,9 @@ async function submitApproveOutcomer(e) {
       await loadOutcomers();
       await loadAttendanceRoster();
       renderStudentsDirectory();
+      if (currentActiveTab === 'outcomer-details') {
+        goBackToOutcomersFromDetails();
+      }
     } else {
       showToast(res.message || 'Approval failed');
     }
@@ -14875,6 +15106,9 @@ async function triggerRejectOutcomer(id, permanent = false) {
     if (res.success) {
       showToast(res.message || (permanent ? 'Submission removed' : 'Marked as Not Approved'));
       await loadOutcomers();
+      if (currentActiveTab === 'outcomer-details') {
+        goBackToOutcomersFromDetails();
+      }
     } else {
       showToast(res.message || 'Failed to update submission');
     }

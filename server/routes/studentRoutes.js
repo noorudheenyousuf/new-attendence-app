@@ -14,15 +14,19 @@ const { caseInsensitiveRegex } = require('../utils/caseHelper');
 // Helper: Compute next sequential roll number for a class (1..N)
 async function getNextRollForClass(className, scopeFilter = { isPrivate: { $ne: true } }) {
   if (!className || !String(className).trim()) return 1;
-  const highest = await Student.findOne({
+  const studentsInClass = await Student.find({
     ...scopeFilter,
     class: caseInsensitiveRegex(className),
-    registrationStatus: { $nin: ['pending', 'rejected'] },
+    registrationStatus: { $ne: 'rejected' },
     lifecycleStatus: { $nin: ['alumni', 'tc'] }
-  }).sort({ roll: -1 }).select('roll').lean();
-  return highest && Number.isFinite(Number(highest.roll)) && Number(highest.roll) > 0
-    ? Number(highest.roll) + 1
-    : 1;
+  }).select('roll').lean();
+
+  let maxRoll = 0;
+  for (const s of studentsInClass) {
+    const r = Number(s.roll);
+    if (Number.isFinite(r) && r > maxRoll) maxRoll = r;
+  }
+  return maxRoll + 1;
 }
 
 // Helper: Validate optional fields only when filled
@@ -195,7 +199,7 @@ router.get('/public-submit-meta', async (req, res) => {
       Class.find({ isPrivate: { $ne: true } }).sort({ order: 1, name: 1 }).select('name order').lean(),
       Student.find({
         isPrivate: { $ne: true },
-        registrationStatus: { $nin: ['pending', 'rejected'] },
+        registrationStatus: { $ne: 'rejected' },
         lifecycleStatus: { $nin: ['alumni', 'tc'] }
       }, 'class roll').lean()
     ]);
@@ -223,6 +227,21 @@ router.get('/public-submit-meta', async (req, res) => {
         nextRollByClass
       }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/students/public-next-roll
+// @desc    Live next roll number lookup for any selected class (used by public student submit & student app fallback)
+router.get('/public-next-roll', async (req, res) => {
+  try {
+    const className = String(req.query.class || '').trim();
+    if (!className) {
+      return res.status(400).json({ success: false, message: 'Class is required' });
+    }
+    const nextRoll = await getNextRollForClass(className, { isPrivate: { $ne: true } });
+    res.json({ success: true, class: className, nextRoll });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

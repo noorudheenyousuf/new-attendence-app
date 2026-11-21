@@ -1024,14 +1024,67 @@ input:checked + .switch-slider:before {
    STUDENT APP — LIGHT GREETING CARD & WHITE PVC STUDENT ID CARD
    ========================================================================== */
 .sp-light-greeting-card {
-  background: linear-gradient(135deg, #f0f9ff 0%, #ecfeff 52%, #f0fdf4 100%);
-  border: 1px solid #cfe8ee;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 60%, #f0f9ff 100%);
+  border: 1px solid #e2e8f0;
   color: #0f172a;
 }
 .dark .sp-light-greeting-card {
-  background: linear-gradient(135deg, rgba(30, 58, 72, 0.45) 0%, rgba(19, 78, 74, 0.35) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.72) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
   color: #f8fafc;
+}
+
+/* Decorative Updates Cards */
+.sp-update-hero {
+  background: linear-gradient(135deg, #f0f9ff 0%, #eef2ff 50%, #fdf2f8 100%);
+  border: 1px solid #dbeafe;
+}
+.dark .sp-update-hero {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.28) 0%, rgba(88, 28, 135, 0.22) 100%);
+  border: 1px solid rgba(129, 140, 248, 0.25);
+}
+
+/* Exact-Color Print-Only Student ID Card */
+#sp-id-print-host {
+  display: none;
+}
+@media print {
+  body.printing-student-id-card {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body.printing-student-id-card > *:not(#sp-id-print-host) {
+    display: none !important;
+  }
+  body.printing-student-id-card #sp-id-print-host {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 100vh !important;
+    padding: 12mm !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body.printing-student-id-card #sp-id-print-host * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body.printing-student-id-card #sp-id-print-host .sp-pvc-card {
+    box-shadow: none !important;
+    border: 1.5px solid #94a3b8 !important;
+    max-width: 440px !important;
+    width: 440px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 }
 
 /* Authentic White PVC Student ID Card (CR80 Landscape Proportion) */

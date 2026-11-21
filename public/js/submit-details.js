@@ -92,17 +92,48 @@
     showFormError('');
   }
 
-  function handlePublicClassChange() {
-    const cls = document.getElementById('pub-class')?.value || '';
+  async function handlePublicClassChange() {
+    const cls = document.getElementById('pub-class')?.value?.trim() || '';
     const rollInput = document.getElementById('pub-roll');
-    if (rollInput) {
-      rollInput.value = cls && nextRollByClass[cls] ? String(nextRollByClass[cls]) : 'Auto';
-    }
+
     const lower = cls.toLowerCase();
     const wrapStream = document.getElementById('pub-wrap-stream');
     const wrapDeg = document.getElementById('pub-wrap-degreeYear');
     if (wrapStream) wrapStream.classList.toggle('hidden', !(lower.includes('plus') || lower.includes('+1') || lower.includes('+2')));
     if (wrapDeg) wrapDeg.classList.toggle('hidden', !lower.includes('degree'));
+
+    if (!rollInput) return;
+    if (!cls) {
+      rollInput.value = '';
+      rollInput.placeholder = 'Select class';
+      return;
+    }
+
+    // Show cached next roll immediately while fetching live next roll from server
+    if (nextRollByClass[cls]) {
+      rollInput.value = String(nextRollByClass[cls]);
+    } else {
+      rollInput.value = '';
+      rollInput.placeholder = 'Calculating...';
+    }
+
+    try {
+      const res = await fetch(`/api/students/public-next-roll?class=${encodeURIComponent(cls)}`);
+      const json = await res.json();
+      if (json && json.success && Number.isFinite(Number(json.nextRoll))) {
+        nextRollByClass[cls] = Number(json.nextRoll);
+        // Only apply if user hasn't switched to another class mid-request
+        const currentCls = document.getElementById('pub-class')?.value?.trim() || '';
+        if (currentCls === cls) {
+          rollInput.value = String(json.nextRoll);
+        }
+      }
+    } catch (err) {
+      console.warn('[Public Next Roll Lookup Error]', err);
+      if (!rollInput.value && nextRollByClass[cls]) {
+        rollInput.value = String(nextRollByClass[cls]);
+      }
+    }
   }
 
   function handlePublicDobChange() {
